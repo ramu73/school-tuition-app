@@ -14,7 +14,8 @@ import {
   IndianRupee,
   BookOpen,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Settings
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -89,15 +90,15 @@ export default function Navbar({
             <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Supabase Live') : 'Local Storage'}</span>
           </div>
 
-          {/* Database Settings (Admin Only) */}
+          {/* System Settings & Database (Admin Only) */}
           {currentUser?.role === USER_ROLES.ADMIN && (
             <button 
               onClick={onOpenSettings}
               className="btn btn-secondary btn-sm db-settings-btn"
-              title="Database & Supabase Configuration"
+              title="Database, Staff Passwords & System Settings"
             >
-              <Database size={14} />
-              <span>Database</span>
+              <Settings size={14} />
+              <span>Settings</span>
             </button>
           )}
 

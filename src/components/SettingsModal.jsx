@@ -1,11 +1,46 @@
 import React, { useState } from 'react';
-import { Database, Copy, Check, RefreshCw, Download, AlertTriangle, X, CloudUpload, Trash2 } from 'lucide-react';
+import { 
+  Database, 
+  Copy, 
+  Check, 
+  RefreshCw, 
+  Download, 
+  AlertTriangle, 
+  X, 
+  CloudUpload, 
+  Trash2,
+  ShieldCheck,
+  Key,
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  FolderArchive
+} from 'lucide-react';
 import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase } from '../lib/supabase';
-import { getSupabaseConfig, saveSupabaseConfig, getStoredData, saveStoredData, getEmptyTuitionData, INITIAL_CLASSES, INITIAL_BATCHES, INITIAL_STUDENTS, INITIAL_FEES, INITIAL_RECEIPTS, INITIAL_EXAMS, INITIAL_MARKS, INITIAL_ATTENDANCE } from '../lib/storage';
+import { 
+  getSupabaseConfig, 
+  saveSupabaseConfig, 
+  getStoredData, 
+  saveStoredData, 
+  getEmptyTuitionData, 
+  INITIAL_CLASSES, 
+  INITIAL_BATCHES, 
+  INITIAL_STUDENTS, 
+  INITIAL_FEES, 
+  INITIAL_RECEIPTS, 
+  INITIAL_EXAMS, 
+  INITIAL_MARKS, 
+  INITIAL_ATTENDANCE 
+} from '../lib/storage';
+import { getStaffAccounts, saveStaffAccounts } from '../lib/auth';
 
 export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   if (!isOpen) return null;
 
+  const [activeSettingsTab, setActiveSettingsTab] = useState('database');
+
+  // Supabase Config State
   const currentConfig = getSupabaseConfig();
   const [url, setUrl] = useState(currentConfig.url || '');
   const [anonKey, setAnonKey] = useState(currentConfig.anonKey || '');
@@ -13,6 +48,20 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   const [pushing, setPushing] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  // Staff Credentials State
+  const initialAccounts = getStaffAccounts();
+  const [adminUser, setAdminUser] = useState(initialAccounts.admin.username || 'admin');
+  const [adminPass, setAdminPass] = useState(initialAccounts.admin.password || 'admin123');
+  const [adminName, setAdminName] = useState(initialAccounts.admin.name || 'Tuition Director');
+  
+  const [teacherUser, setTeacherUser] = useState(initialAccounts.teacher.username || 'teacher');
+  const [teacherPass, setTeacherPass] = useState(initialAccounts.teacher.password || 'teacher123');
+  const [teacherName, setTeacherName] = useState(initialAccounts.teacher.name || 'Mr. R. Sharma');
+
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [showTeacherPass, setShowTeacherPass] = useState(false);
+  const [credSaved, setCredSaved] = useState(false);
 
   const handleTestAndSave = async (e) => {
     e.preventDefault();
@@ -58,6 +107,27 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
     } finally {
       setPushing(false);
     }
+  };
+
+  const handleSaveCredentials = (e) => {
+    e.preventDefault();
+    const updatedAccounts = {
+      admin: {
+        ...initialAccounts.admin,
+        username: adminUser.trim(),
+        password: adminPass.trim(),
+        name: adminName.trim()
+      },
+      teacher: {
+        ...initialAccounts.teacher,
+        username: teacherUser.trim(),
+        password: teacherPass.trim(),
+        name: teacherName.trim()
+      }
+    };
+    saveStaffAccounts(updatedAccounts);
+    setCredSaved(true);
+    setTimeout(() => setCredSaved(false), 3000);
   };
 
   const handleStartClean = async () => {
@@ -110,7 +180,6 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
       onClose();
     }
   };
-
 
   const sqlCode = `-- Run this in Supabase SQL Editor to create all tables with real-time replication:
 CREATE TABLE IF NOT EXISTS class_levels (
@@ -170,122 +239,274 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
   return (
     <div className="modal-overlay">
       <div className="modal-content settings-modal">
+        {/* Header */}
         <div className="modal-header">
           <div className="flex items-center gap-2">
-            <Database size={20} className="text-primary" />
-            <h2 className="modal-title">Database & Cloud Sync Settings</h2>
+            <ShieldCheck size={22} className="text-primary" />
+            <h2 className="modal-title">Settings & System Management</h2>
           </div>
           <button className="close-btn" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
 
-        {/* Supabase Config Form */}
-        <form onSubmit={handleTestAndSave} className="admission-form">
-          <div className="settings-notice">
-            <strong>Free Cloud PostgreSQL with Real-time:</strong> Enter your Supabase Project URL and Anon Key to activate permanent live real-time sync. If left empty, the app uses the built-in fast local real-time store.
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Supabase Project URL</label>
-            <input 
-              type="url"
-              className="form-input"
-              placeholder="https://your-project.supabase.co"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Supabase Anon Public API Key</label>
-            <input 
-              type="password"
-              className="form-input"
-              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-              value={anonKey}
-              onChange={(e) => setAnonKey(e.target.value)}
-            />
-          </div>
-
-          {testResult && (
-            <div className={`connection-alert ${testResult.success ? 'alert-success' : 'alert-danger'}`}>
-              {testResult.message}
-            </div>
-          )}
-
-          <div className="modal-actions-flex">
-            {currentConfig.isConnected && (
-              <button type="button" className="btn btn-danger btn-sm" onClick={handleDisconnect}>
-                Disconnect
-              </button>
-            )}
-            <button type="submit" className="btn btn-primary" disabled={testing || !url || !anonKey}>
-              {testing ? 'Testing...' : 'Test & Connect to Supabase'}
-            </button>
-          </div>
-        </form>
-
-        <hr className="divider mt-4 mb-4" />
-
-        {/* SQL Schema Copy Section */}
-        <div className="sql-section">
-          <div className="flex justify-between items-center mb-2">
-            <div className="font-semibold text-xs text-secondary">
-              Supabase SQL Table Schema & Realtime Setup:
-            </div>
-            <button className="btn btn-secondary btn-sm" onClick={copySql}>
-              {copiedSql ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
-              <span>{copiedSql ? 'Copied!' : 'Copy SQL Script'}</span>
-            </button>
-          </div>
-          <pre className="sql-snippet-box">
-            <code>{sqlCode}</code>
-          </pre>
+        {/* Modal Navigation Tabs */}
+        <div className="settings-nav-tabs">
+          <button 
+            type="button"
+            className={`settings-nav-btn ${activeSettingsTab === 'database' ? 'active' : ''}`}
+            onClick={() => setActiveSettingsTab('database')}
+          >
+            <Database size={15} />
+            <span>Supabase Cloud DB</span>
+          </button>
+          <button 
+            type="button"
+            className={`settings-nav-btn ${activeSettingsTab === 'security' ? 'active' : ''}`}
+            onClick={() => setActiveSettingsTab('security')}
+          >
+            <Key size={15} />
+            <span>Staff Passwords</span>
+          </button>
+          <button 
+            type="button"
+            className={`settings-nav-btn ${activeSettingsTab === 'backup' ? 'active' : ''}`}
+            onClick={() => setActiveSettingsTab('backup')}
+          >
+            <FolderArchive size={15} />
+            <span>Data & Backup</span>
+          </button>
         </div>
 
-        <hr className="divider mt-4 mb-4" />
+        {/* TAB 1: DATABASE & SUPABASE */}
+        {activeSettingsTab === 'database' && (
+          <div className="settings-tab-content">
+            <form onSubmit={handleTestAndSave} className="admission-form">
+              <div className="settings-notice">
+                <strong>Free Cloud PostgreSQL with Real-time:</strong> Enter your Supabase Project URL and Anon Key to activate permanent live real-time sync.
+              </div>
 
-        {/* Cloud Actions (if connected) */}
-        {currentConfig.isConnected && (
-          <div className="data-management-row mb-4">
-            <div>
-              <div className="font-semibold text-xs text-primary">Live Cloud Synchronization</div>
-              <div className="text-xs text-muted">Upload all current students, batches, and fees into your Supabase database</div>
+              <div className="form-group">
+                <label className="form-label">Supabase Project URL</label>
+                <input 
+                  type="url"
+                  className="form-input"
+                  placeholder="https://your-project.supabase.co"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Supabase Anon Public API Key</label>
+                <input 
+                  type="password"
+                  className="form-input"
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  value={anonKey}
+                  onChange={(e) => setAnonKey(e.target.value)}
+                />
+              </div>
+
+              {testResult && (
+                <div className={`connection-alert ${testResult.success ? 'alert-success' : 'alert-danger'}`}>
+                  {testResult.message}
+                </div>
+              )}
+
+              <div className="modal-actions-flex">
+                {currentConfig.isConnected && (
+                  <button type="button" className="btn btn-danger btn-sm" onClick={handleDisconnect}>
+                    Disconnect
+                  </button>
+                )}
+                <button type="submit" className="btn btn-primary" disabled={testing || !url || !anonKey}>
+                  {testing ? 'Testing...' : 'Test & Connect to Supabase'}
+                </button>
+              </div>
+            </form>
+
+            <hr className="divider mt-4 mb-4" />
+
+            {/* SQL Schema Copy Section */}
+            <div className="sql-section">
+              <div className="flex justify-between items-center mb-2">
+                <div className="font-semibold text-xs text-secondary">
+                  Supabase SQL Table Schema & Realtime Setup:
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={copySql}>
+                  {copiedSql ? <Check size={14} className="text-emerald" /> : <Copy size={14} />}
+                  <span>{copiedSql ? 'Copied!' : 'Copy SQL Script'}</span>
+                </button>
+              </div>
+              <pre className="sql-snippet-box">
+                <code>{sqlCode}</code>
+              </pre>
             </div>
-            <button 
-              type="button" 
-              className="btn btn-primary btn-sm" 
-              onClick={handlePushToSupabase}
-              disabled={pushing}
-            >
-              <CloudUpload size={14} />
-              <span>{pushing ? 'Uploading to Supabase...' : 'Push All Data to Supabase'}</span>
-            </button>
           </div>
         )}
 
-        {/* Data Backup & Reset */}
-        <div className="data-management-row">
-          <div>
-            <div className="font-semibold text-xs">Tuition Records Management</div>
-            <div className="text-xs text-muted">Start fresh with clean database or backup data</div>
+        {/* TAB 2: STAFF PASSWORDS & SECURITY */}
+        {activeSettingsTab === 'security' && (
+          <div className="settings-tab-content">
+            <form onSubmit={handleSaveCredentials} className="security-form">
+              <div className="settings-notice">
+                <strong>Protect Your Tuition Data:</strong> Change your Admin & Teacher login passwords here. Only authorized personnel with these credentials can access staff dashboards.
+              </div>
+
+              {credSaved && (
+                <div className="connection-alert alert-success">
+                  <Check size={16} />
+                  <span>Staff credentials updated successfully! Keep your new password secure.</span>
+                </div>
+              )}
+
+              {/* Admin Account Section */}
+              <div className="security-card">
+                <div className="security-card-header">
+                  <ShieldCheck size={16} className="text-primary" />
+                  <span className="font-semibold text-sm text-white">Admin Account (Director Access)</span>
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Admin Username</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="form-input" 
+                      value={adminUser} 
+                      onChange={(e) => setAdminUser(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Admin Password</label>
+                    <div className="input-with-icon-right">
+                      <input 
+                        type={showAdminPass ? 'text' : 'password'} 
+                        required 
+                        className="form-input" 
+                        value={adminPass} 
+                        onChange={(e) => setAdminPass(e.target.value)} 
+                      />
+                      <button 
+                        type="button" 
+                        className="pass-eye-btn" 
+                        onClick={() => setShowAdminPass(!showAdminPass)}
+                      >
+                        {showAdminPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Teacher Account Section */}
+              <div className="security-card mt-3">
+                <div className="security-card-header">
+                  <Key size={16} className="text-emerald" />
+                  <span className="font-semibold text-sm text-white">Teacher / Tutor Account</span>
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Teacher Username</label>
+                    <input 
+                      type="text" 
+                      required 
+                      className="form-input" 
+                      value={teacherUser} 
+                      onChange={(e) => setTeacherUser(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Teacher Password</label>
+                    <div className="input-with-icon-right">
+                      <input 
+                        type={showTeacherPass ? 'text' : 'password'} 
+                        required 
+                        className="form-input" 
+                        value={teacherPass} 
+                        onChange={(e) => setTeacherPass(e.target.value)} 
+                      />
+                      <button 
+                        type="button" 
+                        className="pass-eye-btn" 
+                        onClick={() => setShowTeacherPass(!showTeacherPass)}
+                      >
+                        {showTeacherPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button type="submit" className="btn btn-primary">
+                  <Check size={16} />
+                  <span>Save Updated Passwords</span>
+                </button>
+              </div>
+            </form>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <button className="btn btn-secondary btn-sm" onClick={handleExportJson}>
-              <Download size={13} />
-              <span>Backup JSON</span>
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={handleResetData} title="Restore standard 12 sample students">
-              <RefreshCw size={13} />
-              <span>Sample Demo</span>
-            </button>
-            <button className="btn btn-danger btn-sm" onClick={handleStartClean} title="Wipe out demo data and start with 0 students">
-              <Trash2 size={13} />
-              <span>Start Fresh (0 Students)</span>
-            </button>
+        )}
+
+        {/* TAB 3: DATA BACKUP & RESET */}
+        {activeSettingsTab === 'backup' && (
+          <div className="settings-tab-content">
+            {/* Cloud Push */}
+            {currentConfig.isConnected && (
+              <div className="backup-card mb-4">
+                <div>
+                  <div className="font-semibold text-sm text-primary">Live Cloud Push</div>
+                  <div className="text-xs text-muted">Upload and replace current tuition records directly into your Supabase database</div>
+                </div>
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-sm" 
+                  onClick={handlePushToSupabase}
+                  disabled={pushing}
+                >
+                  <CloudUpload size={14} />
+                  <span>{pushing ? 'Uploading...' : 'Push Data to Supabase'}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Export JSON */}
+            <div className="backup-card mb-3">
+              <div>
+                <div className="font-semibold text-sm text-white">Download Offline Backup</div>
+                <div className="text-xs text-muted">Save a complete JSON snapshot of all students, fees, and marks to your computer</div>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={handleExportJson}>
+                <Download size={14} />
+                <span>Backup JSON</span>
+              </button>
+            </div>
+
+            {/* Clear or Demo Reset */}
+            <div className="backup-card mb-3">
+              <div>
+                <div className="font-semibold text-sm text-amber">Reset to Demo Data</div>
+                <div className="text-xs text-muted">Load 12 sample demo students across classes 1 to 10 for testing</div>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={handleResetData}>
+                <RefreshCw size={14} />
+                <span>Load Demo Data</span>
+              </button>
+            </div>
+
+            <div className="backup-card danger-card">
+              <div>
+                <div className="font-semibold text-sm text-rose-400">Start Fresh with 0 Students</div>
+                <div className="text-xs text-muted">Wipes out all test/demo students & fee records so you can begin real admissions</div>
+              </div>
+              <button className="btn btn-danger btn-sm" onClick={handleStartClean}>
+                <Trash2 size={14} />
+                <span>Clear All Records</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
 
@@ -339,10 +560,98 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
           align-items: center;
           justify-content: space-between;
         }
+        .settings-nav-tabs {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 6px;
+          background: rgba(15, 23, 42, 0.6);
+          padding: 4px;
+          border-radius: var(--radius-lg);
+          border: 1px solid var(--border-subtle);
+          margin-bottom: 20px;
+        }
+        .settings-nav-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 9px 10px;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          border-radius: var(--radius-md);
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .settings-nav-btn:hover {
+          color: white;
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .settings-nav-btn.active {
+          color: white;
+          background: var(--primary-600);
+          box-shadow: 0 2px 10px rgba(79, 70, 229, 0.4);
+        }
+        .security-card {
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-lg);
+          padding: 16px;
+        }
+        .security-card-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+        .input-with-icon-right {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .input-with-icon-right .form-input {
+          padding-right: 36px;
+        }
+        .pass-eye-btn {
+          position: absolute;
+          right: 10px;
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px;
+        }
+        .pass-eye-btn:hover {
+          color: white;
+        }
+        .backup-card {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-lg);
+          padding: 14px 16px;
+          gap: 12px;
+        }
+        .danger-card {
+          border-color: rgba(244, 63, 94, 0.25);
+          background: rgba(244, 63, 94, 0.05);
+        }
         .flex { display: flex; }
         .justify-between { justify-content: space-between; }
+        .justify-end { justify-content: flex-end; }
         .items-center { align-items: center; }
         .gap-2 { gap: 8px; }
+        .mt-3 { margin-top: 12px; }
+        .mt-4 { margin-top: 16px; }
+        .mb-3 { margin-bottom: 12px; }
+        .mb-4 { margin-bottom: 16px; }
       `}</style>
     </div>
   );

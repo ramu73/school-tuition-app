@@ -11,15 +11,16 @@ export const USER_ROLES = {
   PARENT: 'PARENT'
 };
 
-// Default accounts
-export const DEFAULT_CREDENTIALS = {
+// Default staff accounts (baseline)
+export const INITIAL_STAFF_ACCOUNTS = {
   admin: {
     username: 'admin',
     password: 'admin123',
     pin: '1234',
     name: 'Tuition Director',
     role: USER_ROLES.ADMIN,
-    title: 'Administrator'
+    title: 'Administrator',
+    email: 'admin@hayagriva.edu'
   },
   teacher: {
     username: 'teacher',
@@ -27,9 +28,53 @@ export const DEFAULT_CREDENTIALS = {
     pin: '1234',
     name: 'Mr. R. Sharma',
     role: USER_ROLES.TEACHER,
-    title: 'Senior Faculty (Maths & Physics)'
+    title: 'Senior Faculty (Maths & Physics)',
+    email: 'teacher@hayagriva.edu'
   }
 };
+
+const STAFF_ACCOUNTS_KEY = 'hayagriva_staff_accounts_v1';
+
+// Get staff credentials (customized or default)
+export function getStaffAccounts() {
+  try {
+    const raw = localStorage.getItem(STAFF_ACCOUNTS_KEY);
+    if (!raw) return INITIAL_STAFF_ACCOUNTS;
+    const parsed = JSON.parse(raw);
+    return {
+      admin: { ...INITIAL_STAFF_ACCOUNTS.admin, ...(parsed.admin || {}) },
+      teacher: { ...INITIAL_STAFF_ACCOUNTS.teacher, ...(parsed.teacher || {}) }
+    };
+  } catch (err) {
+    console.error('Failed to parse staff accounts:', err);
+    return INITIAL_STAFF_ACCOUNTS;
+  }
+}
+
+// Save customized staff credentials (Admin can update passwords/usernames)
+export function saveStaffAccounts(accounts) {
+  try {
+    localStorage.setItem(STAFF_ACCOUNTS_KEY, JSON.stringify(accounts));
+    window.dispatchEvent(new CustomEvent('hayagriva-staff-accounts-changed', { detail: accounts }));
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to save staff accounts:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Update single staff account password / info
+export function updateStaffAccount(role, updates) {
+  const accounts = getStaffAccounts();
+  if (role === USER_ROLES.ADMIN) {
+    accounts.admin = { ...accounts.admin, ...updates };
+  } else if (role === USER_ROLES.TEACHER) {
+    accounts.teacher = { ...accounts.teacher, ...updates };
+  } else {
+    return { success: false, message: 'Invalid role' };
+  }
+  return saveStaffAccounts(accounts);
+}
 
 // Get active session from storage
 export function getAuthSession() {
@@ -64,46 +109,60 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
   const cleanUser = (usernameOrEmail || '').trim().toLowerCase();
   const cleanPass = (password || '').trim();
 
+  if (!cleanUser || !cleanPass) {
+    return { success: false, message: 'Please enter both username and password.' };
+  }
+
+  const accounts = getStaffAccounts();
+
   if (requestedRole === USER_ROLES.ADMIN) {
-    if ((cleanUser === 'admin' || cleanUser === 'admin@hayagriva.edu') && 
-        (cleanPass === 'admin123' || cleanPass === '1234')) {
+    const adminAcc = accounts.admin;
+    const isUserMatch = cleanUser === adminAcc.username.toLowerCase() || 
+                        (adminAcc.email && cleanUser === adminAcc.email.toLowerCase());
+    const isPassMatch = cleanPass === adminAcc.password || (adminAcc.pin && cleanPass === adminAcc.pin);
+
+    if (isUserMatch && isPassMatch) {
       return {
         success: true,
         user: {
           id: 'admin-01',
-          username: 'admin',
-          name: 'Administrator',
+          username: adminAcc.username,
+          name: adminAcc.name || 'Administrator',
           role: USER_ROLES.ADMIN,
-          title: 'Tuition Director',
-          email: 'admin@hayagriva.edu'
+          title: adminAcc.title || 'Tuition Director',
+          email: adminAcc.email
         }
       };
     }
-    return { success: false, message: 'Invalid Admin username or password. (Default: admin / admin123)' };
+    return { success: false, message: 'Invalid Admin username or password. Please try again.' };
   }
 
   if (requestedRole === USER_ROLES.TEACHER) {
-    if ((cleanUser === 'teacher' || cleanUser === 'teacher@hayagriva.edu' || cleanUser === 'sharma') && 
-        (cleanPass === 'teacher123' || cleanPass === '1234')) {
+    const teacherAcc = accounts.teacher;
+    const isUserMatch = cleanUser === teacherAcc.username.toLowerCase() || 
+                        (teacherAcc.email && cleanUser === teacherAcc.email.toLowerCase());
+    const isPassMatch = cleanPass === teacherAcc.password || (teacherAcc.pin && cleanPass === teacherAcc.pin);
+
+    if (isUserMatch && isPassMatch) {
       return {
         success: true,
         user: {
           id: 'teacher-01',
-          username: 'teacher',
-          name: 'Mr. R. Sharma',
+          username: teacherAcc.username,
+          name: teacherAcc.name || 'Faculty Member',
           role: USER_ROLES.TEACHER,
-          title: 'Mathematics & Science Faculty',
-          email: 'teacher@hayagriva.edu'
+          title: teacherAcc.title || 'Senior Faculty',
+          email: teacherAcc.email
         }
       };
     }
-    return { success: false, message: 'Invalid Teacher username or password. (Default: teacher / teacher123)' };
+    return { success: false, message: 'Invalid Teacher username or password. Please try again.' };
   }
 
   return { success: false, message: 'Invalid role requested.' };
 }
 
-// Authenticate Parent via Mobile Number or Admission Number
+// Authenticate Parent strictly via registered Mobile Number or Admission Number
 export function authenticateParent(identifier, tuitionStudents = []) {
   const query = (identifier || '').trim().toLowerCase();
   if (!query) {
@@ -144,6 +203,6 @@ export function authenticateParent(identifier, tuitionStudents = []) {
 
   return {
     success: false,
-    message: 'Mobile number or admission number not found in registered tuition students.'
+    message: 'Mobile number or admission number not found in registered tuition students. Please contact the tuition office.'
   };
 }

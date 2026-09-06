@@ -7,32 +7,28 @@ import {
   User, 
   Phone, 
   ArrowRight, 
-  Sparkles, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession } from '../lib/auth';
 
 export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [activeRole, setActiveRole] = useState(USER_ROLES.ADMIN);
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
-  const [parentIdentifier, setParentIdentifier] = useState('9876543210');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [parentIdentifier, setParentIdentifier] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleRoleTabChange = (role) => {
     setActiveRole(role);
     setErrorMsg('');
-    if (role === USER_ROLES.ADMIN) {
-      setUsername('admin');
-      setPassword('admin123');
-    } else if (role === USER_ROLES.TEACHER) {
-      setUsername('teacher');
-      setPassword('teacher123');
-    } else if (role === USER_ROLES.PARENT) {
-      setParentIdentifier(students[0]?.parentPhone || '9876543210');
-    }
+    setUsername('');
+    setPassword('');
+    setParentIdentifier('');
   };
 
   const handleSubmit = (e) => {
@@ -54,43 +50,6 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         onLoginSuccess(res.user);
       } else {
         setErrorMsg(res.message);
-      }
-    }
-  };
-
-  // One-click quick login shortcuts
-  const handleQuickLogin = (role) => {
-    if (role === USER_ROLES.ADMIN) {
-      const res = authenticateStaff('admin', 'admin123', USER_ROLES.ADMIN);
-      if (res.success) {
-        setAuthSession(res.user);
-        onLoginSuccess(res.user);
-      }
-    } else if (role === USER_ROLES.TEACHER) {
-      const res = authenticateStaff('teacher', 'teacher123', USER_ROLES.TEACHER);
-      if (res.success) {
-        setAuthSession(res.user);
-        onLoginSuccess(res.user);
-      }
-    } else if (role === USER_ROLES.PARENT) {
-      const defaultPhone = students[0]?.parentPhone || '9876543210';
-      const res = authenticateParent(defaultPhone, students);
-      if (res.success) {
-        setAuthSession(res.user);
-        onLoginSuccess(res.user);
-      } else {
-        // Fallback parent profile if students list is empty
-        const fallbackParent = {
-          id: 'parent-demo',
-          name: 'Rajesh Kumar (Parent)',
-          role: USER_ROLES.PARENT,
-          parentPhone: '9876543210',
-          studentId: 1,
-          studentName: 'Aarav Kumar',
-          allChildren: [{ id: 1, name: 'Aarav Kumar', classCode: 'CLASS_10' }]
-        };
-        setAuthSession(fallbackParent);
-        onLoginSuccess(fallbackParent);
       }
     }
   };
@@ -154,26 +113,30 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 9876543210 or ADM-1001"
+                  autoFocus
+                  placeholder="Enter 10-digit mobile number"
                   value={parentIdentifier}
                   onChange={(e) => setParentIdentifier(e.target.value)}
                   className="form-input with-left-icon"
                 />
               </div>
-              <p className="field-hint">Enter the phone number provided during your child's tuition admission.</p>
+              <p className="field-hint">
+                Enter the mobile number given during your child's tuition admission. No password needed.
+              </p>
             </div>
           ) : (
             <>
               <div className="form-group">
                 <label className="form-label">
-                  {activeRole === USER_ROLES.ADMIN ? 'Admin Username / Email' : 'Teacher ID / Email'}
+                  {activeRole === USER_ROLES.ADMIN ? 'Admin Username or Email' : 'Teacher Username or Email'}
                 </label>
                 <div className="input-with-icon">
                   <User size={16} className="input-icon" />
                   <input
                     type="text"
                     required
-                    placeholder="Enter username"
+                    autoFocus
+                    placeholder={activeRole === USER_ROLES.ADMIN ? 'Enter admin username' : 'Enter teacher username'}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="form-input with-left-icon"
@@ -186,13 +149,22 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                 <div className="input-with-icon">
                   <Lock size={16} className="input-icon" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="Enter password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="form-input with-left-icon"
+                    className="form-input with-left-icon with-right-icon"
                   />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
             </>
@@ -204,36 +176,9 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           </button>
         </form>
 
-        {/* Quick Demo Login One-Click Buttons */}
-        <div className="quick-login-divider">
-          <span>OR ONE-CLICK DEMO ACCESS</span>
-        </div>
-
-        <div className="quick-login-grid">
-          <button 
-            type="button" 
-            className="quick-btn admin-quick"
-            onClick={() => handleQuickLogin(USER_ROLES.ADMIN)}
-          >
-            <ShieldCheck size={14} />
-            <span>Admin</span>
-          </button>
-          <button 
-            type="button" 
-            className="quick-btn teacher-quick"
-            onClick={() => handleQuickLogin(USER_ROLES.TEACHER)}
-          >
-            <GraduationCap size={14} />
-            <span>Teacher</span>
-          </button>
-          <button 
-            type="button" 
-            className="quick-btn parent-quick"
-            onClick={() => handleQuickLogin(USER_ROLES.PARENT)}
-          >
-            <Users size={14} />
-            <span>Parent</span>
-          </button>
+        <div className="login-security-footer">
+          <ShieldCheck size={13} className="text-muted" />
+          <span>Secure Tuition Portal • Hayagriva Tutorials</span>
         </div>
       </div>
 
@@ -367,64 +312,36 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           gap: 8px;
           margin-top: 6px;
         }
-        .quick-login-divider {
-          position: relative;
-          text-align: center;
-          margin: 24px 0 16px;
+        .with-right-icon {
+          padding-right: 38px !important;
         }
-        .quick-login-divider::before {
-          content: '';
+        .password-toggle-btn {
           position: absolute;
-          left: 0;
-          top: 50%;
-          width: 100%;
-          height: 1px;
-          background: var(--border-subtle);
-        }
-        .quick-login-divider span {
-          position: relative;
-          background: #111827;
-          padding: 0 12px;
-          font-size: 0.675rem;
-          font-weight: 700;
-          letter-spacing: 0.08em;
+          right: 12px;
+          background: transparent;
+          border: none;
           color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px;
+          border-radius: var(--radius-sm);
+          transition: color 0.2s ease;
         }
-        .quick-login-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 8px;
+        .password-toggle-btn:hover {
+          color: white;
         }
-        .quick-btn {
+        .login-security-footer {
+          margin-top: 24px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
-          padding: 8px 10px;
-          font-size: 0.775rem;
-          font-weight: 600;
-          border-radius: var(--radius-md);
-          border: 1px solid var(--border-subtle);
-          background: var(--bg-surface);
-          color: var(--text-secondary);
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .quick-btn:hover {
-          color: white;
-          transform: translateY(-1px);
-        }
-        .admin-quick:hover {
-          border-color: #6366F1;
-          background: rgba(99, 102, 241, 0.15);
-        }
-        .teacher-quick:hover {
-          border-color: #10B981;
-          background: rgba(16, 185, 129, 0.15);
-        }
-        .parent-quick:hover {
-          border-color: #F59E0B;
-          background: rgba(245, 158, 11, 0.15);
+          font-size: 0.725rem;
+          color: var(--text-muted);
+          border-top: 1px solid var(--border-subtle);
+          padding-top: 16px;
         }
       `}</style>
     </div>
