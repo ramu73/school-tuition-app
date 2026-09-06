@@ -12,26 +12,42 @@ import {
   CalendarDays,
   CheckSquare,
   IndianRupee,
-  BookOpen
+  BookOpen,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
+import { USER_ROLES } from '../lib/auth';
 
-export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupabaseLive, isSyncing }) {
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Students', icon: Users },
-    { id: 'batches', label: 'Batches & Timing', icon: CalendarDays },
-    { id: 'attendance', label: 'Attendance', icon: CheckSquare },
-    { id: 'fees', label: 'Fee Management', icon: IndianRupee },
-    { id: 'exams', label: 'Exams & Marks', icon: BookOpen }
+export default function Navbar({ 
+  activeTab, 
+  setActiveTab, 
+  onOpenSettings, 
+  isSupabaseLive, 
+  isSyncing,
+  currentUser,
+  onLogout 
+}) {
+  const allNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'students', label: 'Students', icon: Users, roles: [USER_ROLES.ADMIN] },
+    { id: 'batches', label: 'Batches & Timing', icon: CalendarDays, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'attendance', label: 'Attendance', icon: CheckSquare, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'fees', label: 'Fee Management', icon: IndianRupee, roles: [USER_ROLES.ADMIN] },
+    { id: 'exams', label: 'Exams & Marks', icon: BookOpen, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] }
   ];
+
+  // Filter navigation items by role
+  const navItems = currentUser?.role === USER_ROLES.PARENT 
+    ? [{ id: 'parent-portal', label: 'Student Portal', icon: Users }]
+    : allNavItems.filter(item => item.roles.includes(currentUser?.role || USER_ROLES.ADMIN));
 
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
         {/* Brand Logo & Name */}
-        <div className="navbar-brand" onClick={() => setActiveTab('dashboard')}>
+        <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
           <div className="brand-logo-box">
             <HayagrivaLogo size={38} showGlow={true} />
           </div>
@@ -62,9 +78,9 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
           })}
         </nav>
 
-
-        {/* Live Status & Database Settings */}
+        {/* User Profile, Live Status & Actions */}
         <div className="navbar-actions">
+          {/* Supabase Live Pill */}
           <div 
             className={`live-status-pill ${isSyncing ? 'syncing' : ''}`} 
             title={isSupabaseLive ? (isSyncing ? 'Syncing to Supabase PostgreSQL...' : 'Connected to Supabase PostgreSQL Realtime') : 'Running on Local Storage'}
@@ -73,16 +89,41 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
             <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Supabase Live') : 'Local Storage'}</span>
           </div>
 
+          {/* Database Settings (Admin Only) */}
+          {currentUser?.role === USER_ROLES.ADMIN && (
+            <button 
+              onClick={onOpenSettings}
+              className="btn btn-secondary btn-sm db-settings-btn"
+              title="Database & Supabase Configuration"
+            >
+              <Database size={14} />
+              <span>Database</span>
+            </button>
+          )}
+
+          {/* Current User Badge */}
+          {currentUser && (
+            <div className="current-user-badge">
+              {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={14} className="text-primary" />}
+              {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={14} className="text-emerald" />}
+              {currentUser.role === USER_ROLES.PARENT && <Users size={14} className="text-amber" />}
+              <span className="user-badge-name">{currentUser.name}</span>
+              <span className="user-role-tag">{currentUser.role}</span>
+            </div>
+          )}
+
+          {/* Logout Button */}
           <button 
-            onClick={onOpenSettings}
-            className="btn btn-secondary btn-sm db-settings-btn"
-            title="Database & Supabase Configuration"
+            onClick={onLogout}
+            className="btn btn-secondary btn-sm logout-nav-btn"
+            title="Sign out"
           >
-            <Database size={14} />
-            <span>Database</span>
+            <LogOut size={14} />
+            <span>Logout</span>
           </button>
         </div>
       </div>
+
 
       <style>{`
         .navbar-container {
@@ -223,8 +264,49 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
           font-size: 0.775rem;
           white-space: nowrap;
         }
+        .current-user-badge {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          background: rgba(15, 23, 42, 0.6);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-full);
+          font-size: 0.775rem;
+        }
+        .user-badge-name {
+          font-weight: 600;
+          color: white;
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .user-role-tag {
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 1px 6px;
+          border-radius: var(--radius-full);
+          background: rgba(99, 102, 241, 0.2);
+          color: #C7D2FE;
+          text-transform: uppercase;
+        }
+        .logout-nav-btn {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          padding: 5px 10px;
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+        }
+        .logout-nav-btn:hover {
+          color: #FB7185;
+          border-color: rgba(244, 63, 94, 0.4);
+          background: rgba(244, 63, 94, 0.1);
+        }
         @media (max-width: 1080px) {
           .brand-subtitle { display: none; }
+          .user-badge-name { display: none; }
         }
         @media (max-width: 900px) {
           .nav-tab-btn span { display: none; }
@@ -232,6 +314,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
         }
       `}</style>
     </header>
+
 
   );
 }

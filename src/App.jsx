@@ -7,14 +7,19 @@ import Attendance from './components/Attendance';
 import Fees from './components/Fees';
 import Exams from './components/Exams';
 import SettingsModal from './components/SettingsModal';
+import LoginModal from './components/LoginModal';
+import ParentPortal from './components/ParentPortal';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase } from './lib/supabase';
+import { getAuthSession, clearAuthSession, USER_ROLES } from './lib/auth';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [currentUser, setCurrentUser] = useState(getAuthSession);
+  const [activeTab, setActiveTab] = useState(getAuthSession()?.role === USER_ROLES.PARENT ? 'parent-portal' : 'dashboard');
   const [data, setData] = useState(getStoredData);
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [isSyncing, setIsSyncing] = useState(false);
+
 
   // Shared Modals
   const [admitModalOpen, setAdmitModalOpen] = useState(false);
@@ -135,6 +140,22 @@ export default function App() {
     }
   };
 
+  if (!currentUser) {
+    return (
+      <LoginModal 
+        students={data.students}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          if (user.role === USER_ROLES.PARENT) {
+            setActiveTab('parent-portal');
+          } else {
+            setActiveTab('dashboard');
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Top Navigation Bar */}
@@ -144,71 +165,85 @@ export default function App() {
         onOpenSettings={() => setSettingsModalOpen(true)}
         isSupabaseLive={isSupabaseLive}
         isSyncing={isSyncing}
+        currentUser={currentUser}
+        onLogout={() => {
+          clearAuthSession();
+          setCurrentUser(null);
+        }}
       />
 
-
-      {/* Main Content View based on Active Tab */}
+      {/* Main Content View based on Active Tab & User Role */}
       <main className="main-content">
-        {activeTab === 'dashboard' && (
-          <Dashboard 
-            data={data} 
-            setActiveTab={setActiveTab}
-            setSelectedClassFilter={setSelectedClassFilter}
-            onOpenAdmitModal={() => setAdmitModalOpen(true)}
-            onOpenFeeCollectModal={() => setFeeCollectModalOpen(true)}
-          />
-        )}
+        {/* Parent Portal View */}
+        {currentUser.role === USER_ROLES.PARENT ? (
+          <ParentPortal currentUser={currentUser} data={data} />
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <Dashboard 
+                data={data} 
+                setActiveTab={setActiveTab}
+                setSelectedClassFilter={setSelectedClassFilter}
+                onOpenAdmitModal={() => currentUser?.role === USER_ROLES.ADMIN && setAdmitModalOpen(true)}
+                onOpenFeeCollectModal={() => currentUser?.role === USER_ROLES.ADMIN && setFeeCollectModalOpen(true)}
+              />
+            )}
 
-        {activeTab === 'students' && (
-          <Students 
-            data={data}
-            onSaveData={handleSaveData}
-            selectedClassFilter={selectedClassFilter}
-            setSelectedClassFilter={setSelectedClassFilter}
-            admitModalOpen={admitModalOpen}
-            setAdmitModalOpen={setAdmitModalOpen}
-          />
-        )}
+            {activeTab === 'students' && currentUser?.role === USER_ROLES.ADMIN && (
+              <Students 
+                data={data}
+                onSaveData={handleSaveData}
+                selectedClassFilter={selectedClassFilter}
+                setSelectedClassFilter={setSelectedClassFilter}
+                admitModalOpen={admitModalOpen}
+                setAdmitModalOpen={setAdmitModalOpen}
+              />
+            )}
 
-        {activeTab === 'batches' && (
-          <Batches 
-            data={data}
-            onSaveData={handleSaveData}
-            setActiveTab={setActiveTab}
-            setSelectedClassFilter={setSelectedClassFilter}
-          />
-        )}
+            {activeTab === 'batches' && (
+              <Batches 
+                data={data}
+                onSaveData={handleSaveData}
+                setActiveTab={setActiveTab}
+                setSelectedClassFilter={setSelectedClassFilter}
+              />
+            )}
 
-        {activeTab === 'attendance' && (
-          <Attendance 
-            data={data}
-            onSaveData={handleSaveData}
-          />
-        )}
+            {activeTab === 'attendance' && (
+              <Attendance 
+                data={data}
+                onSaveData={handleSaveData}
+              />
+            )}
 
-        {activeTab === 'fees' && (
-          <Fees 
-            data={data}
-            onSaveData={handleSaveData}
-            feeCollectModalOpen={feeCollectModalOpen}
-            setFeeCollectModalOpen={setFeeCollectModalOpen}
-          />
-        )}
+            {activeTab === 'fees' && currentUser?.role === USER_ROLES.ADMIN && (
+              <Fees 
+                data={data}
+                onSaveData={handleSaveData}
+                feeCollectModalOpen={feeCollectModalOpen}
+                setFeeCollectModalOpen={setFeeCollectModalOpen}
+              />
+            )}
 
-        {activeTab === 'exams' && (
-          <Exams 
-            data={data}
-            onSaveData={handleSaveData}
-          />
+            {activeTab === 'exams' && (
+              <Exams 
+                data={data}
+                onSaveData={handleSaveData}
+              />
+            )}
+          </>
         )}
       </main>
 
-      {/* Settings Modal */}
-      <SettingsModal 
-        isOpen={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-        onDataReset={(newData) => setData(newData)}
-      />
+      {/* Settings Modal (Admin Only) */}
+      {currentUser.role === USER_ROLES.ADMIN && (
+        <SettingsModal 
+          isOpen={settingsModalOpen}
+          onClose={() => setSettingsModalOpen(false)}
+          onDataReset={(newData) => setData(newData)}
+        />
+      )}
+
 
       {/* Footer */}
       <footer className="tuition-footer">
