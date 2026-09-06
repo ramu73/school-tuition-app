@@ -14,11 +14,13 @@ import {
   ShieldCheck, 
   FileText,
   Check,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 
-export default function ParentPortal({ currentUser, data }) {
+export default function ParentPortal({ currentUser, data, onLogout }) {
+
   const { students = [], classes = [], batches = [], fees = [], receipts = [], attendance = [], exams = [], marks = [] } = data;
 
   // Find all children belonging to this parent phone or ID
@@ -82,26 +84,37 @@ export default function ParentPortal({ currentUser, data }) {
             <p className="parent-sub">Monitoring academic performance & fee status at Hayagriva Tutorials</p>
           </div>
 
-          {/* If parent has multiple children enrolled */}
-          {myChildren.length > 1 && (
-            <div className="children-switcher">
-              <span className="switcher-label">Select Child:</span>
-              <div className="switcher-pills">
-                {myChildren.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedStudentId(c.id)}
-                    className={`child-pill ${c.id === currentStudent?.id ? 'active' : ''}`}
-                  >
-                    <User size={13} />
-                    <span>{c.name} ({classes.find(cls => cls.code === c.classCode)?.name || c.classCode})</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="portal-header-actions">
+            {onLogout && (
+              <button onClick={onLogout} className="btn btn-secondary btn-sm logout-portal-btn">
+                <LogOut size={14} />
+                <span>Logout</span>
+              </button>
+            )}
+          </div>
         </div>
+
+
+        {/* If parent has multiple children enrolled */}
+        {myChildren.length > 1 && (
+          <div className="children-switcher">
+            <span className="switcher-label">Select Child:</span>
+            <div className="switcher-pills">
+              {myChildren.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedStudentId(c.id)}
+                  className={`child-pill ${c.id === currentStudent?.id ? 'active' : ''}`}
+                >
+                  <User size={13} />
+                  <span>{c.name} ({classes.find(cls => cls.code === c.classCode)?.name || c.classCode})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
 
       {/* Student Profile Overview Card */}
       <div className="student-hero-card glass-card">

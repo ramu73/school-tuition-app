@@ -176,8 +176,16 @@ export default function App() {
       <main className="main-content">
         {/* Parent Portal View */}
         {currentUser.role === USER_ROLES.PARENT ? (
-          <ParentPortal currentUser={currentUser} data={data} />
+          <ParentPortal 
+            currentUser={currentUser} 
+            data={data} 
+            onLogout={() => {
+              clearAuthSession();
+              setCurrentUser(null);
+            }} 
+          />
         ) : (
+
           <>
             {activeTab === 'dashboard' && (
               <Dashboard 
