@@ -31,19 +31,21 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
     <header className="navbar-container">
       <div className="navbar-inner">
         {/* Brand Logo & Name */}
-        <div className="brand-wrapper" onClick={() => setActiveTab('dashboard')}>
-          <HayagrivaLogo size={38} showGlow={true} />
+        <div className="navbar-brand" onClick={() => setActiveTab('dashboard')}>
+          <div className="brand-logo-box">
+            <HayagrivaLogo size={38} showGlow={true} />
+          </div>
           <div className="brand-text">
             <div className="brand-title">
-              <span>HAYAGRIVA</span>
-              <span className="brand-badge">TUTORIALS</span>
+              <span>HAYAGRIVA TUTORIALS</span>
+              <span className="brand-tag">Class 1 to X</span>
             </div>
-            <div className="brand-tagline">Classes 1 to 10 Tuition Academy</div>
+            <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="nav-tabs" role="tablist">
+        <nav className="navbar-links" role="tablist">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -59,6 +61,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
             );
           })}
         </nav>
+
 
         {/* Live Status & Database Settings */}
         <div className="navbar-actions">
@@ -97,11 +100,13 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
           margin: 0 auto;
           padding: 10px 20px;
           display: flex;
+          flex-direction: row;
           align-items: center;
           justify-content: space-between;
           gap: 14px;
         }
-        .navbar-brand {
+        .navbar-brand,
+        .brand-wrapper {
           display: flex;
           align-items: center;
           gap: 12px;
@@ -123,7 +128,8 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
           gap: 8px;
           line-height: 1.2;
         }
-        .brand-tag {
+        .brand-tag,
+        .brand-badge {
           font-size: 0.65rem;
           font-weight: 700;
           padding: 2px 7px;
@@ -133,31 +139,36 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
           border-radius: var(--radius-full);
           text-transform: uppercase;
         }
-        .brand-subtitle {
+        .brand-subtitle,
+        .brand-tagline {
           font-size: 0.725rem;
           color: var(--text-secondary);
         }
-        .navbar-links {
-          display: flex;
-          align-items: center;
-          gap: 4px;
+        .navbar-links,
+        .nav-tabs {
+          display: flex !important;
+          flex-direction: row !important;
+          align-items: center !important;
+          gap: 6px;
           overflow-x: auto;
           padding: 2px;
           scrollbar-width: none !important;
           -ms-overflow-style: none !important;
         }
-        .navbar-links::-webkit-scrollbar {
+        .navbar-links::-webkit-scrollbar,
+        .nav-tabs::-webkit-scrollbar {
           display: none !important;
           width: 0 !important;
           height: 0 !important;
         }
         .nav-tab-btn {
-          display: flex;
+          display: inline-flex;
           align-items: center;
           gap: 6px;
           padding: 7px 12px;
           font-size: 0.8125rem;
           font-weight: 600;
+
           font-family: var(--font-body);
           border: 1px solid transparent;
           border-radius: var(--radius-md);
