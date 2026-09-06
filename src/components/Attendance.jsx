@@ -11,6 +11,9 @@ import {
   X,
   AlertTriangle
 } from 'lucide-react';
+import { generateNextId } from '../lib/storage';
+
+
 
 export default function Attendance({ data, onSaveData }) {
   const { students = [], batches = [], classes = [], attendance = [] } = data;
@@ -48,7 +51,7 @@ export default function Attendance({ data, onSaveData }) {
       };
     } else {
       updated.push({
-        id: Date.now() + Math.random(),
+        id: generateNextId(updated),
         studentId,
         date: selectedDate,
         status,
@@ -68,7 +71,7 @@ export default function Attendance({ data, onSaveData }) {
         updated[existingIndex] = { ...updated[existingIndex], status: 'PRESENT' };
       } else {
         updated.push({
-          id: Date.now() + Math.random(),
+          id: generateNextId(updated),
           studentId: student.id,
           date: selectedDate,
           status: 'PRESENT',
@@ -76,6 +79,7 @@ export default function Attendance({ data, onSaveData }) {
         });
       }
     });
+
 
     onSaveData({ ...data, attendance: updated });
   };

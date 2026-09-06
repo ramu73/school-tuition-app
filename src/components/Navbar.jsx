@@ -8,41 +8,42 @@ import {
   Receipt, 
   Award, 
   Database,
-  Radio
+  Radio,
+  CalendarDays,
+  CheckSquare,
+  IndianRupee,
+  BookOpen
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
 
-export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupabaseLive }) {
+export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupabaseLive, isSyncing }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Students (1–10)', icon: Users },
-    { id: 'batches', label: 'Batches', icon: Clock },
-    { id: 'attendance', label: 'Attendance', icon: CheckCircle2 },
-    { id: 'fees', label: 'Fees & Receipts', icon: Receipt },
-    { id: 'exams', label: 'Tests & Marks', icon: Award }
+    { id: 'students', label: 'Students', icon: Users },
+    { id: 'batches', label: 'Batches & Timing', icon: CalendarDays },
+    { id: 'attendance', label: 'Attendance', icon: CheckSquare },
+    { id: 'fees', label: 'Fee Management', icon: IndianRupee },
+    { id: 'exams', label: 'Exams & Marks', icon: BookOpen }
   ];
 
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
-        {/* Brand Logo & Title */}
-        <div className="navbar-brand" onClick={() => setActiveTab('dashboard')}>
-          <div className="brand-logo-box">
-            <HayagrivaLogo size={36} />
-          </div>
+        {/* Brand Logo & Name */}
+        <div className="brand-wrapper" onClick={() => setActiveTab('dashboard')}>
+          <HayagrivaLogo size={38} showGlow={true} />
           <div className="brand-text">
             <div className="brand-title">
-              HAYAGRIVA TUTORIALS <span className="brand-tag">Class 1 to X</span>
+              <span>HAYAGRIVA</span>
+              <span className="brand-badge">TUTORIALS</span>
             </div>
-            <div className="brand-subtitle">
-              LEARN • GROW • SUCCEED <span className="text-muted">| Hyderabad</span>
-            </div>
+            <div className="brand-tagline">Classes 1 to 10 Tuition Academy</div>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="navbar-links">
+        <nav className="nav-tabs" role="tablist">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -61,9 +62,12 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, isSupa
 
         {/* Live Status & Database Settings */}
         <div className="navbar-actions">
-          <div className="live-status-pill" title={isSupabaseLive ? 'Connected to Supabase PostgreSQL Realtime' : 'Running on Local Real-time Engine'}>
-            <Radio size={13} className="pulse-dot" />
-            <span>{isSupabaseLive ? 'Supabase Live' : 'Real-time Active'}</span>
+          <div 
+            className={`live-status-pill ${isSyncing ? 'syncing' : ''}`} 
+            title={isSupabaseLive ? (isSyncing ? 'Syncing to Supabase PostgreSQL...' : 'Connected to Supabase PostgreSQL Realtime') : 'Running on Local Storage'}
+          >
+            <Radio size={13} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
+            <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Supabase Live') : 'Local Storage'}</span>
           </div>
 
           <button 

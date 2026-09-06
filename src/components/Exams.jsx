@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Award, Plus, FileText, CheckCircle2, User, X, Check, BookOpen } from 'lucide-react';
+import { generateNextId } from '../lib/storage';
+
 
 export default function Exams({ data, onSaveData }) {
   const { exams = [], marks = [], students = [], classes = [] } = data;
@@ -35,7 +37,7 @@ export default function Exams({ data, onSaveData }) {
       return;
     }
 
-    const createdId = Date.now();
+    const createdId = generateNextId(exams);
     const createdExam = {
       id: createdId,
       title: newExamData.title,
@@ -80,13 +82,14 @@ export default function Exams({ data, onSaveData }) {
       };
     } else {
       updatedMarks.push({
-        id: Date.now() + Math.random(),
+        id: generateNextId(updatedMarks),
         examId: currentExam.id,
         studentId,
         marksObtained: val,
         remarks: val >= currentExam.passingMarks ? 'Passed' : 'Needs improvement'
       });
     }
+
 
     onSaveData({
       ...data,

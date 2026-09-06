@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Database, Copy, Check, RefreshCw, Download, AlertTriangle, X } from 'lucide-react';
-import { testSupabaseConnection } from '../lib/supabase';
-import { getSupabaseConfig, saveSupabaseConfig, INITIAL_CLASSES, INITIAL_BATCHES, INITIAL_STUDENTS, INITIAL_FEES, INITIAL_RECEIPTS, INITIAL_EXAMS, INITIAL_MARKS, INITIAL_ATTENDANCE } from '../lib/storage';
+import { Database, Copy, Check, RefreshCw, Download, AlertTriangle, X, CloudUpload, Trash2 } from 'lucide-react';
+import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase } from '../lib/supabase';
+import { getSupabaseConfig, saveSupabaseConfig, getStoredData, saveStoredData, getEmptyTuitionData, INITIAL_CLASSES, INITIAL_BATCHES, INITIAL_STUDENTS, INITIAL_FEES, INITIAL_RECEIPTS, INITIAL_EXAMS, INITIAL_MARKS, INITIAL_ATTENDANCE } from '../lib/storage';
 
 export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   if (!isOpen) return null;
@@ -10,6 +10,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   const [url, setUrl] = useState(currentConfig.url || '');
   const [anonKey, setAnonKey] = useState(currentConfig.anonKey || '');
   const [testing, setTesting] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [copiedSql, setCopiedSql] = useState(false);
 
@@ -39,7 +40,39 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
     });
     setUrl('');
     setAnonKey('');
-    setTestResult({ success: false, message: 'Disconnected. Switched back to local real-time storage.' });
+    setTestResult({ success: false, message: 'Disconnected. Switched back to local storage.' });
+  };
+
+  const handlePushToSupabase = async () => {
+    setPushing(true);
+    try {
+      const currentData = getStoredData();
+      const res = await syncTuitionDataToSupabase(currentData);
+      if (res.success) {
+        alert('All local tuition data successfully uploaded & synced to your Supabase PostgreSQL database!');
+      } else {
+        alert('Failed to upload data to Supabase: ' + (res.error || 'Check connection settings'));
+      }
+    } catch (err) {
+      alert('Error during cloud sync: ' + err.message);
+    } finally {
+      setPushing(false);
+    }
+  };
+
+  const handleStartClean = async () => {
+    if (window.confirm('Clear all sample students, fees, attendance, and exams to start fresh with 0 students? (Class 1 to 10 structure will be kept).')) {
+      const cleanData = getEmptyTuitionData();
+      saveStoredData(cleanData);
+      onDataReset(cleanData);
+
+      const config = getSupabaseConfig();
+      if (config.isConnected) {
+        await clearSupabaseDatabase();
+      }
+      alert('Cleared! Your tuition database is now clean with 0 students, ready for real student admissions.');
+      onClose();
+    }
   };
 
   const handleExportJson = () => {
@@ -55,7 +88,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   };
 
   const handleResetData = () => {
-    if (window.confirm('Reset all records to standard Class 1 to 10 demo data?')) {
+    if (window.confirm('Reset all records to standard Class 1 to 10 sample demo data?')) {
       const defaultData = {
         classes: INITIAL_CLASSES,
         batches: INITIAL_BATCHES,
@@ -66,12 +99,18 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
         marks: INITIAL_MARKS,
         attendance: INITIAL_ATTENDANCE
       };
-      localStorage.setItem('vidyatrack_tuition_data_v1', JSON.stringify(defaultData));
+      saveStoredData(defaultData);
       onDataReset(defaultData);
-      alert('Data reset successfully!');
+
+      const config = getSupabaseConfig();
+      if (config.isConnected) {
+        syncTuitionDataToSupabase(defaultData);
+      }
+      alert('Data reset to demo data successfully!');
       onClose();
     }
   };
+
 
   const sqlCode = `-- Run this in Supabase SQL Editor to create all tables with real-time replication:
 CREATE TABLE IF NOT EXISTS class_levels (
@@ -207,24 +246,48 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
 
         <hr className="divider mt-4 mb-4" />
 
+        {/* Cloud Actions (if connected) */}
+        {currentConfig.isConnected && (
+          <div className="data-management-row mb-4">
+            <div>
+              <div className="font-semibold text-xs text-primary">Live Cloud Synchronization</div>
+              <div className="text-xs text-muted">Upload all current students, batches, and fees into your Supabase database</div>
+            </div>
+            <button 
+              type="button" 
+              className="btn btn-primary btn-sm" 
+              onClick={handlePushToSupabase}
+              disabled={pushing}
+            >
+              <CloudUpload size={14} />
+              <span>{pushing ? 'Uploading to Supabase...' : 'Push All Data to Supabase'}</span>
+            </button>
+          </div>
+        )}
+
         {/* Data Backup & Reset */}
         <div className="data-management-row">
           <div>
-            <div className="font-semibold text-xs">Offline Backup & Reset</div>
-            <div className="text-xs text-muted">Export tuition records to JSON or reload sample data</div>
+            <div className="font-semibold text-xs">Tuition Records Management</div>
+            <div className="text-xs text-muted">Start fresh with clean database or backup data</div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button className="btn btn-secondary btn-sm" onClick={handleExportJson}>
               <Download size={13} />
-              <span>Export JSON</span>
+              <span>Backup JSON</span>
             </button>
-            <button className="btn btn-danger btn-sm" onClick={handleResetData}>
+            <button className="btn btn-secondary btn-sm" onClick={handleResetData} title="Restore standard 12 sample students">
               <RefreshCw size={13} />
-              <span>Reset Data</span>
+              <span>Sample Demo</span>
+            </button>
+            <button className="btn btn-danger btn-sm" onClick={handleStartClean} title="Wipe out demo data and start with 0 students">
+              <Trash2 size={13} />
+              <span>Start Fresh (0 Students)</span>
             </button>
           </div>
         </div>
       </div>
+
 
       <style>{`
         .settings-modal {

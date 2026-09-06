@@ -7,13 +7,14 @@ import Attendance from './components/Attendance';
 import Fees from './components/Fees';
 import Exams from './components/Exams';
 import SettingsModal from './components/SettingsModal';
-import { getStoredData, saveStoredData, getSupabaseConfig } from './lib/storage';
-import { getSupabaseClient } from './lib/supabase';
+import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
+import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase } from './lib/supabase';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [data, setData] = useState(getStoredData);
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Shared Modals
   const [admitModalOpen, setAdmitModalOpen] = useState(false);
@@ -23,7 +24,7 @@ export default function App() {
   // Supabase connection state
   const [isSupabaseLive, setIsSupabaseLive] = useState(getSupabaseConfig().isConnected);
 
-  // Sync data whenever changed locally or by real-time event
+  // Sync data whenever changed locally or by custom event
   useEffect(() => {
     const handleDbUpdate = (e) => {
       setData(e.detail || getStoredData());
@@ -42,19 +43,73 @@ export default function App() {
     };
   }, []);
 
-  // Supabase Real-Time Subscriptions Listener (when configured)
+  // Fetch remote database records from Supabase on mount / connection change
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFromSupabase = async () => {
+      const config = getSupabaseConfig();
+      if (!config.isConnected) return;
+
+      setIsSyncing(true);
+      try {
+        const remote = await fetchTuitionDataFromSupabase();
+        if (isMounted && remote) {
+          if (remote.hasData) {
+            setData(remote);
+            saveStoredData(remote);
+          } else {
+            console.log('Connected to Supabase PostgreSQL. Tables are ready.');
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase initial fetch warning:', err);
+      } finally {
+        if (isMounted) setIsSyncing(false);
+      }
+    };
+
+    loadFromSupabase();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSupabaseLive]);
+
+  // Supabase Real-Time Subscriptions Listener (cross-tab & multi-device sync)
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase) return;
 
-    // Listen to real-time changes on attendance, fee_records, and students
     const channel = supabase
       .channel('tuition-live-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, (payload) => {
-        console.log('Realtime Attendance Change:', payload);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fee_records' }, (payload) => {
-        console.log('Realtime Fee Change:', payload);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'batches' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fee_records' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
       })
       .subscribe();
 
@@ -63,9 +118,21 @@ export default function App() {
     };
   }, [isSupabaseLive]);
 
-  const handleSaveData = (updatedData) => {
+  const handleSaveData = async (updatedData) => {
     setData(updatedData);
     saveStoredData(updatedData);
+
+    const config = getSupabaseConfig();
+    if (config.isConnected) {
+      setIsSyncing(true);
+      try {
+        await syncTuitionDataToSupabase(updatedData);
+      } catch (err) {
+        console.error('Failed to sync to Supabase:', err);
+      } finally {
+        setIsSyncing(false);
+      }
+    }
   };
 
   return (
@@ -76,7 +143,9 @@ export default function App() {
         setActiveTab={setActiveTab} 
         onOpenSettings={() => setSettingsModalOpen(true)}
         isSupabaseLive={isSupabaseLive}
+        isSyncing={isSyncing}
       />
+
 
       {/* Main Content View based on Active Tab */}
       <main className="main-content">

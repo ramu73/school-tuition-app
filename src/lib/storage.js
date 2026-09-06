@@ -140,3 +140,28 @@ export function saveSupabaseConfig(config) {
   localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
   window.dispatchEvent(new CustomEvent('tuition-supabase-config-changed', { detail: config }));
 }
+
+// Generate clean positive integer IDs (< 2 billion) for PostgreSQL SERIAL compatibility
+export function generateNextId(items = []) {
+  if (!items || items.length === 0) return 1;
+  const max = items.reduce((m, item) => {
+    const num = Number(item?.id);
+    return !isNaN(num) && num < 2000000000 ? Math.max(m, num) : m;
+  }, 0);
+  return max + 1;
+}
+
+// Clean blank slate template (0 students, standard classes)
+export function getEmptyTuitionData() {
+  return {
+    classes: INITIAL_CLASSES,
+    batches: [],
+    students: [],
+    fees: [],
+    receipts: [],
+    exams: [],
+    marks: [],
+    attendance: []
+  };
+}
+

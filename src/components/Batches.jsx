@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, Plus, Users, UserCheck, MapPin, X, BookOpen, Trash2 } from 'lucide-react';
+import { generateNextId } from '../lib/storage';
 
 export default function Batches({ data, onSaveData, setActiveTab, setSelectedClassFilter }) {
   const { batches = [], students = [], classes = [] } = data;
@@ -24,7 +25,7 @@ export default function Batches({ data, onSaveData, setActiveTab, setSelectedCla
     }
 
     const created = {
-      id: Date.now(),
+      id: generateNextId(batches),
       name: newBatch.name,
       classCode: newBatch.classCode,
       timing: newBatch.timing,
@@ -32,6 +33,7 @@ export default function Batches({ data, onSaveData, setActiveTab, setSelectedCla
       room: newBatch.room,
       capacity: Number(newBatch.capacity) || 25
     };
+
 
     onSaveData({
       ...data,

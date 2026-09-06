@@ -15,6 +15,8 @@ import {
   IndianRupee,
   Award
 } from 'lucide-react';
+import { generateNextId } from '../lib/storage';
+
 
 export default function Students({ 
   data, 
@@ -75,7 +77,7 @@ export default function Students({
       setEditingStudent(null);
     } else {
       // Create new
-      const newId = Date.now();
+      const newId = generateNextId(students);
       const newStudent = {
         id: newId,
         admissionNo: formData.admissionNo || `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -94,7 +96,7 @@ export default function Students({
       // Also create current month fee record for this student
       const currentMonthYear = 'March 2026';
       const newFeeRecord = {
-        id: Date.now() + 1,
+        id: generateNextId(fees),
         studentId: newId,
         monthYear: currentMonthYear,
         amountDue: newStudent.monthlyFee,
@@ -103,6 +105,7 @@ export default function Students({
         status: 'PENDING',
         lastPaymentDate: null
       };
+
 
       onSaveData({
         ...data,

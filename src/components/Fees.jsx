@@ -21,7 +21,9 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
+import { generateNextId } from '../lib/storage';
 import HayagrivaLogo from './HayagrivaLogo';
+
 
 export default function Fees({ 
   data, 
@@ -123,7 +125,7 @@ export default function Fees({
       const monthlyFee = student?.monthlyFee || amountNum;
       const balance = Math.max(monthlyFee - amountNum, 0);
       updatedFees.push({
-        id: Date.now(),
+        id: generateNextId(fees),
         studentId: sId,
         monthYear: currentMonth,
         amountDue: monthlyFee,
@@ -137,7 +139,7 @@ export default function Fees({
     }
 
     const newReceipt = {
-      id: Date.now() + 2,
+      id: generateNextId(receipts),
       receiptNo: receiptNumber,
       studentId: sId,
       studentName: student?.name || 'Student',
@@ -149,6 +151,7 @@ export default function Fees({
       transactionRef: transactionRef || `${paymentMode}-OFFLINE`,
       notes: feeNotes || 'Monthly tuition fee'
     };
+
 
     onSaveData({
       ...data,
