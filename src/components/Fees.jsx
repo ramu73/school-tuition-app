@@ -947,28 +947,145 @@ export default function Fees({
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.7; transform: scale(0.96); }
         }
-
+        .fee-filters-card {
+          padding: 14px 18px;
+          margin-bottom: 20px;
+          background: rgba(17, 24, 39, 0.7);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-lg);
+        }
+        .filters-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+        .status-pills {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .pill-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          border-radius: var(--radius-full);
+          background: var(--bg-surface);
+          border: 1px solid var(--border-subtle);
+          color: var(--text-secondary);
+          font-family: var(--font-body);
+          font-size: 0.8125rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        }
+        .pill-btn:hover {
+          color: var(--text-primary);
+          border-color: var(--primary-500);
+          background: rgba(99, 102, 241, 0.12);
+        }
+        .pill-btn.active {
+          background: var(--primary-600);
+          border-color: var(--primary-500);
+          color: white;
+          box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+        }
         .pill-danger {
-          color: #FB7185 !important;
+          color: #FB7185;
+          border-color: rgba(244, 63, 94, 0.3);
+        }
+        .pill-danger:hover {
+          background: rgba(244, 63, 94, 0.12);
+          border-color: #FB7185;
         }
         .pill-danger.active {
           background: var(--rose-600) !important;
+          border-color: var(--rose-500) !important;
           color: white !important;
+          box-shadow: 0 2px 8px rgba(225, 29, 72, 0.4);
         }
         .pill-warning {
-          color: #FBBF24 !important;
+          color: #FBBF24;
+          border-color: rgba(245, 158, 11, 0.3);
+        }
+        .pill-warning:hover {
+          background: rgba(245, 158, 11, 0.12);
+          border-color: #FBBF24;
         }
         .pill-warning.active {
           background: var(--amber-600) !important;
+          border-color: var(--amber-500) !important;
           color: white !important;
+          box-shadow: 0 2px 8px rgba(217, 119, 6, 0.4);
         }
         .pill-success {
-          color: #34D399 !important;
+          color: #34D399;
+          border-color: rgba(16, 185, 129, 0.3);
+        }
+        .pill-success:hover {
+          background: rgba(16, 185, 129, 0.12);
+          border-color: #34D399;
         }
         .pill-success.active {
           background: var(--emerald-600) !important;
+          border-color: var(--emerald-500) !important;
           color: white !important;
+          box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4);
         }
+        .class-filter-box {
+          flex-shrink: 0;
+        }
+        .select-class-sm {
+          width: auto;
+          min-width: 190px;
+          background: var(--bg-surface);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 7px 12px;
+          color: var(--text-primary);
+          font-size: 0.8125rem;
+          font-weight: 500;
+          outline: none;
+          cursor: pointer;
+        }
+        .select-class-sm:focus {
+          border-color: var(--primary-500);
+        }
+        .search-box-wrapper {
+          flex: 1;
+          min-width: 220px;
+          max-width: 320px;
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+        .search-icon {
+          position: absolute;
+          left: 12px;
+          color: var(--text-muted);
+          pointer-events: none;
+        }
+        .search-input {
+          width: 100%;
+          background: var(--bg-surface);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 7px 12px 7px 36px;
+          color: var(--text-primary);
+          font-size: 0.8125rem;
+          font-family: var(--font-body);
+          outline: none;
+          transition: border-color 0.2s ease;
+        }
+        .search-input:focus {
+          border-color: var(--primary-500);
+          box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+        }
+
 
         .whatsapp-btn-icon {
           display: inline-flex;
