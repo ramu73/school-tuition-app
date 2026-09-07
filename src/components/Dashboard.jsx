@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Users, 
   CheckCircle, 
@@ -9,11 +9,14 @@ import {
   UserPlus, 
   Receipt, 
   Clock, 
-  BookOpen,
-  MessageSquare,
-  Bell,
-  AlertTriangle,
-  Award
+  BookOpen, 
+  MessageSquare, 
+  Bell, 
+  AlertTriangle, 
+  Award,
+  Edit3,
+  X,
+  Check
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
@@ -22,6 +25,7 @@ import { USER_ROLES } from '../lib/auth';
 export default function Dashboard({ 
   data, 
   currentUser,
+  onSaveData,
   setActiveTab, 
   setSelectedClassFilter, 
   onOpenAdmitModal, 
@@ -29,6 +33,43 @@ export default function Dashboard({
 }) {
   const { students = [], batches = [], fees = [], attendance = [], classes = [], exams = [] } = data;
   const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
+
+  // State for Editing Standard Class Fees
+  const [editFeesModalOpen, setEditFeesModalOpen] = useState(false);
+  const [feeFormValues, setFeeFormValues] = useState({});
+  const [feeSaveSuccess, setFeeSaveSuccess] = useState(false);
+
+  const handleOpenEditFees = () => {
+    const vals = {};
+    classes.forEach(c => {
+      vals[c.code] = c.defaultFee;
+    });
+    setFeeFormValues(vals);
+    setEditFeesModalOpen(true);
+  };
+
+  const handleSaveClassFees = (e) => {
+    e.preventDefault();
+    const updatedClasses = classes.map(cls => ({
+      ...cls,
+      defaultFee: Number(feeFormValues[cls.code]) !== undefined && !isNaN(Number(feeFormValues[cls.code]))
+        ? Number(feeFormValues[cls.code])
+        : cls.defaultFee
+    }));
+
+    if (onSaveData) {
+      onSaveData({
+        ...data,
+        classes: updatedClasses
+      });
+    }
+
+    setFeeSaveSuccess(true);
+    setTimeout(() => {
+      setFeeSaveSuccess(false);
+      setEditFeesModalOpen(false);
+    }, 1200);
+  };
 
   // 1. Calculations
   const activeStudents = students.filter(s => s.status === 'ACTIVE');
@@ -339,18 +380,31 @@ export default function Dashboard({
           <div className="card-header-flex">
             <div>
               <h2 className="card-title">Enrolled Students (Class 1 to X)</h2>
-              <p className="card-subtitle">Click on any class to instantly view student roster</p>
+              <p className="card-subtitle">Click on any class to view roster • Click fee rate to change amount</p>
             </div>
-            <button 
-              className="btn btn-secondary btn-sm"
-              onClick={() => { 
-                setSelectedClassFilter('ALL'); 
-                setActiveTab(isTeacher ? 'batches' : 'students'); 
-              }}
-            >
-              <span>{isTeacher ? 'View Batches' : 'View All'}</span>
-              <ArrowUpRight size={14} />
-            </button>
+            <div className="flex items-center gap-2">
+              {!isTeacher && (
+                <button 
+                  type="button"
+                  className="btn btn-secondary btn-sm edit-fees-btn"
+                  onClick={handleOpenEditFees}
+                  title="Change Monthly Tuition Fee Rates for Classes 1 to 10"
+                >
+                  <Edit3 size={13} />
+                  <span>Edit Fees</span>
+                </button>
+              )}
+              <button 
+                className="btn btn-secondary btn-sm"
+                onClick={() => { 
+                  setSelectedClassFilter('ALL'); 
+                  setActiveTab(isTeacher ? 'batches' : 'students'); 
+                }}
+              >
+                <span>{isTeacher ? 'View Batches' : 'View All'}</span>
+                <ArrowUpRight size={14} />
+              </button>
+            </div>
           </div>
 
           <div className="classes-bar-grid">
@@ -375,8 +429,16 @@ export default function Dashboard({
                     </div>
                   </div>
                   {!isTeacher ? (
-                    <div className="class-fee-rate">
-                      ₹{cls.defaultFee}/mo
+                    <div 
+                      className="class-fee-rate clickable-fee-rate"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditFees();
+                      }}
+                      title="Click to edit class monthly tuition fee"
+                    >
+                      <span>₹{cls.defaultFee}/mo</span>
+                      <Edit3 size={11} className="fee-edit-hint-icon" />
                     </div>
                   ) : (
                     <div className="class-fee-rate text-xs text-muted">
@@ -437,6 +499,84 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
+      {/* Edit Class Fee Structure Modal (Admin Only) */}
+      {editFeesModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content edit-fees-modal">
+            <div className="modal-header">
+              <div className="flex items-center gap-2">
+                <IndianRupee size={22} className="text-emerald" />
+                <div>
+                  <h2 className="modal-title">Standard Tuition Fee Structure</h2>
+                  <div className="text-xs text-muted">Set default monthly fee for Classes 1 to 10</div>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="close-btn" 
+                onClick={() => setEditFeesModalOpen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveClassFees} className="mt-4">
+              <div className="settings-notice mb-3">
+                <strong>Standard Monthly Fees:</strong> These amounts appear on the Dashboard and automatically populate the monthly fee field when admitting new students in each class.
+              </div>
+
+              {feeSaveSuccess && (
+                <div className="connection-alert alert-success mb-3">
+                  <Check size={16} />
+                  <span>Fee rates updated successfully!</span>
+                </div>
+              )}
+
+              <div className="class-fee-inputs-grid">
+                {classes.map(cls => (
+                  <div key={cls.code} className="class-fee-input-card">
+                    <div className="fee-card-meta">
+                      <span className="font-bold text-sm text-white">{cls.name}</span>
+                      <span className="badge badge-class text-xs">{cls.category}</span>
+                    </div>
+                    <div className="fee-input-wrap">
+                      <span className="currency-prefix">₹</span>
+                      <input 
+                        type="number"
+                        min="0"
+                        step="50"
+                        required
+                        className="form-input font-mono"
+                        value={feeFormValues[cls.code] ?? cls.defaultFee}
+                        onChange={(e) => setFeeFormValues({
+                          ...feeFormValues,
+                          [cls.code]: e.target.value
+                        })}
+                      />
+                      <span className="month-suffix">/mo</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="modal-actions-flex mt-4">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setEditFeesModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <Check size={16} />
+                  <span>Save Fee Rates</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .dashboard-wrapper {
@@ -828,6 +968,76 @@ export default function Dashboard({
           align-items: center;
           gap: 5px;
           flex-shrink: 0;
+        }
+
+        .edit-fees-btn {
+          gap: 6px;
+        }
+        .clickable-fee-rate {
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 6px;
+          border-radius: var(--radius-sm);
+          transition: all 0.2s ease;
+        }
+        .clickable-fee-rate:hover {
+          background: rgba(16, 185, 129, 0.15);
+          text-decoration: underline;
+        }
+        .fee-edit-hint-icon {
+          opacity: 0.6;
+          transition: opacity 0.2s;
+        }
+        .clickable-fee-rate:hover .fee-edit-hint-icon {
+          opacity: 1;
+        }
+        .edit-fees-modal {
+          max-width: 620px;
+        }
+        .class-fee-inputs-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          gap: 12px;
+          max-height: 52vh;
+          overflow-y: auto;
+          padding-right: 4px;
+        }
+        .class-fee-input-card {
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .fee-card-meta {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .fee-input-wrap {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          max-width: 120px;
+        }
+        .currency-prefix {
+          font-weight: 700;
+          color: #34D399;
+          font-size: 0.9rem;
+        }
+        .month-suffix {
+          font-size: 0.725rem;
+          color: var(--text-muted);
+        }
+        .fee-input-wrap .form-input {
+          padding: 6px 8px;
+          font-size: 0.875rem;
+          text-align: right;
         }
 
         /* Mobile & Tablet Responsive Layout */

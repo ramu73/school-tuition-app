@@ -191,6 +191,7 @@ export default function App() {
               <Dashboard 
                 data={data} 
                 currentUser={currentUser}
+                onSaveData={handleSaveData}
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
                 onOpenAdmitModal={() => currentUser?.role === USER_ROLES.ADMIN && setAdmitModalOpen(true)}
