@@ -9,18 +9,23 @@ import {
   Users, 
   Check, 
   X,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  CheckCheck,
+  RotateCcw
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
+import { USER_ROLES } from '../lib/auth';
 
-
-
-export default function Attendance({ data, onSaveData }) {
+export default function Attendance({ data, currentUser, onSaveData }) {
   const { students = [], batches = [], classes = [], attendance = [] } = data;
+  const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedClass, setSelectedClass] = useState('CLASS_10');
   const [selectedBatchId, setSelectedBatchId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [saveIndicator, setSaveIndicator] = useState(false);
 
   // Filter batches for current class
   const classBatches = batches.filter(b => b.classCode === selectedClass);
@@ -33,12 +38,42 @@ export default function Attendance({ data, onSaveData }) {
     return true;
   });
 
-  // Get current attendance status for a student on selected date
-  const getAttendanceRecord = (studentId) => {
-    return attendance.find(a => a.studentId === studentId && a.date === selectedDate);
+  // Default Assumption: In tuition, all students are PRESENT unless explicitly marked ABSENT or LATE
+  const getStudentStatus = (studentId) => {
+    const record = attendance.find(a => a.studentId === studentId && a.date === selectedDate);
+    if (!record) return 'PRESENT';
+    return record.status || 'PRESENT';
   };
 
-  // Toggle or set status
+  // 1-Tap Toggle: Present ↔ Absent ("Only absent will take")
+  const handleToggleAbsent = (studentId) => {
+    const currentStatus = getStudentStatus(studentId);
+    const newStatus = currentStatus === 'ABSENT' ? 'PRESENT' : 'ABSENT';
+
+    const existingIndex = attendance.findIndex(a => a.studentId === studentId && a.date === selectedDate);
+    let updated = [...attendance];
+
+    if (existingIndex >= 0) {
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        status: newStatus,
+        batchId: eligibleStudents.find(s => s.id === studentId)?.batchId
+      };
+    } else {
+      updated.push({
+        id: generateNextId(updated),
+        studentId,
+        date: selectedDate,
+        status: newStatus,
+        batchId: eligibleStudents.find(s => s.id === studentId)?.batchId
+      });
+    }
+
+    onSaveData({ ...data, attendance: updated });
+    triggerSaveIndicator();
+  };
+
+  // Optional: Set specific status (Present, Absent, Late)
   const handleSetStatus = (studentId, status) => {
     const existingIndex = attendance.findIndex(a => a.studentId === studentId && a.date === selectedDate);
     let updated = [...attendance];
@@ -60,10 +95,11 @@ export default function Attendance({ data, onSaveData }) {
     }
 
     onSaveData({ ...data, attendance: updated });
+    triggerSaveIndicator();
   };
 
-  // One-click Mark All Present
-  const handleMarkAllPresent = () => {
+  // One-click: Reset All Students to Present (Clears all absentees)
+  const handleResetAllPresent = () => {
     let updated = [...attendance];
     eligibleStudents.forEach(student => {
       const existingIndex = updated.findIndex(a => a.studentId === student.id && a.date === selectedDate);
@@ -80,43 +116,65 @@ export default function Attendance({ data, onSaveData }) {
       }
     });
 
-
     onSaveData({ ...data, attendance: updated });
+    triggerSaveIndicator();
   };
 
-  // Stats for current selection
-  const markedRecords = eligibleStudents.map(s => getAttendanceRecord(s.id)).filter(Boolean);
-  const presentCount = markedRecords.filter(r => r.status === 'PRESENT').length;
-  const absentCount = markedRecords.filter(r => r.status === 'ABSENT').length;
-  const lateCount = markedRecords.filter(r => r.status === 'LATE').length;
+  const triggerSaveIndicator = () => {
+    setSaveIndicator(true);
+    setTimeout(() => setSaveIndicator(false), 2200);
+  };
+
+  // Stats calculation
+  const absentStudents = eligibleStudents.filter(s => getStudentStatus(s.id) === 'ABSENT');
+  const lateStudents = eligibleStudents.filter(s => getStudentStatus(s.id) === 'LATE');
+  const presentCount = eligibleStudents.length - absentStudents.length - lateStudents.length;
+  const absentCount = absentStudents.length;
+  const lateCount = lateStudents.length;
   const attendancePercentage = eligibleStudents.length > 0 
     ? Math.round((presentCount / eligibleStudents.length) * 100) 
-    : 0;
+    : 100;
 
-  // Absentees list for WhatsApp parent communication
-  const absentees = eligibleStudents.filter(s => {
-    const rec = getAttendanceRecord(s.id);
-    return rec && rec.status === 'ABSENT';
+  // Filtered students based on search query
+  const displayStudents = eligibleStudents.filter(s => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return s.name.toLowerCase().includes(q) || (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
   });
 
   return (
     <div className="attendance-page">
+      {/* Header */}
       <div className="attendance-header">
         <div>
-          <h1 className="page-title">Daily Attendance Register</h1>
-          <p className="page-subtitle">Fast roll call and instant parent absentee alerts for Class 1 to 10</p>
+          <div className="flex items-center gap-2">
+            <h1 className="page-title">Daily Attendance Register</h1>
+            {saveIndicator && (
+              <span className="save-badge-pill animate-fade-in">
+                <Check size={13} /> Saved ✓
+              </span>
+            )}
+          </div>
+          <p className="page-subtitle">
+            <strong>Fast Mode:</strong> All students are marked Present by default. Simply tap on any student to mark them <strong>Absent</strong>.
+          </p>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={handleMarkAllPresent}
-          disabled={eligibleStudents.length === 0}
-        >
-          <Zap size={16} />
-          <span>Mark All Present</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button 
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={handleResetAllPresent}
+            title="Reset everyone in this class/batch to Present"
+            disabled={eligibleStudents.length === 0}
+          >
+            <RotateCcw size={14} />
+            <span>Reset All Present</span>
+          </button>
+        </div>
       </div>
 
-      {/* Selector Filters Bar */}
+      {/* Selector Controls Card */}
       <div className="glass-card attendance-controls-card">
         <div className="controls-grid">
           {/* Date Picker */}
@@ -158,7 +216,7 @@ export default function Attendance({ data, onSaveData }) {
               value={selectedBatchId}
               onChange={(e) => setSelectedBatchId(e.target.value)}
             >
-              <option value="">All Batches for {classes.find(c => c.code === selectedClass)?.name}</option>
+              <option value="">All Batches ({classBatches.length} slots)</option>
               {classBatches.map(b => (
                 <option key={b.id} value={b.id}>{b.name} ({b.timing})</option>
               ))}
@@ -170,13 +228,13 @@ export default function Attendance({ data, onSaveData }) {
         <div className="attendance-stats-bar mt-4">
           <div className="stat-pill stat-total">
             <Users size={15} />
-            <span>Enrolled: <strong>{eligibleStudents.length}</strong></span>
+            <span>Total Enrolled: <strong>{eligibleStudents.length}</strong></span>
           </div>
           <div className="stat-pill stat-present">
             <CheckCircle2 size={15} />
             <span>Present: <strong>{presentCount}</strong></span>
           </div>
-          <div className="stat-pill stat-absent">
+          <div className={`stat-pill stat-absent ${absentCount > 0 ? 'has-absent' : ''}`}>
             <XCircle size={15} />
             <span>Absent: <strong>{absentCount}</strong></span>
           </div>
@@ -190,75 +248,150 @@ export default function Attendance({ data, onSaveData }) {
             <span>Turnout: <strong>{attendancePercentage}%</strong></span>
           </div>
         </div>
+
+        {/* Quick Absentees Tray (Chips list for rapid visual confirmation & 1-tap undo) */}
+        {absentStudents.length > 0 && (
+          <div className="absentees-tray mt-3">
+            <div className="tray-label">
+              <XCircle size={14} className="text-rose" />
+              <span>Marked Absent Today ({absentStudents.length}):</span>
+            </div>
+            <div className="tray-chips">
+              {absentStudents.map(student => (
+                <button
+                  key={student.id}
+                  type="button"
+                  className="absentee-chip"
+                  onClick={() => handleToggleAbsent(student.id)}
+                  title="Tap to unmark (make Present)"
+                >
+                  <span className="chip-name">{student.name}</span>
+                  <X size={12} className="chip-remove-icon" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Split Layout: Attendance Table on Left + WhatsApp Absentee Alerts on Right */}
+      {/* Quick Search Input */}
+      <div className="search-bar-row">
+        <div className="search-input-box">
+          <Search size={16} className="search-icon" />
+          <input 
+            type="text"
+            className="form-input"
+            placeholder="Search student by name or roll number to mark..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className="search-clear-btn" onClick={() => setSearchQuery('')}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <div className="search-helper-text">
+          {displayStudents.length} of {eligibleStudents.length} students shown
+        </div>
+      </div>
+
+      {/* Split Layout: Attendance Table on Left + Absentee Sidebar on Right */}
       <div className="attendance-split-layout">
         {/* Student Roll Call Table */}
         <div className="table-container flex-1">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Roll No</th>
+                <th style={{ width: '90px' }}>Roll No</th>
                 <th>Student Name</th>
-                <th>Parent Phone</th>
-                <th style={{ textAlign: 'center' }}>Mark Status</th>
-                <th>Status</th>
+                {!isTeacher && <th>Parent Phone</th>}
+                <th style={{ textAlign: 'center', width: '220px' }}>Take Attendance</th>
+                <th style={{ width: '110px' }}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {eligibleStudents.length === 0 ? (
+              {displayStudents.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No active students enrolled in this class / batch yet.
+                  <td colSpan={!isTeacher ? 5 : 4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    {eligibleStudents.length === 0 
+                      ? 'No active students enrolled in this class / batch yet.' 
+                      : `No students matching "${searchQuery}".`}
                   </td>
                 </tr>
               ) : (
-                eligibleStudents.map((student) => {
-                  const record = getAttendanceRecord(student.id);
-                  const status = record?.status || 'UNMARKED';
+                displayStudents.map((student) => {
+                  const status = getStudentStatus(student.id);
+                  const isAbsent = status === 'ABSENT';
+                  const isLate = status === 'LATE';
 
                   return (
-                    <tr key={student.id}>
+                    <tr key={student.id} className={isAbsent ? 'row-absent' : ''}>
                       <td className="font-mono text-xs text-muted">{student.admissionNo}</td>
                       <td>
-                        <div className="font-semibold">{student.name}</div>
+                        <div className="font-semibold text-white">{student.name}</div>
                         <div className="text-xs text-muted">{student.school || 'School unspecified'}</div>
                       </td>
-                      <td className="text-xs text-secondary">{student.parentPhone}</td>
+                      
+                      {/* Privacy: Parent phone is strictly hidden from Teachers */}
+                      {!isTeacher && (
+                        <td className="text-xs font-mono text-secondary">{student.parentPhone}</td>
+                      )}
+
+                      {/* 1-Tap Attendance Action (User-friendly toggle) */}
                       <td style={{ textAlign: 'center' }}>
-                        <div className="status-toggle-group">
+                        <div className="fast-attendance-cell">
                           <button
-                            className={`toggle-btn toggle-present ${status === 'PRESENT' ? 'active' : ''}`}
-                            onClick={() => handleSetStatus(student.id, 'PRESENT')}
-                            title="Mark Present"
+                            type="button"
+                            className={`btn-fast-attendance ${isAbsent ? 'status-absent' : isLate ? 'status-late' : 'status-present'}`}
+                            onClick={() => handleToggleAbsent(student.id)}
+                            title={isAbsent ? "Currently Absent. Click to mark Present." : "Currently Present. Click to mark Absent."}
                           >
-                            <Check size={14} />
-                            <span>P</span>
+                            {isAbsent ? (
+                              <>
+                                <XCircle size={16} />
+                                <span className="status-title">ABSENT</span>
+                                <span className="status-sub-hint">Tap for Present</span>
+                              </>
+                            ) : isLate ? (
+                              <>
+                                <Clock size={16} />
+                                <span className="status-title">LATE</span>
+                                <span className="status-sub-hint">Tap for Absent</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={16} />
+                                <span className="status-title">PRESENT</span>
+                                <span className="status-sub-hint">Tap if Absent</span>
+                              </>
+                            )}
                           </button>
+
+                          {/* Quick Late Toggle Option */}
                           <button
-                            className={`toggle-btn toggle-absent ${status === 'ABSENT' ? 'active' : ''}`}
-                            onClick={() => handleSetStatus(student.id, 'ABSENT')}
-                            title="Mark Absent"
+                            type="button"
+                            className={`btn-late-mini ${isLate ? 'active' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetStatus(student.id, isLate ? 'PRESENT' : 'LATE');
+                            }}
+                            title={isLate ? "Unmark Late" : "Mark as Late arrival"}
                           >
-                            <X size={14} />
-                            <span>A</span>
-                          </button>
-                          <button
-                            className={`toggle-btn toggle-late ${status === 'LATE' ? 'active' : ''}`}
-                            onClick={() => handleSetStatus(student.id, 'LATE')}
-                            title="Mark Late"
-                          >
-                            <Clock size={14} />
-                            <span>L</span>
+                            L
                           </button>
                         </div>
                       </td>
+
+                      {/* Status Badge */}
                       <td>
-                        {status === 'PRESENT' && <span className="badge badge-success">Present</span>}
-                        {status === 'ABSENT' && <span className="badge badge-danger">Absent</span>}
-                        {status === 'LATE' && <span className="badge badge-warning">Late</span>}
-                        {status === 'UNMARKED' && <span className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>Not Marked</span>}
+                        {isAbsent ? (
+                          <span className="badge badge-danger">Absent</span>
+                        ) : isLate ? (
+                          <span className="badge badge-warning">Late</span>
+                        ) : (
+                          <span className="badge badge-success">Present</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -272,39 +405,60 @@ export default function Attendance({ data, onSaveData }) {
         <div className="glass-card absentee-sidebar">
           <div className="absentee-header">
             <AlertTriangle size={18} className="text-rose" />
-            <h2 className="absentee-title">Absentee Alerts ({absentees.length})</h2>
+            <h2 className="absentee-title">Absentee Alerts ({absentStudents.length})</h2>
           </div>
+          
           <p className="text-xs text-muted mb-3">
-            Notify parents via WhatsApp with a single tap when students miss tuition.
+            {!isTeacher 
+              ? 'Send instant WhatsApp notices to parents when students are absent from tuition.'
+              : 'Absentees are automatically saved and available to the Admin for parent communication.'}
           </p>
 
-          {absentees.length === 0 ? (
+          {absentStudents.length === 0 ? (
             <div className="no-absentees-box">
-              <CheckCircle2 size={24} className="text-emerald mb-1" />
-              <div className="font-semibold text-xs text-emerald">No Absentees Today</div>
-              <div className="text-xs text-muted">All marked students are present!</div>
+              <CheckCircle2 size={26} className="text-emerald mb-2" />
+              <div className="font-semibold text-xs text-emerald">100% Present Today!</div>
+              <div className="text-xs text-muted mt-1">No students marked absent for this batch.</div>
             </div>
           ) : (
             <div className="absentees-list">
-              {absentees.map(student => {
-                const messageText = `Dear Parent, this is to inform you that your child ${student.name} was marked ABSENT for ${classes.find(c => c.code === student.classCode)?.name} tuition today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`;
+              {absentStudents.map(student => {
+                const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
+                const messageText = `Dear Parent, this is to inform you that your child ${student.name} was marked ABSENT for ${className} tuition today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`;
                 const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=${encodeURIComponent(messageText)}`;
 
                 return (
                   <div key={student.id} className="absentee-card">
-                    <div>
-                      <div className="font-semibold text-xs">{student.name}</div>
-                      <div className="text-xs text-muted">Parent: {student.parentPhone}</div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-xs text-white">{student.name}</div>
+                      {!isTeacher ? (
+                        <div className="text-xs text-muted font-mono">📱 {student.parentPhone}</div>
+                      ) : (
+                        <div className="text-xs text-emerald font-medium">Recorded Absent ✓</div>
+                      )}
                     </div>
-                    <a 
-                      href={whatsappUrl} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="btn btn-sm btn-success whatsapp-alert-btn"
-                    >
-                      <MessageSquare size={13} />
-                      <span>Alert</span>
-                    </a>
+
+                    {!isTeacher ? (
+                      <a 
+                        href={whatsappUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="btn btn-sm btn-success whatsapp-alert-btn"
+                        title={`Send WhatsApp absentee notice to ${student.parentName || 'Parent'}`}
+                      >
+                        <MessageSquare size={13} />
+                        <span>Alert</span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => handleToggleAbsent(student.id)}
+                        title="Unmark absent"
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -325,6 +479,18 @@ export default function Attendance({ data, onSaveData }) {
           justify-content: space-between;
           flex-wrap: wrap;
           gap: 16px;
+        }
+        .save-badge-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: rgba(16, 185, 129, 0.2);
+          color: #34D399;
+          border: 1px solid rgba(16, 185, 129, 0.4);
+          font-size: 0.725rem;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: var(--radius-full);
         }
         .attendance-controls-card {
           padding: 20px;
@@ -353,70 +519,218 @@ export default function Attendance({ data, onSaveData }) {
           align-items: center;
           gap: 12px;
           flex-wrap: wrap;
-          padding-top: 14px;
-          border-top: 1px solid var(--border-subtle);
         }
         .stat-pill {
           display: flex;
           align-items: center;
           gap: 6px;
           padding: 6px 12px;
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid var(--border-subtle);
           border-radius: var(--radius-full);
           font-size: 0.8125rem;
-          background: var(--bg-surface);
-          border: 1px solid var(--border-subtle);
+          color: var(--text-secondary);
         }
-        .stat-total { color: #A5B4FC; }
-        .stat-present { color: #34D399; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.25); }
-        .stat-absent { color: #FB7185; background: rgba(244, 63, 94, 0.1); border-color: rgba(244, 63, 94, 0.25); }
-        .stat-late { color: #FBBF24; background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.25); }
-        .stat-rate { margin-left: auto; font-weight: 700; color: var(--text-primary); }
+        .stat-present {
+          color: #34D399;
+          border-color: rgba(16, 185, 129, 0.3);
+          background: rgba(16, 185, 129, 0.08);
+        }
+        .stat-absent {
+          color: var(--text-muted);
+        }
+        .stat-absent.has-absent {
+          color: #FB7185;
+          border-color: rgba(244, 63, 94, 0.4);
+          background: rgba(244, 63, 94, 0.1);
+        }
+        .stat-late {
+          color: #FBBF24;
+          border-color: rgba(245, 158, 11, 0.3);
+          background: rgba(245, 158, 11, 0.08);
+        }
+        .stat-rate {
+          margin-left: auto;
+          color: #A5B4FC;
+          font-weight: 600;
+        }
 
+        /* Top Absentees Tray */
+        .absentees-tray {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          background: rgba(244, 63, 94, 0.08);
+          border: 1px solid rgba(244, 63, 94, 0.3);
+          border-radius: var(--radius-md);
+          flex-wrap: wrap;
+        }
+        .tray-label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: #FB7185;
+          flex-shrink: 0;
+        }
+        .tray-chips {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .absentee-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(244, 63, 94, 0.2);
+          border: 1px solid rgba(244, 63, 94, 0.5);
+          color: white;
+          padding: 4px 10px;
+          border-radius: var(--radius-full);
+          font-size: 0.775rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .absentee-chip:hover {
+          background: rgba(244, 63, 94, 0.4);
+          transform: scale(1.03);
+        }
+        .chip-remove-icon {
+          color: #FB7185;
+        }
+
+        /* Search Bar */
+        .search-bar-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .search-input-box {
+          position: relative;
+          display: flex;
+          align-items: center;
+          max-width: 420px;
+          width: 100%;
+        }
+        .search-icon {
+          position: absolute;
+          left: 12px;
+          color: var(--text-muted);
+          pointer-events: none;
+        }
+        .search-input-box .form-input {
+          padding-left: 36px;
+          padding-right: 32px;
+        }
+        .search-clear-btn {
+          position: absolute;
+          right: 10px;
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+        }
+        .search-helper-text {
+          font-size: 0.775rem;
+          color: var(--text-muted);
+        }
+
+        /* Table & Fast Action Button */
         .attendance-split-layout {
           display: grid;
-          grid-template-columns: 1fr 320px;
+          grid-template-columns: 1fr 340px;
           gap: 20px;
           align-items: start;
         }
-        @media (max-width: 900px) {
-          .attendance-split-layout { grid-template-columns: 1fr; }
+        .row-absent {
+          background: rgba(244, 63, 94, 0.06) !important;
         }
-        .status-toggle-group {
+        .fast-attendance-cell {
           display: inline-flex;
-          border-radius: var(--radius-sm);
-          overflow: hidden;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-subtle);
+          align-items: center;
+          gap: 6px;
+          justify-content: center;
         }
-        .toggle-btn {
+        .btn-fast-attendance {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px;
+          border-radius: var(--radius-md);
+          font-weight: 700;
+          font-size: 0.8125rem;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          border: 1px solid transparent;
+          user-select: none;
+        }
+        .btn-fast-attendance:hover {
+          transform: scale(1.02);
+        }
+        .btn-fast-attendance.status-present {
+          background: rgba(16, 185, 129, 0.12);
+          border-color: rgba(16, 185, 129, 0.4);
+          color: #34D399;
+        }
+        .btn-fast-attendance.status-present:hover {
+          background: rgba(16, 185, 129, 0.22);
+          border-color: #10B981;
+        }
+        .btn-fast-attendance.status-absent {
+          background: rgba(244, 63, 94, 0.2);
+          border-color: #F43F5E;
+          color: #FB7185;
+          box-shadow: 0 0 12px rgba(244, 63, 94, 0.3);
+        }
+        .btn-fast-attendance.status-absent:hover {
+          background: rgba(244, 63, 94, 0.3);
+        }
+        .btn-fast-attendance.status-late {
+          background: rgba(245, 158, 11, 0.15);
+          border-color: rgba(245, 158, 11, 0.4);
+          color: #FBBF24;
+        }
+        .status-title {
+          letter-spacing: 0.03em;
+        }
+        .status-sub-hint {
+          font-size: 0.675rem;
+          font-weight: 500;
+          opacity: 0.75;
+          margin-left: 2px;
+        }
+        .btn-late-mini {
+          width: 26px;
+          height: 26px;
+          border-radius: var(--radius-sm);
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-muted);
+          font-size: 0.7rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.15s ease;
           display: flex;
           align-items: center;
-          gap: 3px;
-          padding: 6px 10px;
-          border: none;
-          background: transparent;
-          color: var(--text-muted);
-          cursor: pointer;
-          font-size: 0.75rem;
-          font-weight: 700;
-          transition: all 0.15s ease;
+          justify-content: center;
         }
-        .toggle-btn:hover {
-          color: var(--text-primary);
+        .btn-late-mini:hover {
+          color: #FBBF24;
+          border-color: #FBBF24;
         }
-        .toggle-present.active {
-          background: var(--emerald-600);
-          color: white;
-        }
-        .toggle-absent.active {
-          background: var(--rose-600);
-          color: white;
-        }
-        .toggle-late.active {
-          background: var(--amber-600);
-          color: white;
+        .btn-late-mini.active {
+          background: rgba(245, 158, 11, 0.2);
+          color: #FBBF24;
+          border-color: #FBBF24;
         }
 
+        /* Sidebar */
         .absentee-sidebar {
           padding: 20px;
         }
@@ -436,7 +750,7 @@ export default function Attendance({ data, onSaveData }) {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 24px;
+          padding: 28px 16px;
           background: rgba(16, 185, 129, 0.06);
           border: 1px dashed rgba(16, 185, 129, 0.25);
           border-radius: var(--radius-md);
@@ -454,22 +768,20 @@ export default function Attendance({ data, onSaveData }) {
           padding: 10px 12px;
           border-radius: var(--radius-sm);
           background: var(--bg-surface);
-          border: 1px solid rgba(244, 63, 94, 0.2);
+          border: 1px solid rgba(244, 63, 94, 0.25);
+          gap: 10px;
         }
         .whatsapp-alert-btn {
-          padding: 4px 8px;
-          font-size: 0.725rem;
+          padding: 5px 10px;
+          font-size: 0.75rem;
         }
 
-        /* Mobile Responsive for Attendance */
+        /* Mobile Responsive */
         @media (max-width: 768px) {
           .attendance-header {
             flex-direction: column;
             align-items: stretch;
             gap: 12px;
-          }
-          .attendance-header .btn {
-            width: 100%;
           }
           .attendance-controls-card {
             padding: 14px 12px;
@@ -487,6 +799,10 @@ export default function Attendance({ data, onSaveData }) {
           }
           .attendance-split-layout {
             grid-template-columns: 1fr !important;
+          }
+          .btn-fast-attendance {
+            padding: 6px 10px;
+            font-size: 0.75rem;
           }
         }
       `}</style>

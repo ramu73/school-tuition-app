@@ -15,7 +15,10 @@ import {
   Lock,
   Eye,
   EyeOff,
-  FolderArchive
+  FolderArchive,
+  Plus,
+  GraduationCap,
+  Users
 } from 'lucide-react';
 import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase } from '../lib/supabase';
 import { 
@@ -33,7 +36,13 @@ import {
   INITIAL_MARKS, 
   INITIAL_ATTENDANCE 
 } from '../lib/storage';
-import { getStaffAccounts, saveStaffAccounts } from '../lib/auth';
+import { 
+  getStaffAccounts, 
+  saveStaffAccounts, 
+  getTeacherAccounts, 
+  addTeacherAccount, 
+  deleteTeacherAccount 
+} from '../lib/auth';
 
 export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   if (!isOpen) return null;
@@ -53,15 +62,17 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   const initialAccounts = getStaffAccounts();
   const [adminUser, setAdminUser] = useState(initialAccounts.admin.username || 'admin');
   const [adminPass, setAdminPass] = useState(initialAccounts.admin.password || 'admin123');
-  const [adminName, setAdminName] = useState(initialAccounts.admin.name || 'Tuition Director');
-  
-  const [teacherUser, setTeacherUser] = useState(initialAccounts.teacher.username || 'teacher');
-  const [teacherPass, setTeacherPass] = useState(initialAccounts.teacher.password || 'teacher123');
-  const [teacherName, setTeacherName] = useState(initialAccounts.teacher.name || 'Mr. R. Sharma');
-
   const [showAdminPass, setShowAdminPass] = useState(false);
-  const [showTeacherPass, setShowTeacherPass] = useState(false);
-  const [credSaved, setCredSaved] = useState(false);
+
+  // Teacher Accounts State
+  const [teachers, setTeachers] = useState(initialAccounts.teachers || []);
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
+  const [newTeacherName, setNewTeacherName] = useState('');
+  const [newTeacherSubject, setNewTeacherSubject] = useState('');
+  const [newTeacherUsername, setNewTeacherUsername] = useState('');
+  const [newTeacherPassword, setNewTeacherPassword] = useState('');
+  const [teacherPassVisible, setTeacherPassVisible] = useState({});
+  const [staffMsg, setStaffMsg] = useState(null);
 
   const handleTestAndSave = async (e) => {
     e.preventDefault();
@@ -109,25 +120,61 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
     }
   };
 
-  const handleSaveCredentials = (e) => {
+  const handleSaveAdminCreds = (e) => {
     e.preventDefault();
-    const updatedAccounts = {
+    const currentAccs = getStaffAccounts();
+    const updated = {
+      ...currentAccs,
       admin: {
-        ...initialAccounts.admin,
+        ...currentAccs.admin,
         username: adminUser.trim(),
-        password: adminPass.trim(),
-        name: adminName.trim()
-      },
-      teacher: {
-        ...initialAccounts.teacher,
-        username: teacherUser.trim(),
-        password: teacherPass.trim(),
-        name: teacherName.trim()
+        password: adminPass.trim()
       }
     };
-    saveStaffAccounts(updatedAccounts);
-    setCredSaved(true);
-    setTimeout(() => setCredSaved(false), 3000);
+    saveStaffAccounts(updated);
+    setStaffMsg({ type: 'success', text: 'Admin login credentials updated successfully!' });
+    setTimeout(() => setStaffMsg(null), 3500);
+  };
+
+  const handleAddNewTeacher = (e) => {
+    e.preventDefault();
+    const res = addTeacherAccount({
+      name: newTeacherName,
+      subject: newTeacherSubject,
+      username: newTeacherUsername,
+      password: newTeacherPassword
+    });
+
+    if (res.success) {
+      setTeachers(getTeacherAccounts());
+      setShowAddTeacher(false);
+      setNewTeacherName('');
+      setNewTeacherSubject('');
+      setNewTeacherUsername('');
+      setNewTeacherPassword('');
+      setStaffMsg({ type: 'success', text: `Teacher "${newTeacherName}" account created! They can now log in using username "${newTeacherUsername}".` });
+      setTimeout(() => setStaffMsg(null), 4000);
+    } else {
+      setStaffMsg({ type: 'error', text: res.message || 'Failed to create teacher' });
+      setTimeout(() => setStaffMsg(null), 4000);
+    }
+  };
+
+  const handleDeleteTeacher = (teacherId, teacherName) => {
+    if (window.confirm(`Are you sure you want to remove the teacher account for "${teacherName}"?`)) {
+      const res = deleteTeacherAccount(teacherId);
+      if (res.success) {
+        setTeachers(getTeacherAccounts());
+        setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted.` });
+        setTimeout(() => setStaffMsg(null), 3000);
+      } else {
+        alert(res.message);
+      }
+    }
+  };
+
+  const toggleTeacherPass = (id) => {
+    setTeacherPassVisible(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleStartClean = async () => {
@@ -265,8 +312,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
             className={`settings-nav-btn ${activeSettingsTab === 'security' ? 'active' : ''}`}
             onClick={() => setActiveSettingsTab('security')}
           >
-            <Key size={15} />
-            <span>Staff Passwords</span>
+            <Users size={15} />
+            <span>Staff & Teachers</span>
           </button>
           <button 
             type="button"
@@ -346,29 +393,33 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
           </div>
         )}
 
-        {/* TAB 2: STAFF PASSWORDS & SECURITY */}
+        {/* TAB 2: STAFF & TEACHERS MANAGEMENT */}
         {activeSettingsTab === 'security' && (
           <div className="settings-tab-content">
-            <form onSubmit={handleSaveCredentials} className="security-form">
-              <div className="settings-notice">
-                <strong>Protect Your Tuition Data:</strong> Change your Admin & Teacher login passwords here. Only authorized personnel with these credentials can access staff dashboards.
+            <div className="settings-notice mb-3">
+              <strong>Staff Roles & Student Privacy:</strong>
+              <div className="text-xs text-muted mt-1 leading-relaxed">
+                • <strong>Admin</strong> has full access to financial data, fees, admissions, and student records.<br />
+                • <strong>Teachers</strong> can only take attendance, view batch schedules, and enter test marks. <em>All student personal details (parent phone numbers, addresses, fee records) are strictly hidden from teachers.</em>
               </div>
+            </div>
 
-              {credSaved && (
-                <div className="connection-alert alert-success">
-                  <Check size={16} />
-                  <span>Staff credentials updated successfully! Keep your new password secure.</span>
-                </div>
-              )}
+            {staffMsg && (
+              <div className={`connection-alert ${staffMsg.type === 'success' ? 'alert-success' : 'alert-danger'} mb-3`}>
+                {staffMsg.type === 'success' ? <Check size={16} /> : <AlertTriangle size={16} />}
+                <span>{staffMsg.text}</span>
+              </div>
+            )}
 
-              {/* Admin Account Section */}
-              <div className="security-card">
-                <div className="security-card-header">
-                  <ShieldCheck size={16} className="text-primary" />
-                  <span className="font-semibold text-sm text-white">Admin Account (Director Access)</span>
-                </div>
+            {/* Section 1: Admin Account */}
+            <div className="security-card mb-4">
+              <div className="security-card-header">
+                <ShieldCheck size={16} className="text-primary" />
+                <span className="font-semibold text-sm text-white">Admin Account (Tuition Director)</span>
+              </div>
+              <form onSubmit={handleSaveAdminCreds}>
                 <div className="form-grid-2">
-                  <div className="form-group">
+                  <div className="form-group mb-2">
                     <label className="form-label">Admin Username</label>
                     <input 
                       type="text" 
@@ -378,7 +429,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
                       onChange={(e) => setAdminUser(e.target.value)} 
                     />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group mb-2">
                     <label className="form-label">Admin Password</label>
                     <div className="input-with-icon-right">
                       <input 
@@ -392,60 +443,170 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
                         type="button" 
                         className="pass-eye-btn" 
                         onClick={() => setShowAdminPass(!showAdminPass)}
+                        title={showAdminPass ? "Hide password" : "Show password"}
                       >
                         {showAdminPass ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
                   </div>
                 </div>
+                <div className="flex justify-end mt-2">
+                  <button type="submit" className="btn btn-primary btn-sm">
+                    <Check size={14} />
+                    <span>Save Admin Credentials</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Section 2: Teacher Accounts Management */}
+            <div className="security-card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <GraduationCap size={18} className="text-emerald" />
+                  <div>
+                    <span className="font-semibold text-sm text-white">Teacher & Faculty Accounts</span>
+                    <span className="badge badge-class ml-2">{teachers.length} Active</span>
+                  </div>
+                </div>
+                {!showAddTeacher && (
+                  <button 
+                    type="button" 
+                    className="btn btn-success btn-sm"
+                    onClick={() => setShowAddTeacher(true)}
+                  >
+                    <Plus size={14} />
+                    <span>Add New Teacher</span>
+                  </button>
+                )}
               </div>
 
-              {/* Teacher Account Section */}
-              <div className="security-card mt-3">
-                <div className="security-card-header">
-                  <Key size={16} className="text-emerald" />
-                  <span className="font-semibold text-sm text-white">Teacher / Tutor Account</span>
-                </div>
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label className="form-label">Teacher Username</label>
-                    <input 
-                      type="text" 
-                      required 
-                      className="form-input" 
-                      value={teacherUser} 
-                      onChange={(e) => setTeacherUser(e.target.value)} 
-                    />
+              {/* Add New Teacher Form */}
+              {showAddTeacher && (
+                <div className="add-teacher-form-card mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-xs text-white">Create New Teacher Account</span>
+                    <button 
+                      type="button" 
+                      className="btn-delete-mini"
+                      onClick={() => setShowAddTeacher(false)}
+                      title="Cancel"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Teacher Password</label>
-                    <div className="input-with-icon-right">
-                      <input 
-                        type={showTeacherPass ? 'text' : 'password'} 
-                        required 
-                        className="form-input" 
-                        value={teacherPass} 
-                        onChange={(e) => setTeacherPass(e.target.value)} 
-                      />
+                  <form onSubmit={handleAddNewTeacher}>
+                    <div className="form-grid-2">
+                      <div className="form-group mb-2">
+                        <label className="form-label">Teacher Name *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          placeholder="e.g. Mrs. S. Lakshmi"
+                          className="form-input"
+                          value={newTeacherName}
+                          onChange={(e) => setNewTeacherName(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group mb-2">
+                        <label className="form-label">Subject / Faculty Specialization</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Science & English or Maths"
+                          className="form-input"
+                          value={newTeacherSubject}
+                          onChange={(e) => setNewTeacherSubject(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group mb-2">
+                        <label className="form-label">Teacher Username *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          placeholder="e.g. lakshmi"
+                          className="form-input font-mono"
+                          value={newTeacherUsername}
+                          onChange={(e) => setNewTeacherUsername(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group mb-2">
+                        <label className="form-label">Login Password *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          placeholder="e.g. teach123"
+                          className="form-input font-mono"
+                          value={newTeacherPassword}
+                          onChange={(e) => setNewTeacherPassword(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-3">
                       <button 
                         type="button" 
-                        className="pass-eye-btn" 
-                        onClick={() => setShowTeacherPass(!showTeacherPass)}
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setShowAddTeacher(false)}
                       >
-                        {showTeacherPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                        Cancel
+                      </button>
+                      <button type="submit" className="btn btn-primary btn-sm">
+                        <Plus size={14} />
+                        <span>Create Teacher Account</span>
                       </button>
                     </div>
-                  </div>
+                  </form>
                 </div>
-              </div>
+              )}
 
-              <div className="mt-4 flex justify-end">
-                <button type="submit" className="btn btn-primary">
-                  <Check size={16} />
-                  <span>Save Updated Passwords</span>
-                </button>
+              {/* Existing Teachers List */}
+              <div className="teachers-list-container">
+                {teachers.map((teacher) => {
+                  const isVisible = !!teacherPassVisible[teacher.id];
+                  return (
+                    <div key={teacher.id} className="teacher-account-row">
+                      <div className="teacher-info-col">
+                        <div className="font-semibold text-sm text-white flex items-center gap-2">
+                          <span>{teacher.name}</span>
+                          {teacher.subject && (
+                            <span className="badge badge-class text-xs">{teacher.subject}</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted font-mono mt-0.5">
+                          Username: <strong className="text-emerald">@{teacher.username}</strong>
+                        </div>
+                      </div>
+
+                      <div className="teacher-creds-col">
+                        <span className="text-xs text-muted">Password:</span>
+                        <span className="font-mono text-xs text-secondary teacher-pass-field">
+                          {isVisible ? teacher.password : '••••••••'}
+                        </span>
+                        <button 
+                          type="button"
+                          className="pass-eye-btn-inline"
+                          onClick={() => toggleTeacherPass(teacher.id)}
+                          title={isVisible ? "Hide password" : "Reveal password"}
+                        >
+                          {isVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+
+                      <div className="teacher-actions-col">
+                        <button 
+                          type="button"
+                          className="btn-delete-mini"
+                          title="Delete Teacher Account"
+                          onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+                          disabled={teachers.length <= 1}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </form>
+            </div>
           </div>
         )}
 
@@ -628,6 +789,61 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
         }
         .pass-eye-btn:hover {
           color: white;
+        }
+        .add-teacher-form-card {
+          background: rgba(16, 185, 129, 0.05);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          border-radius: var(--radius-md);
+          padding: 14px;
+        }
+        .teachers-list-container {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .teacher-account-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: var(--radius-md);
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .teacher-info-col {
+          display: flex;
+          flex-direction: column;
+          min-width: 140px;
+        }
+        .teacher-creds-col {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(0, 0, 0, 0.25);
+          padding: 4px 10px;
+          border-radius: var(--radius-sm);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .teacher-pass-field {
+          min-width: 70px;
+        }
+        .pass-eye-btn-inline {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          padding: 2px;
+        }
+        .pass-eye-btn-inline:hover {
+          color: white;
+        }
+        .teacher-actions-col {
+          display: flex;
+          align-items: center;
         }
         .backup-card {
           display: flex;

@@ -17,15 +17,18 @@ import {
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
+import { USER_ROLES } from '../lib/auth';
 
 export default function Dashboard({ 
   data, 
+  currentUser,
   setActiveTab, 
   setSelectedClassFilter, 
   onOpenAdmitModal, 
   onOpenFeeCollectModal 
 }) {
-  const { students = [], batches = [], fees = [], attendance = [], classes = [] } = data;
+  const { students = [], batches = [], fees = [], attendance = [], classes = [], exams = [] } = data;
+  const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
 
   // 1. Calculations
   const activeStudents = students.filter(s => s.status === 'ACTIVE');
@@ -39,13 +42,13 @@ export default function Dashboard({
     ? Math.round((presentCount / todayAttendance.length) * 100) 
     : 92; // fallback realistic rate if none marked yet today
 
-  // Fees calculation
+  // Fees calculation (strictly for Admin)
   const totalCollected = fees.reduce((sum, f) => sum + (Number(f.amountPaid) || 0), 0);
   const totalPending = fees.reduce((sum, f) => sum + (Number(f.balance) || 0), 0);
   const defaultersCount = fees.filter(f => f.balance > 0).length;
 
-  // Joining date fee cycles & notification calculations
-  const studentFeeCycles = activeStudents.map(student => {
+  // Joining date fee cycles & notification calculations (Admin only)
+  const studentFeeCycles = isTeacher ? [] : activeStudents.map(student => {
     const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026')
       || fees.find(f => f.studentId === student.id);
     return calculateStudentFeeCycle(student, feeRecord);
@@ -65,7 +68,11 @@ export default function Dashboard({
 
   const handleClassCardClick = (classCode) => {
     setSelectedClassFilter(classCode);
-    setActiveTab('students');
+    if (isTeacher) {
+      setActiveTab('batches');
+    } else {
+      setActiveTab('students');
+    }
   };
 
   return (
@@ -94,18 +101,27 @@ export default function Dashboard({
 
         <div className="hero-actions-right">
           <div className="hero-actions">
-            <button className="btn btn-primary" onClick={onOpenAdmitModal}>
-              <UserPlus size={16} />
-              <span>Admit Student</span>
-            </button>
+            {!isTeacher && (
+              <button className="btn btn-primary" onClick={onOpenAdmitModal}>
+                <UserPlus size={16} />
+                <span>Admit Student</span>
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={() => setActiveTab('attendance')}>
               <CheckCircle size={16} />
               <span>Roll Call</span>
             </button>
-            <button className="btn btn-success" onClick={onOpenFeeCollectModal}>
-              <IndianRupee size={16} />
-              <span>Collect Fee</span>
-            </button>
+            {isTeacher ? (
+              <button className="btn btn-success" onClick={() => setActiveTab('exams')}>
+                <Award size={16} />
+                <span>Enter Test Marks</span>
+              </button>
+            ) : (
+              <button className="btn btn-success" onClick={onOpenFeeCollectModal}>
+                <IndianRupee size={16} />
+                <span>Collect Fee</span>
+              </button>
+            )}
           </div>
 
           <div className="contact-pills-box mt-3">
@@ -178,43 +194,84 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* KPI 3: Fee Collected */}
-        <div className="glass-card kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Fees Collected (This Month)</span>
-            <div className="kpi-icon-pill icon-sky">
-              <IndianRupee size={20} />
+        {/* KPI 3 & 4: Teacher vs Admin View */}
+        {isTeacher ? (
+          <>
+            {/* Teacher KPI 3: Active Batches */}
+            <div className="glass-card kpi-card">
+              <div className="kpi-top">
+                <span className="kpi-label">Active Batches</span>
+                <div className="kpi-icon-pill icon-sky">
+                  <Clock size={20} />
+                </div>
+              </div>
+              <div className="kpi-value">{batches.length}</div>
+              <div className="kpi-footer">
+                <span className="kpi-tag tag-sky">Classes 1–10</span>
+                <span className="kpi-note" onClick={() => setActiveTab('batches')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                  View timetable
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="kpi-value">₹{totalCollected.toLocaleString('en-IN')}</div>
-          <div className="kpi-footer">
-            <span className="kpi-tag tag-sky">March 2026</span>
-            <span className="kpi-note">Via Cash, UPI & GPay</span>
-          </div>
-        </div>
 
-        {/* KPI 4: Pending Dues */}
-        <div className="glass-card kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Pending Dues</span>
-            <div className="kpi-icon-pill icon-rose">
-              <AlertCircle size={20} />
+            {/* Teacher KPI 4: Weekly Tests / Exams */}
+            <div className="glass-card kpi-card">
+              <div className="kpi-top">
+                <span className="kpi-label">Tests & Assessments</span>
+                <div className="kpi-icon-pill icon-rose">
+                  <Award size={20} />
+                </div>
+              </div>
+              <div className="kpi-value">{exams.length}</div>
+              <div className="kpi-footer">
+                <span className="kpi-tag tag-success">Active Tests</span>
+                <span className="kpi-note" onClick={() => setActiveTab('exams')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                  Scorecards
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="kpi-value" style={{ color: '#FB7185' }}>
-            ₹{totalPending.toLocaleString('en-IN')}
-          </div>
-          <div className="kpi-footer">
-            <span className="kpi-tag tag-danger">{defaultersCount} Students Due</span>
-            <span className="kpi-note" onClick={() => setActiveTab('fees')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-              View ledger
-            </span>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            {/* Admin KPI 3: Fee Collected */}
+            <div className="glass-card kpi-card">
+              <div className="kpi-top">
+                <span className="kpi-label">Fees Collected (This Month)</span>
+                <div className="kpi-icon-pill icon-sky">
+                  <IndianRupee size={20} />
+                </div>
+              </div>
+              <div className="kpi-value">₹{totalCollected.toLocaleString('en-IN')}</div>
+              <div className="kpi-footer">
+                <span className="kpi-tag tag-sky">March 2026</span>
+                <span className="kpi-note">Via Cash, UPI & GPay</span>
+              </div>
+            </div>
+
+            {/* Admin KPI 4: Pending Dues */}
+            <div className="glass-card kpi-card">
+              <div className="kpi-top">
+                <span className="kpi-label">Pending Dues</span>
+                <div className="kpi-icon-pill icon-rose">
+                  <AlertCircle size={20} />
+                </div>
+              </div>
+              <div className="kpi-value" style={{ color: '#FB7185' }}>
+                ₹{totalPending.toLocaleString('en-IN')}
+              </div>
+              <div className="kpi-footer">
+                <span className="kpi-tag tag-danger">{defaultersCount} Students Due</span>
+                <span className="kpi-note" onClick={() => setActiveTab('fees')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                  View ledger
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Joining Date Fee Due Alerts Banner */}
-      {dueOrOverdue.length > 0 && (
+      {/* Joining Date Fee Due Alerts Banner (Strictly Admin Only) */}
+      {!isTeacher && dueOrOverdue.length > 0 && (
         <div className="glass-card fee-cycle-alert-banner">
           <div className="alert-banner-header">
             <div className="flex items-center gap-2">
@@ -286,9 +343,12 @@ export default function Dashboard({
             </div>
             <button 
               className="btn btn-secondary btn-sm"
-              onClick={() => { setSelectedClassFilter('ALL'); setActiveTab('students'); }}
+              onClick={() => { 
+                setSelectedClassFilter('ALL'); 
+                setActiveTab(isTeacher ? 'batches' : 'students'); 
+              }}
             >
-              <span>View All</span>
+              <span>{isTeacher ? 'View Batches' : 'View All'}</span>
               <ArrowUpRight size={14} />
             </button>
           </div>
@@ -314,9 +374,15 @@ export default function Dashboard({
                       <span className="class-count-inside">{cls.count}</span>
                     </div>
                   </div>
-                  <div className="class-fee-rate">
-                    ₹{cls.defaultFee}/mo
-                  </div>
+                  {!isTeacher ? (
+                    <div className="class-fee-rate">
+                      ₹{cls.defaultFee}/mo
+                    </div>
+                  ) : (
+                    <div className="class-fee-rate text-xs text-muted">
+                      {cls.category}
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -22,6 +22,20 @@ export const INITIAL_STAFF_ACCOUNTS = {
     title: 'Administrator',
     email: 'admin@hayagriva.edu'
   },
+  teachers: [
+    {
+      id: 'teacher-01',
+      username: 'teacher',
+      password: 'teacher123',
+      pin: '1234',
+      name: 'Mr. R. Sharma',
+      role: USER_ROLES.TEACHER,
+      title: 'Senior Faculty (Maths & Physics)',
+      subject: 'Mathematics & Physics',
+      phone: '9848266892',
+      email: 'teacher@hayagriva.edu'
+    }
+  ],
   teacher: {
     username: 'teacher',
     password: 'teacher123',
@@ -29,6 +43,7 @@ export const INITIAL_STAFF_ACCOUNTS = {
     name: 'Mr. R. Sharma',
     role: USER_ROLES.TEACHER,
     title: 'Senior Faculty (Maths & Physics)',
+    subject: 'Mathematics & Physics',
     email: 'teacher@hayagriva.edu'
   }
 };
@@ -41,9 +56,29 @@ export function getStaffAccounts() {
     const raw = localStorage.getItem(STAFF_ACCOUNTS_KEY);
     if (!raw) return INITIAL_STAFF_ACCOUNTS;
     const parsed = JSON.parse(raw);
+
+    // Ensure teachers array is always populated
+    let teachers = parsed.teachers;
+    if (!Array.isArray(teachers) || teachers.length === 0) {
+      const fallbackTeacher = parsed.teacher || INITIAL_STAFF_ACCOUNTS.teacher;
+      teachers = [{
+        id: 'teacher-01',
+        username: fallbackTeacher.username || 'teacher',
+        password: fallbackTeacher.password || 'teacher123',
+        pin: fallbackTeacher.pin || '1234',
+        name: fallbackTeacher.name || 'Mr. R. Sharma',
+        role: USER_ROLES.TEACHER,
+        title: fallbackTeacher.title || 'Senior Faculty (Maths & Physics)',
+        subject: fallbackTeacher.subject || 'Mathematics & Physics',
+        phone: fallbackTeacher.phone || '9848266892',
+        email: fallbackTeacher.email || 'teacher@hayagriva.edu'
+      }];
+    }
+
     return {
       admin: { ...INITIAL_STAFF_ACCOUNTS.admin, ...(parsed.admin || {}) },
-      teacher: { ...INITIAL_STAFF_ACCOUNTS.teacher, ...(parsed.teacher || {}) }
+      teacher: { ...INITIAL_STAFF_ACCOUNTS.teacher, ...(parsed.teacher || teachers[0] || {}) },
+      teachers
     };
   } catch (err) {
     console.error('Failed to parse staff accounts:', err);
@@ -63,6 +98,93 @@ export function saveStaffAccounts(accounts) {
   }
 }
 
+// Get all teacher accounts
+export function getTeacherAccounts() {
+  const accounts = getStaffAccounts();
+  return accounts.teachers || [];
+}
+
+// Add a new teacher account
+export function addTeacherAccount({ name, subject, username, password, phone, email }) {
+  const accounts = getStaffAccounts();
+  const cleanUsername = (username || '').trim().toLowerCase();
+  const cleanPassword = (password || '').trim();
+
+  if (!cleanUsername || !cleanPassword) {
+    return { success: false, message: 'Username and password are required' };
+  }
+
+  // Check duplicate username against admin and other teachers
+  if (cleanUsername === accounts.admin.username.toLowerCase()) {
+    return { success: false, message: 'Username is already reserved for Admin' };
+  }
+  if ((accounts.teachers || []).some(t => t.username.toLowerCase() === cleanUsername)) {
+    return { success: false, message: `Teacher with username "${cleanUsername}" already exists` };
+  }
+
+  const newTeacher = {
+    id: `teacher-${Date.now()}`,
+    name: (name || '').trim() || 'Faculty Member',
+    subject: (subject || '').trim() || 'General Subjects',
+    title: (subject || '').trim() ? `Faculty (${subject.trim()})` : 'Tuition Faculty',
+    username: cleanUsername,
+    password: cleanPassword,
+    phone: phone ? phone.trim() : '',
+    email: email ? email.trim() : '',
+    role: USER_ROLES.TEACHER,
+    createdAt: new Date().toISOString()
+  };
+
+  accounts.teachers = [...(accounts.teachers || []), newTeacher];
+  accounts.teacher = accounts.teachers[0];
+
+  const res = saveStaffAccounts(accounts);
+  if (res.success) {
+    return { success: true, teacher: newTeacher };
+  }
+  return res;
+}
+
+// Update teacher account
+export function updateTeacherAccount(id, updates) {
+  const accounts = getStaffAccounts();
+  const teachers = accounts.teachers || [];
+  const idx = teachers.findIndex(t => t.id === id);
+  if (idx === -1) return { success: false, message: 'Teacher account not found' };
+
+  if (updates.username) {
+    const cleanUser = updates.username.trim().toLowerCase();
+    if (cleanUser === accounts.admin.username.toLowerCase()) {
+      return { success: false, message: 'Username cannot match Admin username' };
+    }
+    const duplicate = teachers.some((t, i) => i !== idx && t.username.toLowerCase() === cleanUser);
+    if (duplicate) {
+      return { success: false, message: 'Username is already taken by another teacher' };
+    }
+  }
+
+  teachers[idx] = {
+    ...teachers[idx],
+    ...updates,
+    title: updates.subject ? `Faculty (${updates.subject})` : teachers[idx].title
+  };
+  accounts.teachers = teachers;
+  accounts.teacher = teachers[0];
+  return saveStaffAccounts(accounts);
+}
+
+// Delete teacher account
+export function deleteTeacherAccount(id) {
+  const accounts = getStaffAccounts();
+  const teachers = accounts.teachers || [];
+  if (teachers.length <= 1) {
+    return { success: false, message: 'At least one teacher account must remain in the system.' };
+  }
+  accounts.teachers = teachers.filter(t => t.id !== id);
+  accounts.teacher = accounts.teachers[0];
+  return saveStaffAccounts(accounts);
+}
+
 // Update single staff account password / info
 export function updateStaffAccount(role, updates) {
   const accounts = getStaffAccounts();
@@ -70,6 +192,9 @@ export function updateStaffAccount(role, updates) {
     accounts.admin = { ...accounts.admin, ...updates };
   } else if (role === USER_ROLES.TEACHER) {
     accounts.teacher = { ...accounts.teacher, ...updates };
+    if (accounts.teachers && accounts.teachers.length > 0) {
+      accounts.teachers[0] = { ...accounts.teachers[0], ...updates };
+    }
   } else {
     return { success: false, message: 'Invalid role' };
   }
@@ -138,21 +263,28 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
   }
 
   if (requestedRole === USER_ROLES.TEACHER) {
-    const teacherAcc = accounts.teacher;
-    const isUserMatch = cleanUser === teacherAcc.username.toLowerCase() || 
-                        (teacherAcc.email && cleanUser === teacherAcc.email.toLowerCase());
-    const isPassMatch = cleanPass === teacherAcc.password || (teacherAcc.pin && cleanPass === teacherAcc.pin);
+    const teachersList = accounts.teachers && accounts.teachers.length > 0 
+      ? accounts.teachers 
+      : [accounts.teacher];
 
-    if (isUserMatch && isPassMatch) {
+    const matchedTeacher = teachersList.find(t => {
+      const isUserMatch = cleanUser === t.username.toLowerCase() || 
+                          (t.email && cleanUser === t.email.toLowerCase());
+      const isPassMatch = cleanPass === t.password || (t.pin && cleanPass === t.pin);
+      return isUserMatch && isPassMatch;
+    });
+
+    if (matchedTeacher) {
       return {
         success: true,
         user: {
-          id: 'teacher-01',
-          username: teacherAcc.username,
-          name: teacherAcc.name || 'Faculty Member',
+          id: matchedTeacher.id || 'teacher-01',
+          username: matchedTeacher.username,
+          name: matchedTeacher.name || 'Faculty Member',
           role: USER_ROLES.TEACHER,
-          title: teacherAcc.title || 'Senior Faculty',
-          email: teacherAcc.email
+          title: matchedTeacher.title || (matchedTeacher.subject ? `Faculty (${matchedTeacher.subject})` : 'Senior Faculty'),
+          subject: matchedTeacher.subject || '',
+          email: matchedTeacher.email || ''
         }
       };
     }

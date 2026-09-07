@@ -190,6 +190,7 @@ export default function App() {
             {activeTab === 'dashboard' && (
               <Dashboard 
                 data={data} 
+                currentUser={currentUser}
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
                 onOpenAdmitModal={() => currentUser?.role === USER_ROLES.ADMIN && setAdmitModalOpen(true)}
@@ -211,6 +212,7 @@ export default function App() {
             {activeTab === 'batches' && (
               <Batches 
                 data={data}
+                currentUser={currentUser}
                 onSaveData={handleSaveData}
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
@@ -220,6 +222,7 @@ export default function App() {
             {activeTab === 'attendance' && (
               <Attendance 
                 data={data}
+                currentUser={currentUser}
                 onSaveData={handleSaveData}
               />
             )}
@@ -236,6 +239,7 @@ export default function App() {
             {activeTab === 'exams' && (
               <Exams 
                 data={data}
+                currentUser={currentUser}
                 onSaveData={handleSaveData}
               />
             )}

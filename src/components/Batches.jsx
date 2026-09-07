@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Clock, Plus, Users, UserCheck, MapPin, X, BookOpen, Trash2 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
+import { USER_ROLES } from '../lib/auth';
 
-export default function Batches({ data, onSaveData, setActiveTab, setSelectedClassFilter }) {
+export default function Batches({ data, currentUser, onSaveData, setActiveTab, setSelectedClassFilter }) {
   const { batches = [], students = [], classes = [] } = data;
+  const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
 
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [selectedBatchForRoster, setSelectedBatchForRoster] = useState(null);
@@ -82,13 +84,15 @@ export default function Batches({ data, onSaveData, setActiveTab, setSelectedCla
             <div key={batch.id} className="glass-card batch-card">
               <div className="batch-card-top">
                 <span className="badge badge-class">{className}</span>
-                <button 
-                  className="btn-delete-mini"
-                  title="Delete Batch"
-                  onClick={() => handleDeleteBatch(batch.id)}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {!isTeacher && (
+                  <button 
+                    className="btn-delete-mini"
+                    title="Delete Batch"
+                    onClick={() => handleDeleteBatch(batch.id)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
 
               <h2 className="batch-title">{batch.name}</h2>
@@ -269,7 +273,10 @@ export default function Batches({ data, onSaveData, setActiveTab, setSelectedCla
                     <span className="roster-idx font-mono text-muted">{idx + 1}.</span>
                     <div className="flex-1">
                       <div className="font-semibold">{student.name}</div>
-                      <div className="text-xs text-muted">{student.school || 'School unspecified'} • Parent: {student.parentPhone}</div>
+                      <div className="text-xs text-muted">
+                        {student.school || 'School unspecified'}
+                        {!isTeacher && ` • Parent: ${student.parentPhone}`}
+                      </div>
                     </div>
                     <span className="font-mono text-xs badge badge-class">{student.admissionNo}</span>
                   </div>
