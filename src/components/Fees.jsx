@@ -1249,6 +1249,85 @@ export default function Fees({
           gap: 12px;
           margin-top: 16px;
         }
+
+        /* Mobile Responsive Layout for Fees */
+        @media (max-width: 768px) {
+          .fees-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          .fees-header .btn {
+            width: 100%;
+          }
+          .fee-kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          .fee-kpi-card {
+            padding: 14px 12px;
+          }
+          .fee-kpi-card .kpi-value {
+            font-size: 1.35rem;
+          }
+          .view-mode-tabs-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          .view-mode-tabs {
+            min-width: max-content;
+          }
+          .view-tab-btn {
+            padding: 8px 12px;
+            font-size: 0.775rem;
+          }
+          .fee-filters-card {
+            padding: 12px 10px;
+          }
+          .filters-row {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+          .status-pills {
+            width: 100%;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 4px;
+            -webkit-overflow-scrolling: touch;
+          }
+          .pill-btn {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+          }
+          .class-filter-box {
+            width: 100%;
+          }
+          .select-class-sm {
+            width: 100%;
+            min-width: 100%;
+          }
+          .search-box-wrapper {
+            width: 100%;
+            min-width: 100%;
+            max-width: 100%;
+          }
+          .action-buttons-flex {
+            flex-direction: row;
+            gap: 4px;
+          }
+          .whatsapp-btn-icon {
+            padding: 4px 8px;
+            font-size: 0.7rem;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .fee-kpi-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
     </div>
   );

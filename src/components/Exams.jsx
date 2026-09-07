@@ -554,6 +554,34 @@ export default function Exams({ data, onSaveData }) {
           font-size: 0.8125rem;
           color: #334155;
         }
+
+        /* Mobile Responsive for Exams */
+        @media (max-width: 768px) {
+          .exams-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          .exams-header .btn {
+            width: 100%;
+          }
+          .exam-controls-flex {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+          .exam-select-box, .select-class-sm {
+            width: 100%;
+            min-width: 100%;
+          }
+          .scorecard-details {
+            grid-template-columns: 1fr;
+          }
+          .scorecard-marks-highlight {
+            flex-direction: column;
+            text-align: center;
+          }
+        }
       `}</style>
     </div>
   );

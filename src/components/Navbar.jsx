@@ -47,17 +47,64 @@ export default function Navbar({
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
-        {/* Brand Logo & Name */}
-        <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
-          <div className="brand-logo-box">
-            <HayagrivaLogo size={38} showGlow={true} />
-          </div>
-          <div className="brand-text">
-            <div className="brand-title">
-              <span>HAYAGRIVA TUTORIALS</span>
-              <span className="brand-tag">Class 1 to X</span>
+        <div className="navbar-top-bar">
+          {/* Brand Logo & Name */}
+          <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
+            <div className="brand-logo-box">
+              <HayagrivaLogo size={34} showGlow={true} />
             </div>
-            <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
+            <div className="brand-text">
+              <div className="brand-title">
+                <span>HAYAGRIVA</span>
+                <span className="brand-tag">Class 1-X</span>
+              </div>
+              <div className="brand-subtitle">School Tuition Academy</div>
+            </div>
+          </div>
+
+          {/* User Profile, Live Status & Actions */}
+          <div className="navbar-actions">
+            {/* Supabase Live Pill */}
+            <div 
+              className={`live-status-pill ${isSyncing ? 'syncing' : ''}`} 
+              title={isSupabaseLive ? (isSyncing ? 'Syncing to Supabase PostgreSQL...' : 'Connected to Supabase PostgreSQL Realtime') : 'Running on Local Storage'}
+            >
+              <Radio size={12} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
+              <span className="live-pill-text">{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Live') : 'Local'}</span>
+            </div>
+
+            {/* System Settings & Database (Admin Only) */}
+            {currentUser?.role === USER_ROLES.ADMIN && (
+              <button 
+                onClick={onOpenSettings}
+                className="btn btn-secondary btn-sm db-settings-btn"
+                title="Database, Staff Passwords & System Settings"
+              >
+                <Settings size={14} />
+                <span className="btn-label-text">Settings</span>
+              </button>
+            )}
+
+            {/* Current User Badge */}
+            {currentUser && (
+              <div className="current-user-badge">
+                {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={13} className="text-primary" />}
+                {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={13} className="text-emerald" />}
+                {currentUser.role === USER_ROLES.PARENT && <Users size={13} className="text-amber" />}
+                <span className="user-badge-name">{currentUser.name}</span>
+                <span className="user-role-tag">{currentUser.role}</span>
+              </div>
+            )}
+
+            {/* Logout Button */}
+            <button 
+              onClick={onLogout}
+              className="btn btn-secondary btn-sm logout-nav-btn"
+              title="Sign out"
+            >
+              <LogOut size={14} />
+              <span className="btn-label-text">Logout</span>
+            </button>
           </div>
         </div>
 
@@ -72,63 +119,18 @@ export default function Navbar({
                 onClick={() => setActiveTab(item.id)}
                 className={`nav-tab-btn ${isActive ? 'active' : ''}`}
               >
-                <Icon size={16} />
+                <Icon size={15} />
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
-
-        {/* User Profile, Live Status & Actions */}
-        <div className="navbar-actions">
-          {/* Supabase Live Pill */}
-          <div 
-            className={`live-status-pill ${isSyncing ? 'syncing' : ''}`} 
-            title={isSupabaseLive ? (isSyncing ? 'Syncing to Supabase PostgreSQL...' : 'Connected to Supabase PostgreSQL Realtime') : 'Running on Local Storage'}
-          >
-            <Radio size={13} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
-            <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Supabase Live') : 'Local Storage'}</span>
-          </div>
-
-          {/* System Settings & Database (Admin Only) */}
-          {currentUser?.role === USER_ROLES.ADMIN && (
-            <button 
-              onClick={onOpenSettings}
-              className="btn btn-secondary btn-sm db-settings-btn"
-              title="Database, Staff Passwords & System Settings"
-            >
-              <Settings size={14} />
-              <span>Settings</span>
-            </button>
-          )}
-
-          {/* Current User Badge */}
-          {currentUser && (
-            <div className="current-user-badge">
-              {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={14} className="text-primary" />}
-              {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={14} className="text-emerald" />}
-              {currentUser.role === USER_ROLES.PARENT && <Users size={14} className="text-amber" />}
-              <span className="user-badge-name">{currentUser.name}</span>
-              <span className="user-role-tag">{currentUser.role}</span>
-            </div>
-          )}
-
-          {/* Logout Button */}
-          <button 
-            onClick={onLogout}
-            className="btn btn-secondary btn-sm logout-nav-btn"
-            title="Sign out"
-          >
-            <LogOut size={14} />
-            <span>Logout</span>
-          </button>
-        </div>
       </div>
 
 
       <style>{`
         .navbar-container {
-          background: rgba(17, 24, 39, 0.88);
+          background: rgba(17, 24, 39, 0.94);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
           border-bottom: 1px solid var(--border-subtle);
@@ -136,6 +138,8 @@ export default function Navbar({
           top: 0;
           z-index: 100;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+          width: 100%;
+          max-width: 100vw;
         }
         .navbar-inner {
           max-width: 1400px;
@@ -146,12 +150,16 @@ export default function Navbar({
           align-items: center;
           justify-content: space-between;
           gap: 14px;
+          width: 100%;
+          min-width: 0;
         }
-        .navbar-brand,
-        .brand-wrapper {
+        .navbar-top-bar {
+          display: contents;
+        }
+        .navbar-brand {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           cursor: pointer;
           user-select: none;
           flex-shrink: 0;
@@ -163,15 +171,14 @@ export default function Navbar({
         }
         .brand-title {
           font-family: var(--font-heading);
-          font-size: 1.1rem;
+          font-size: 1.05rem;
           font-weight: 700;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           line-height: 1.2;
         }
-        .brand-tag,
-        .brand-badge {
+        .brand-tag {
           font-size: 0.65rem;
           font-weight: 700;
           padding: 2px 7px;
@@ -180,25 +187,25 @@ export default function Navbar({
           color: #A5B4FC;
           border-radius: var(--radius-full);
           text-transform: uppercase;
+          white-space: nowrap;
         }
-        .brand-subtitle,
-        .brand-tagline {
+        .brand-subtitle {
           font-size: 0.725rem;
           color: var(--text-secondary);
         }
-        .navbar-links,
-        .nav-tabs {
+        .navbar-links {
           display: flex !important;
           flex-direction: row !important;
           align-items: center !important;
           gap: 6px;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           padding: 2px;
           scrollbar-width: none !important;
           -ms-overflow-style: none !important;
+          min-width: 0;
         }
-        .navbar-links::-webkit-scrollbar,
-        .nav-tabs::-webkit-scrollbar {
+        .navbar-links::-webkit-scrollbar {
           display: none !important;
           width: 0 !important;
           height: 0 !important;
@@ -210,7 +217,6 @@ export default function Navbar({
           padding: 7px 12px;
           font-size: 0.8125rem;
           font-weight: 600;
-
           font-family: var(--font-body);
           border: 1px solid transparent;
           border-radius: var(--radius-md);
@@ -219,6 +225,7 @@ export default function Navbar({
           cursor: pointer;
           white-space: nowrap;
           transition: all 0.2s ease;
+          flex-shrink: 0;
         }
         .nav-tab-btn:hover {
           color: var(--text-primary);
@@ -278,7 +285,7 @@ export default function Navbar({
         .user-badge-name {
           font-weight: 600;
           color: white;
-          max-width: 120px;
+          max-width: 110px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -305,17 +312,47 @@ export default function Navbar({
           border-color: rgba(244, 63, 94, 0.4);
           background: rgba(244, 63, 94, 0.1);
         }
-        @media (max-width: 1080px) {
+
+        /* Mobile & Tablet Responsive Layout */
+        @media (max-width: 960px) {
+          .navbar-inner {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+            padding: 8px 12px;
+          }
+          .navbar-top-bar {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+          }
           .brand-subtitle { display: none; }
+          .btn-label-text { display: none; }
           .user-badge-name { display: none; }
+          .db-settings-btn, .logout-nav-btn {
+            padding: 6px 8px;
+          }
+          .navbar-links {
+            width: 100%;
+            padding: 3px 0;
+          }
+          .nav-tab-btn {
+            padding: 6px 10px;
+            font-size: 0.775rem;
+          }
         }
-        @media (max-width: 900px) {
-          .nav-tab-btn span { display: none; }
-          .nav-tab-btn { padding: 8px 10px; }
+
+        @media (max-width: 480px) {
+          .brand-title { font-size: 0.95rem; }
+          .brand-tag { display: none; }
+          .live-status-pill { padding: 4px 6px; font-size: 0.65rem; }
+          .current-user-badge { padding: 3px 6px; }
+          .user-role-tag { font-size: 0.6rem; padding: 1px 4px; }
         }
       `}</style>
     </header>
-
-
   );
 }

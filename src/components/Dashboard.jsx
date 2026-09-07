@@ -763,6 +763,141 @@ export default function Dashboard({
           gap: 5px;
           flex-shrink: 0;
         }
+
+        /* Mobile & Tablet Responsive Layout */
+        @media (max-width: 768px) {
+          .dashboard-hero {
+            padding: 16px 14px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 14px;
+          }
+          .hero-branding-left {
+            max-width: 100%;
+          }
+          .hero-logo-row {
+            gap: 12px;
+          }
+          .hero-heading {
+            font-size: 1.35rem;
+          }
+          .hero-tagline-quote {
+            font-size: 0.775rem;
+          }
+          .maths-focus-banner {
+            padding: 8px 12px;
+          }
+          .maths-bullets {
+            flex-direction: column;
+            gap: 4px;
+          }
+          .hero-actions-right {
+            align-items: stretch;
+            width: 100%;
+          }
+          .hero-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 100%;
+          }
+          .hero-actions .btn {
+            padding: 8px 6px;
+            font-size: 0.75rem;
+            gap: 4px;
+            white-space: nowrap;
+          }
+          .contact-pills-box {
+            align-items: flex-start;
+            width: 100%;
+            gap: 4px;
+          }
+          .contact-pill-item {
+            width: 100%;
+            font-size: 0.7rem;
+            white-space: normal;
+            word-break: break-word;
+          }
+          .we-offer-strip {
+            padding: 10px 12px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+          .offer-items-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+          }
+          .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          .kpi-card {
+            padding: 14px 12px;
+            gap: 8px;
+          }
+          .kpi-value {
+            font-size: 1.5rem;
+          }
+          .fee-cycle-alert-banner {
+            padding: 14px 12px;
+          }
+          .cycle-alerts-grid {
+            grid-template-columns: 1fr !important;
+            gap: 10px;
+          }
+          .cycle-alert-item {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            padding: 12px;
+          }
+          .cycle-student-meta {
+            white-space: normal;
+          }
+          .cycle-status-meta {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .cycle-wa-btn {
+            width: 100%;
+            justify-content: center;
+          }
+          .class-bar-row {
+            grid-template-columns: 95px 1fr 65px;
+            gap: 8px;
+            padding: 8px;
+          }
+          .class-name {
+            font-size: 0.8rem;
+          }
+          .class-fee-rate {
+            font-size: 0.75rem;
+          }
+          .batch-mini-item {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+          }
+          .batch-time-box {
+            align-self: flex-start;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .kpi-grid {
+            grid-template-columns: 1fr;
+          }
+          .hero-actions {
+            grid-template-columns: 1fr;
+          }
+          .offer-items-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
     </div>
   );

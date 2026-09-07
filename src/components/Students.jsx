@@ -926,6 +926,42 @@ export default function Students({
           border: 1px solid var(--border-subtle);
           font-size: 0.8125rem;
         }
+
+        /* Mobile Responsive for Students */
+        @media (max-width: 768px) {
+          .students-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          .students-header .btn {
+            width: 100%;
+          }
+          .filters-card {
+            padding: 12px 10px;
+          }
+          .filters-flex {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+          .category-pills {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          .select-class-sm {
+            width: 100%;
+            min-width: 100%;
+          }
+          .search-box-wrapper {
+            width: 100%;
+            min-width: 100%;
+          }
+          .profile-details-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
     </div>
   );

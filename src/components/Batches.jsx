@@ -385,6 +385,25 @@ export default function Batches({ data, onSaveData, setActiveTab, setSelectedCla
           border: 1px solid var(--border-subtle);
           font-size: 0.825rem;
         }
+
+        /* Mobile Responsive for Batches */
+        @media (max-width: 768px) {
+          .batches-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          .batches-header .btn {
+            width: 100%;
+          }
+          .batches-grid {
+            grid-template-columns: 1fr !important;
+            gap: 14px;
+          }
+          .batch-actions-row {
+            flex-direction: column;
+          }
+        }
       `}</style>
     </div>
   );

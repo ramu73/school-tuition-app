@@ -460,6 +460,35 @@ export default function Attendance({ data, onSaveData }) {
           padding: 4px 8px;
           font-size: 0.725rem;
         }
+
+        /* Mobile Responsive for Attendance */
+        @media (max-width: 768px) {
+          .attendance-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          .attendance-header .btn {
+            width: 100%;
+          }
+          .attendance-controls-card {
+            padding: 14px 12px;
+          }
+          .controls-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+          .attendance-stats-bar {
+            gap: 6px;
+          }
+          .stat-pill {
+            padding: 4px 8px;
+            font-size: 0.725rem;
+          }
+          .attendance-split-layout {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
     </div>
   );

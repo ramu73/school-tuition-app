@@ -631,6 +631,50 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
           color: var(--text-muted);
           font-size: 0.85rem;
         }
+
+        /* Mobile Responsive for Parent Portal */
+        @media (max-width: 768px) {
+          .portal-header-card {
+            padding: 14px 12px;
+          }
+          .portal-header-content {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+          }
+          .student-selector-box {
+            width: 100%;
+            min-width: 100%;
+          }
+          .student-banner-card {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 14px 12px;
+          }
+          .tuition-batch-info-box {
+            width: 100%;
+            min-width: 100%;
+          }
+          .portal-kpis-grid {
+            grid-template-columns: 1fr !important;
+            gap: 10px;
+          }
+          .portal-details-grid {
+            grid-template-columns: 1fr !important;
+            gap: 14px;
+          }
+          .parent-receipt-item,
+          .parent-test-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+          .test-score-col {
+            align-items: flex-start;
+            width: 100%;
+          }
+        }
       `}</style>
     </div>
   );
