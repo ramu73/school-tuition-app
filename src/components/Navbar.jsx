@@ -47,68 +47,21 @@ export default function Navbar({
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
-        <div className="navbar-top-bar">
-          {/* Brand Logo & Name */}
-          <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
-            <div className="brand-logo-box">
-              <HayagrivaLogo size={34} showGlow={true} />
-            </div>
-            <div className="brand-text">
-              <div className="brand-title">
-                <span>HAYAGRIVA</span>
-                <span className="brand-tag">Class 1-X</span>
-              </div>
-              <div className="brand-subtitle">School Tuition Academy</div>
-            </div>
+        {/* Brand Logo & Name (Left) */}
+        <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
+          <div className="brand-logo-box">
+            <HayagrivaLogo size={36} showGlow={true} />
           </div>
-
-          {/* User Profile, Live Status & Actions */}
-          <div className="navbar-actions">
-            {/* Supabase Live Pill */}
-            <div 
-              className={`live-status-pill ${isSyncing ? 'syncing' : ''}`} 
-              title={isSupabaseLive ? (isSyncing ? 'Syncing to Supabase PostgreSQL...' : 'Connected to Supabase PostgreSQL Realtime') : 'Running on Local Storage'}
-            >
-              <Radio size={12} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
-              <span className="live-pill-text">{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Live') : 'Local'}</span>
+          <div className="brand-text">
+            <div className="brand-title">
+              <span>HAYAGRIVA TUTORIALS</span>
+              <span className="brand-tag">Class 1 to X</span>
             </div>
-
-            {/* System Settings & Database (Admin Only) */}
-            {currentUser?.role === USER_ROLES.ADMIN && (
-              <button 
-                onClick={onOpenSettings}
-                className="btn btn-secondary btn-sm db-settings-btn"
-                title="Database, Staff Passwords & System Settings"
-              >
-                <Settings size={14} />
-                <span className="btn-label-text">Settings</span>
-              </button>
-            )}
-
-            {/* Current User Badge */}
-            {currentUser && (
-              <div className="current-user-badge">
-                {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={13} className="text-primary" />}
-                {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={13} className="text-emerald" />}
-                {currentUser.role === USER_ROLES.PARENT && <Users size={13} className="text-amber" />}
-                <span className="user-badge-name">{currentUser.name}</span>
-                <span className="user-role-tag">{currentUser.role}</span>
-              </div>
-            )}
-
-            {/* Logout Button */}
-            <button 
-              onClick={onLogout}
-              className="btn btn-secondary btn-sm logout-nav-btn"
-              title="Sign out"
-            >
-              <LogOut size={14} />
-              <span className="btn-label-text">Logout</span>
-            </button>
+            <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (Middle) */}
         <nav className="navbar-links" role="tablist">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -119,14 +72,58 @@ export default function Navbar({
                 onClick={() => setActiveTab(item.id)}
                 className={`nav-tab-btn ${isActive ? 'active' : ''}`}
               >
-                <Icon size={15} />
+                <Icon size={16} />
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
-      </div>
 
+        {/* User Profile, Live Status & Actions (Far Right in Web View) */}
+        <div className="navbar-actions">
+          {/* Supabase Live Pill */}
+          <div 
+            className={`live-status-pill ${isSyncing ? 'syncing' : ''}`} 
+            title={isSupabaseLive ? (isSyncing ? 'Syncing to Supabase PostgreSQL...' : 'Connected to Supabase PostgreSQL Realtime') : 'Running on Local Storage'}
+          >
+            <Radio size={12} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
+            <span className="live-pill-text">{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Live') : 'Local'}</span>
+          </div>
+
+          {/* System Settings & Database (Admin Only) */}
+          {currentUser?.role === USER_ROLES.ADMIN && (
+            <button 
+              onClick={onOpenSettings}
+              className="btn btn-secondary btn-sm db-settings-btn"
+              title="Database, Staff Passwords & System Settings"
+            >
+              <Settings size={14} />
+              <span className="btn-label-text">Settings</span>
+            </button>
+          )}
+
+          {/* Current User Badge */}
+          {currentUser && (
+            <div className="current-user-badge">
+              {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={13} className="text-primary" />}
+              {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={13} className="text-emerald" />}
+              {currentUser.role === USER_ROLES.PARENT && <Users size={13} className="text-amber" />}
+              <span className="user-badge-name">{currentUser.name}</span>
+              <span className="user-role-tag">{currentUser.role}</span>
+            </div>
+          )}
+
+          {/* Logout Button (Always on the far right!) */}
+          <button 
+            onClick={onLogout}
+            className="btn btn-secondary btn-sm logout-nav-btn"
+            title="Sign out"
+          >
+            <LogOut size={14} />
+            <span className="btn-label-text">Logout</span>
+          </button>
+        </div>
+      </div>
 
       <style>{`
         .navbar-container {
@@ -149,20 +146,18 @@ export default function Navbar({
           flex-direction: row;
           align-items: center;
           justify-content: space-between;
-          gap: 14px;
+          gap: 16px;
           width: 100%;
           min-width: 0;
-        }
-        .navbar-top-bar {
-          display: contents;
         }
         .navbar-brand {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           cursor: pointer;
           user-select: none;
           flex-shrink: 0;
+          order: 1;
         }
         .brand-logo-box {
           display: flex;
@@ -171,11 +166,11 @@ export default function Navbar({
         }
         .brand-title {
           font-family: var(--font-heading);
-          font-size: 1.05rem;
+          font-size: 1.1rem;
           font-weight: 700;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
           line-height: 1.2;
         }
         .brand-tag {
@@ -204,6 +199,7 @@ export default function Navbar({
           scrollbar-width: none !important;
           -ms-overflow-style: none !important;
           min-width: 0;
+          order: 2;
         }
         .navbar-links::-webkit-scrollbar {
           display: none !important;
@@ -242,6 +238,8 @@ export default function Navbar({
           align-items: center;
           gap: 8px;
           flex-shrink: 0;
+          order: 3;
+          margin-left: auto;
         }
         .live-status-pill {
           display: flex;
@@ -285,7 +283,7 @@ export default function Navbar({
         .user-badge-name {
           font-weight: 600;
           color: white;
-          max-width: 110px;
+          max-width: 120px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -316,28 +314,30 @@ export default function Navbar({
         /* Mobile & Tablet Responsive Layout */
         @media (max-width: 960px) {
           .navbar-inner {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 8px;
+            flex-wrap: wrap;
+            gap: 10px 8px;
             padding: 8px 12px;
           }
-          .navbar-top-bar {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: space-between;
+          .navbar-brand {
+            order: 1;
+          }
+          .navbar-actions {
+            order: 2;
+            margin-left: auto;
+            gap: 6px;
+          }
+          .navbar-links {
+            order: 3;
             width: 100%;
-            gap: 8px;
+            flex-basis: 100%;
+            padding: 4px 0 2px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
           }
           .brand-subtitle { display: none; }
           .btn-label-text { display: none; }
           .user-badge-name { display: none; }
           .db-settings-btn, .logout-nav-btn {
             padding: 6px 8px;
-          }
-          .navbar-links {
-            width: 100%;
-            padding: 3px 0;
           }
           .nav-tab-btn {
             padding: 6px 10px;
