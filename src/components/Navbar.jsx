@@ -163,6 +163,17 @@ export default function Navbar({
           display: flex;
           align-items: center;
           justify-content: center;
+          background: radial-gradient(circle, rgba(30, 58, 138, 0.45) 0%, rgba(15, 23, 42, 0.85) 100%);
+          border: 1px solid rgba(96, 165, 250, 0.4);
+          border-radius: 10px;
+          padding: 4px;
+          box-shadow: 0 0 16px rgba(56, 189, 248, 0.35), inset 0 0 8px rgba(96, 165, 250, 0.15);
+          transition: all 0.25s ease;
+        }
+        .navbar-brand:hover .brand-logo-box {
+          border-color: rgba(96, 165, 250, 0.8);
+          box-shadow: 0 0 22px rgba(56, 189, 248, 0.6);
+          transform: scale(1.05);
         }
         .brand-title {
           font-family: var(--font-heading);

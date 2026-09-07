@@ -122,7 +122,7 @@ export default function Dashboard({
       <div className="dashboard-hero">
         <div className="hero-branding-left">
           <div className="hero-logo-row">
-            <HayagrivaLogo size={52} showText={false} />
+            <HayagrivaLogo size={52} showText={false} showGlow={true} />
             <div>
               <div className="badge badge-class mb-1">LEARN • GROW • SUCCEED</div>
               <h1 className="hero-heading">HAYAGRIVA TUTORIALS</h1>
