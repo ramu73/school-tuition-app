@@ -18,6 +18,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(getAuthSession()?.role === USER_ROLES.PARENT ? 'parent-portal' : 'dashboard');
   const [data, setData] = useState(getStoredData);
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
+  const [attendanceViewMode, setAttendanceViewMode] = useState('all-absentees');
   const [isSyncing, setIsSyncing] = useState(false);
 
 
@@ -194,6 +195,7 @@ export default function App() {
                 onSaveData={handleSaveData}
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
+                setAttendanceViewMode={setAttendanceViewMode}
                 onOpenAdmitModal={() => currentUser?.role === USER_ROLES.ADMIN && setAdmitModalOpen(true)}
                 onOpenFeeCollectModal={() => currentUser?.role === USER_ROLES.ADMIN && setFeeCollectModalOpen(true)}
               />
@@ -222,9 +224,11 @@ export default function App() {
 
             {activeTab === 'attendance' && (
               <Attendance 
-                data={data}
+                data={data} 
                 currentUser={currentUser}
                 onSaveData={handleSaveData}
+                viewMode={attendanceViewMode}
+                onViewModeChange={setAttendanceViewMode}
               />
             )}
 

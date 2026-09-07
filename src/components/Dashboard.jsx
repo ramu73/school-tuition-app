@@ -28,6 +28,7 @@ export default function Dashboard({
   onSaveData,
   setActiveTab, 
   setSelectedClassFilter, 
+  setAttendanceViewMode,
   onOpenAdmitModal, 
   onOpenFeeCollectModal 
 }) {
@@ -78,6 +79,8 @@ export default function Dashboard({
   // Today's attendance
   const todayStr = new Date().toISOString().split('T')[0];
   const todayAttendance = attendance.filter(a => a.date === todayStr);
+  const todayAbsentees = todayAttendance.filter(a => a.status === 'ABSENT');
+  const todayAbsenteesCount = todayAbsentees.length;
   const presentCount = todayAttendance.filter(a => a.status === 'PRESENT').length;
   const attendanceRate = todayAttendance.length > 0 
     ? Math.round((presentCount / todayAttendance.length) * 100) 
@@ -221,17 +224,31 @@ export default function Dashboard({
         </div>
 
         {/* KPI 2: Today's Attendance */}
-        <div className="glass-card kpi-card">
+        <div 
+          className="glass-card kpi-card clickable-kpi-card"
+          onClick={() => {
+            if (setAttendanceViewMode) setAttendanceViewMode('all-absentees');
+            setActiveTab('attendance');
+          }}
+          style={{ cursor: 'pointer' }}
+          title="Click to view All Absentees Register across all classes"
+        >
           <div className="kpi-top">
             <span className="kpi-label">Today's Attendance</span>
-            <div className="kpi-icon-pill icon-emerald">
+            <div className={`kpi-icon-pill ${todayAbsenteesCount > 0 ? 'icon-rose' : 'icon-emerald'}`}>
               <CheckCircle size={20} />
             </div>
           </div>
           <div className="kpi-value">{attendanceRate}%</div>
           <div className="kpi-footer">
             <span className="kpi-tag tag-success">{presentCount || 10} Present</span>
-            <span className="kpi-note">{todayAttendance.length || 12} marked today</span>
+            {todayAbsenteesCount > 0 ? (
+              <span className="kpi-tag tag-danger" style={{ background: 'rgba(244, 63, 94, 0.2)', color: '#FB7185', border: '1px solid rgba(244, 63, 94, 0.4)', fontWeight: 600 }}>
+                🚨 {todayAbsenteesCount} Absent Today →
+              </span>
+            ) : (
+              <span className="kpi-note">All Absentees Register →</span>
+            )}
           </div>
         </div>
 
