@@ -46,7 +46,8 @@ export default function Dashboard({
 
   // Joining date fee cycles & notification calculations
   const studentFeeCycles = activeStudents.map(student => {
-    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026');
+    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026')
+      || fees.find(f => f.studentId === student.id);
     return calculateStudentFeeCycle(student, feeRecord);
   });
   const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'OVERDUE');

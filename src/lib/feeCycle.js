@@ -5,31 +5,68 @@
 
 export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new Date()) {
   const joiningDateStr = student.admissionDate || '2026-01-01';
-  const joiningDate = new Date(joiningDateStr);
-  const cycleDay = joiningDate.getDate(); // e.g. 10th of every month
+  // Parse date safely without timezone offset issues
+  const [jYear, jMonth, jDay] = joiningDateStr.split('-').map(Number);
+  const joiningDate = new Date(jYear, (jMonth || 1) - 1, jDay || 1);
+  const cycleDay = jDay || joiningDate.getDate(); // e.g. 30th of every month
 
   const currentYear = referenceDate.getFullYear();
-  const currentMonth = referenceDate.getMonth(); // 0-indexed
-  const currentDay = referenceDate.getDate();
+  const currentMonth = referenceDate.getMonth(); // 0-indexed (e.g. 8 for September)
+  const currentDay = referenceDate.getDate(); // e.g. 7
 
-  // Due date for current month
-  // Handles month length variations (e.g. Feb 28/29)
-  const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const actualCycleDay = Math.min(cycleDay, daysInCurrentMonth);
-  const dueDateThisMonth = new Date(currentYear, currentMonth, actualCycleDay);
-  const dueDateStr = dueDateThisMonth.toISOString().split('T')[0];
+  const today = new Date(currentYear, currentMonth, currentDay);
 
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const monthYearLabel = `${monthNames[currentMonth]} ${currentYear}`;
+  // Helper to compute actual cycle date for a given year and month (handling variable days in month)
+  const getCycleDate = (y, m) => {
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const actualDay = Math.min(cycleDay, daysInMonth);
+    return new Date(y, m, actualDay);
+  };
 
-  const amountDue = feeRecord ? Number(feeRecord.amountDue) : student.monthlyFee;
+  // Cycle date in the current calendar month
+  const cycleThisMonth = getCycleDate(currentYear, currentMonth);
+  // Cycle date in the previous calendar month
+  const cyclePrevMonth = getCycleDate(currentYear, currentMonth - 1);
+  // Cycle date in the next calendar month
+  const cycleNextMonth = getCycleDate(currentYear, currentMonth + 1);
+
+  const amountDue = feeRecord ? Number(feeRecord.amountDue) : Number(student.monthlyFee || 0);
   const amountPaid = feeRecord ? Number(feeRecord.amountPaid) : 0;
-  const balance = feeRecord ? Number(feeRecord.balance) : student.monthlyFee;
+  const balance = feeRecord ? Number(feeRecord.balance) : Number(student.monthlyFee || 0);
   const isPaid = balance === 0;
 
-  // Compute status relative to reference date
+  let activeDueDate;
   let cycleStatus = 'UPCOMING'; // UPCOMING, DUE_TODAY, OVERDUE, PAID
-  let daysDiff = actualCycleDay - currentDay;
+  let daysDiff = 0;
+
+  // Determine active due date:
+  // If today is before this month's cycle day (e.g. Today is Sept 7, cycle day is 30 -> Sept 30 is in the future):
+  // Check if student joined on or before the previous month's cycle day (e.g. June 30 <= Aug 30).
+  // If so, the active billing cycle that was due on Aug 30 is pending and calculates from Aug 30 onwards!
+  if (today.getTime() < cycleThisMonth.getTime()) {
+    if (!isPaid && joiningDate.getTime() <= cyclePrevMonth.getTime()) {
+      activeDueDate = cyclePrevMonth;
+    } else {
+      activeDueDate = cycleThisMonth;
+    }
+  } else if (today.getTime() === cycleThisMonth.getTime()) {
+    activeDueDate = cycleThisMonth;
+  } else {
+    // Today is after this month's cycle day (e.g. Today is Sept 7, cycle day was Sept 5)
+    if (isPaid) {
+      activeDueDate = cycleNextMonth;
+    } else {
+      activeDueDate = cycleThisMonth;
+    }
+  }
+
+  // Calculate day difference relative to active due date
+  // diffTime = activeDueDate - today:
+  // positive = upcoming in X days
+  // 0 = due today
+  // negative = overdue by X days
+  const diffTime = activeDueDate.getTime() - today.getTime();
+  daysDiff = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
   if (isPaid) {
     cycleStatus = 'PAID';
@@ -41,6 +78,11 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
     cycleStatus = 'UPCOMING';
   }
 
+  const pad = (n) => String(n).padStart(2, '0');
+  const dueDateStr = `${activeDueDate.getFullYear()}-${pad(activeDueDate.getMonth() + 1)}-${pad(activeDueDate.getDate())}`;
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthYearLabel = `${monthNames[activeDueDate.getMonth()]} ${activeDueDate.getFullYear()}`;
+
   return {
     studentId: student.id,
     studentName: student.name,
@@ -48,9 +90,9 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
     parentName: student.parentName,
     parentPhone: student.parentPhone,
     joiningDate: joiningDateStr,
-    cycleDay: actualCycleDay,
+    cycleDay: activeDueDate.getDate(),
     dueDateStr,
-    formattedDueDate: dueDateThisMonth.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    formattedDueDate: activeDueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
     monthYearLabel,
     amountDue,
     amountPaid,
@@ -61,33 +103,49 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
   };
 }
 
-// Generate pre-filled WhatsApp notification message for parents
-export function generateFeeReminderWhatsAppUrl(cycleInfo, instituteName = 'HAYAGRIVA TUTORIALS') {
+// Generate pre-filled WhatsApp notification message text
+export function generateFeeReminderMessage(cycleInfo, instituteName = 'HAYAGRIVA TUTORIALS') {
   const {
     studentName,
     parentName,
-    parentPhone,
     formattedDueDate,
-    amountDue,
     balance,
-    cycleDay,
-    joiningDate,
-    cycleStatus,
-    daysDiff
+    cycleStatus
   } = cycleInfo;
 
-  let message = '';
+  // Clean parent name: remove any existing "ji" or extra spaces, and don't add "Ji"
+  const cleanParentName = parentName ? parentName.replace(/\bji\b/gi, '').trim() : '';
+  const greeting = cleanParentName ? `Dear ${cleanParentName},` : 'Dear Parent,';
+  const formattedBalance = Number(balance || 0).toLocaleString('en-IN');
 
-  if (cycleStatus === 'OVERDUE') {
-    const overdueDays = Math.abs(daysDiff);
-    message = `Dear ${parentName} ji,\n\n🔔 *FEE OVERDUE REMINDER - ${instituteName}*\n\nThis is an urgent reminder that monthly tuition fee for your child *${studentName}* was due on *${formattedDueDate}* (Monthly Cycle: ${cycleDay}th of every month, based on joining date ${joiningDate}) and is now *${overdueDays} day(s) OVERDUE*.\n\nPending Balance: *₹${balance.toLocaleString('en-IN')}*\nPayment Mode: Cash / UPI (PhonePe, GPay)\n\nKindly clear the dues today.\nThank you,\n*${instituteName}*\nContact: +91 98482 66892`;
-  } else if (cycleStatus === 'DUE_TODAY') {
-    message = `Dear ${parentName} ji,\n\n📢 *FEE DUE TODAY - ${instituteName}*\n\nThis is a friendly reminder that monthly tuition fee for your child *${studentName}* is *DUE TODAY (${formattedDueDate})* based on their joining date (${cycleDay}th of every month).\n\nDue Amount: *₹${balance.toLocaleString('en-IN')}*\nPayment Mode: Cash / UPI (PhonePe, GPay)\n\nKindly remit the fee at your earliest convenience.\nRegards,\n*${instituteName}*\nContact: +91 98482 66892`;
-  } else {
-    // UPCOMING
-    message = `Dear ${parentName} ji,\n\n🗓️ *UPCOMING TUITION FEE INTIMATION - ${instituteName}*\n\nThis is an advance notice that monthly tuition fee for *${studentName}* will be due on *${formattedDueDate}* in ${daysDiff} day(s) (Monthly Cycle: ${cycleDay}th of every month).\n\nMonthly Fee: *₹${balance.toLocaleString('en-IN')}*\nPayment Mode: Cash / UPI\n\nThank you for ensuring timely payments.\n*${instituteName}*\nContact: +91 98482 66892`;
+  let statusNote = `This is a reminder regarding the tuition fee for *${studentName}*.`;
+  if (cycleStatus === 'DUE_TODAY') {
+    statusNote = `This is a reminder that the tuition fee for *${studentName}* is due today.`;
+  } else if (cycleStatus === 'UPCOMING') {
+    statusNote = `This is a reminder for the upcoming tuition fee for *${studentName}*.`;
   }
 
-  const cleanPhone = parentPhone.replace(/[^0-9]/g, '');
-  return `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`;
+  return `${greeting}
+
+*Fee Reminder - ${instituteName}*
+
+${statusNote}
+
+• Due Date: *${formattedDueDate}*
+• Pending Amount: *₹${formattedBalance}*
+• Payment Mode: Cash / UPI (PhonePe, GPay)
+
+Kindly clear the pending fee at your convenience.
+
+Thank you,
+*${instituteName}*
+Contact: +91 98482 66892`;
+}
+
+// Generate pre-filled WhatsApp notification message URL for parents
+export function generateFeeReminderWhatsAppUrl(cycleInfo, instituteName = 'HAYAGRIVA TUTORIALS') {
+  const message = generateFeeReminderMessage(cycleInfo, instituteName);
+  const rawPhone = (cycleInfo.parentPhone || '').replace(/[^0-9]/g, '');
+  const cleanPhone = rawPhone.length === 10 ? `91${rawPhone}` : rawPhone;
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }

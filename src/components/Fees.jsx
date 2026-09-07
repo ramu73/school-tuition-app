@@ -20,7 +20,7 @@ import {
   UserCheck,
   AlertTriangle
 } from 'lucide-react';
-import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
+import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl, generateFeeReminderMessage } from '../lib/feeCycle';
 import { generateNextId } from '../lib/storage';
 import HayagrivaLogo from './HayagrivaLogo';
 
@@ -59,7 +59,8 @@ export default function Fees({
   // Calculate Fee Cycles based on Joining Date
   const activeStudents = students.filter(s => s.status === 'ACTIVE');
   const studentFeeCycles = activeStudents.map(student => {
-    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026');
+    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026')
+      || fees.find(f => f.studentId === student.id);
     return calculateStudentFeeCycle(student, feeRecord);
   });
 
@@ -70,7 +71,8 @@ export default function Fees({
   // Handle student selection in Collect Fee modal
   const handleStudentSelect = (studentId) => {
     setSelectedStudentId(studentId);
-    const existingFee = fees.find(f => f.studentId === Number(studentId) && f.monthYear === 'March 2026');
+    const existingFee = fees.find(f => f.studentId === Number(studentId) && f.monthYear === 'March 2026')
+      || fees.find(f => f.studentId === Number(studentId));
     if (existingFee) {
       setPaymentAmount(existingFee.balance);
     } else {
@@ -81,8 +83,7 @@ export default function Fees({
 
   // Copy SMS / WhatsApp message to clipboard
   const handleCopyMessage = (cycleInfo) => {
-    const url = generateFeeReminderWhatsAppUrl(cycleInfo, 'HAYAGRIVA TUTORIALS');
-    const msg = decodeURIComponent(url.split('text=')[1] || '');
+    const msg = generateFeeReminderMessage(cycleInfo, 'HAYAGRIVA TUTORIALS');
     navigator.clipboard.writeText(msg);
     setCopiedId(cycleInfo.studentId);
     setTimeout(() => setCopiedId(null), 2500);
