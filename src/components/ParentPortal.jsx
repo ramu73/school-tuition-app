@@ -467,9 +467,25 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
             padding: 16px 14px;
           }
           .portal-header-content {
-            flex-direction: column;
-            align-items: stretch;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: space-between;
             gap: 12px;
+          }
+          .portal-header-actions {
+            flex-shrink: 0;
+          }
+          .parent-title {
+            font-size: 1.25rem;
+          }
+          .parent-sub {
+            font-size: 0.775rem;
+          }
+          .logout-portal-btn {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            white-space: nowrap;
           }
           .student-hero-card {
             flex-direction: column;

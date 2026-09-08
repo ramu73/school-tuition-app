@@ -325,26 +325,50 @@ export default function Navbar({
         /* Mobile & Tablet Responsive Layout */
         @media (max-width: 960px) {
           .navbar-inner {
-            flex-wrap: wrap;
-            gap: 10px 8px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-areas:
+              "brand actions"
+              "links links";
+            align-items: center;
+            gap: 6px 10px;
             padding: 8px 12px;
           }
           .navbar-brand {
-            order: 1;
+            grid-area: brand;
+            min-width: 0;
+            gap: 8px;
+          }
+          .brand-logo-box {
+            flex-shrink: 0;
+          }
+          .brand-title {
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .brand-tag {
+            display: none;
+          }
+          .brand-subtitle {
+            display: none;
           }
           .navbar-actions {
-            order: 2;
-            margin-left: auto;
+            grid-area: actions;
+            display: flex;
+            align-items: center;
             gap: 6px;
+            flex-shrink: 0;
+            justify-self: end;
           }
           .navbar-links {
-            order: 3;
+            grid-area: links;
             width: 100%;
-            flex-basis: 100%;
             padding: 4px 0 2px 0;
             border-top: 1px solid rgba(255, 255, 255, 0.06);
+            overflow-x: auto;
           }
-          .brand-subtitle { display: none; }
           .btn-label-text { display: none; }
           .user-badge-name { display: none; }
           .db-settings-btn, .logout-nav-btn {
@@ -357,11 +381,34 @@ export default function Navbar({
         }
 
         @media (max-width: 480px) {
-          .brand-title { font-size: 0.95rem; }
-          .brand-tag { display: none; }
-          .live-status-pill { padding: 4px 6px; font-size: 0.65rem; }
-          .current-user-badge { padding: 3px 6px; }
-          .user-role-tag { font-size: 0.6rem; padding: 1px 4px; }
+          .navbar-inner {
+            padding: 6px 10px;
+            gap: 4px 6px;
+          }
+          .navbar-brand {
+            gap: 6px;
+          }
+          .brand-title {
+            font-size: 0.85rem;
+          }
+          .navbar-actions {
+            gap: 4px;
+          }
+          .live-status-pill {
+            padding: 3px 6px;
+            font-size: 0.65rem;
+          }
+          .current-user-badge {
+            padding: 2px 6px;
+            font-size: 0.675rem;
+          }
+          .user-role-tag {
+            font-size: 0.575rem;
+            padding: 1px 4px;
+          }
+          .logout-nav-btn {
+            padding: 4px 6px;
+          }
         }
       `}</style>
     </header>
