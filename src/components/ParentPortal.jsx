@@ -8,7 +8,6 @@ import {
   MessageSquare, 
   BookOpen, 
   Award, 
-  LogOut,
   Sparkles
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
@@ -74,15 +73,6 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
             <div className="parent-greeting">Parent & Guardian Portal</div>
             <h1 className="parent-title">Welcome, {currentUser?.name || currentStudent?.parentName || 'Parent'}</h1>
             <p className="parent-sub">Monitoring academic performance, tests & attendance at Hayagriva Tutorials</p>
-          </div>
-
-          <div className="portal-header-actions">
-            {onLogout && (
-              <button onClick={onLogout} className="btn btn-secondary btn-sm logout-portal-btn">
-                <LogOut size={14} />
-                <span>Logout</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -454,8 +444,7 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
           padding: 36px 20px;
           color: var(--text-muted);
         }
-        .whatsapp-portal-btn,
-        .logout-portal-btn {
+        .whatsapp-portal-btn {
           display: inline-flex;
           align-items: center;
           gap: 5px;
@@ -466,26 +455,11 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
           .portal-header-card {
             padding: 16px 14px;
           }
-          .portal-header-content {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 12px;
-          }
-          .portal-header-actions {
-            flex-shrink: 0;
-          }
           .parent-title {
             font-size: 1.25rem;
           }
           .parent-sub {
             font-size: 0.775rem;
-          }
-          .logout-portal-btn {
-            padding: 5px 10px;
-            font-size: 0.75rem;
-            white-space: nowrap;
           }
           .student-hero-card {
             flex-direction: column;
