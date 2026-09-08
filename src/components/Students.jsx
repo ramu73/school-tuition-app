@@ -311,7 +311,7 @@ export default function Students({
               filteredStudents.map((student) => {
                 const assignedBatch = batches.find(b => b.id === student.batchId);
                 const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
-                const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=Hello%20${encodeURIComponent(student.parentName)},%20this%20is%20from%20HAYAGRIVA%20TUTORIALS%20regarding%20${encodeURIComponent(student.name)}.`;
+                const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=Dear%20Sir%2FMam,%20this%20is%20from%20HAYAGRIVA%20TUTORIALS%20regarding%20${encodeURIComponent(student.name)}.`;
 
                 return (
                   <tr key={student.id}>

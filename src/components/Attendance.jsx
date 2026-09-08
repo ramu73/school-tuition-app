@@ -502,7 +502,7 @@ export default function Attendance({
                 </thead>
                 <tbody>
                   {filteredAllAbsentees.map((student, index) => {
-                    const messageText = `Dear Parent, this is to inform you that your child *${student.name}* of *${student.className}* was marked ABSENT for tuition today (${selectedDate}). Regular attendance is critical for academic continuity. Kindly contact us if you have any questions. - HAYAGRIVA TUTORIALS`;
+                    const messageText = `Dear Sir/Mam, this is to inform you that your child *${student.name}* of *${student.className}* was marked ABSENT for tuition today (${selectedDate}). Regular attendance is critical for academic continuity. Kindly contact us if you have any questions. - HAYAGRIVA TUTORIALS`;
                     const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=${encodeURIComponent(messageText)}`;
 
                     return (
@@ -871,7 +871,7 @@ export default function Attendance({
                 <div className="absentees-list">
                   {batchAbsentStudents.map(student => {
                     const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
-                    const messageText = `Dear Parent, this is to inform you that your child *${student.name}* was marked ABSENT for *${className}* tuition today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`;
+                    const messageText = `Dear Sir/Mam, this is to inform you that your child *${student.name}* was marked ABSENT for *${className}* tuition today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`;
                     const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=${encodeURIComponent(messageText)}`;
 
                     return (

@@ -113,9 +113,8 @@ export function generateFeeReminderMessage(cycleInfo, instituteName = 'HAYAGRIVA
     cycleStatus
   } = cycleInfo;
 
-  // Clean parent name: remove any existing "ji" or extra spaces, and don't add "Ji"
-  const cleanParentName = parentName ? parentName.replace(/\bji\b/gi, '').trim() : '';
-  const greeting = cleanParentName ? `Dear ${cleanParentName},` : 'Dear Parent,';
+  // Polite formal greeting as requested
+  const greeting = 'Dear Sir/Mam,';
   const formattedBalance = Number(balance || 0).toLocaleString('en-IN');
 
   let statusNote = `This is a reminder regarding the tuition fee for *${studentName}*.`;
