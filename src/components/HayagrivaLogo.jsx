@@ -59,7 +59,7 @@ export default function HayagrivaLogo({
         }}
       >
         <img 
-          src="/hayagriva-emblem.png" 
+          src="/hayagriva-emblem.png?v=2" 
           alt="Hayagriva Tutorials Emblem" 
           style={{ 
             width: '100%', 
