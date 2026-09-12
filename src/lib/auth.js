@@ -33,7 +33,9 @@ export const INITIAL_STAFF_ACCOUNTS = {
       title: 'Senior Faculty (Maths & Physics)',
       subject: 'Mathematics & Physics',
       phone: '9848266892',
-      email: 'teacher@hayagriva.edu'
+      email: 'teacher@hayagriva.edu',
+      assignedBatchIds: [1, 2], // Default assigned batches
+      assignedStudentIds: []
     }
   ],
   teacher: {
@@ -44,7 +46,9 @@ export const INITIAL_STAFF_ACCOUNTS = {
     role: USER_ROLES.TEACHER,
     title: 'Senior Faculty (Maths & Physics)',
     subject: 'Mathematics & Physics',
-    email: 'teacher@hayagriva.edu'
+    email: 'teacher@hayagriva.edu',
+    assignedBatchIds: [1, 2],
+    assignedStudentIds: []
   }
 };
 
@@ -53,11 +57,14 @@ const STAFF_ACCOUNTS_KEY = 'hayagriva_staff_accounts_v1';
 // Get staff credentials (customized or default)
 export function getStaffAccounts() {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return INITIAL_STAFF_ACCOUNTS;
+    }
     const raw = localStorage.getItem(STAFF_ACCOUNTS_KEY);
     if (!raw) return INITIAL_STAFF_ACCOUNTS;
     const parsed = JSON.parse(raw);
 
-    // Ensure teachers array is always populated
+    // Ensure teachers array is always populated and has assignedBatchIds and assignedStudentIds
     let teachers = parsed.teachers;
     if (!Array.isArray(teachers) || teachers.length === 0) {
       const fallbackTeacher = parsed.teacher || INITIAL_STAFF_ACCOUNTS.teacher;
@@ -71,8 +78,20 @@ export function getStaffAccounts() {
         title: fallbackTeacher.title || 'Senior Faculty (Maths & Physics)',
         subject: fallbackTeacher.subject || 'Mathematics & Physics',
         phone: fallbackTeacher.phone || '9848266892',
-        email: fallbackTeacher.email || 'teacher@hayagriva.edu'
+        email: fallbackTeacher.email || 'teacher@hayagriva.edu',
+        assignedBatchIds: Array.isArray(fallbackTeacher.assignedBatchIds) ? fallbackTeacher.assignedBatchIds : [1, 2],
+        assignedStudentIds: Array.isArray(fallbackTeacher.assignedStudentIds) ? fallbackTeacher.assignedStudentIds : []
       }];
+    } else {
+      teachers = teachers.map((t, idx) => ({
+        ...t,
+        assignedBatchIds: Array.isArray(t.assignedBatchIds) 
+          ? t.assignedBatchIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id) 
+          : (idx === 0 ? [1, 2] : []),
+        assignedStudentIds: Array.isArray(t.assignedStudentIds)
+          ? t.assignedStudentIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id)
+          : []
+      }));
     }
 
     return {
@@ -89,8 +108,12 @@ export function getStaffAccounts() {
 // Save customized staff credentials (Admin can update passwords/usernames)
 export function saveStaffAccounts(accounts) {
   try {
-    localStorage.setItem(STAFF_ACCOUNTS_KEY, JSON.stringify(accounts));
-    window.dispatchEvent(new CustomEvent('hayagriva-staff-accounts-changed', { detail: accounts }));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STAFF_ACCOUNTS_KEY, JSON.stringify(accounts));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hayagriva-staff-accounts-changed', { detail: accounts }));
+    }
     return { success: true };
   } catch (err) {
     console.error('Failed to save staff accounts:', err);
@@ -104,8 +127,76 @@ export function getTeacherAccounts() {
   return accounts.teachers || [];
 }
 
+// Assign/reassign batches to a specific teacher
+export function assignBatchesToTeacher(teacherId, batchIds) {
+  const accounts = getStaffAccounts();
+  const cleanBatchIds = Array.isArray(batchIds) 
+    ? batchIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id) 
+    : [];
+  let updated = false;
+
+  const updatedTeachers = (accounts.teachers || []).map(t => {
+    if (t.id === teacherId) {
+      updated = true;
+      return { ...t, assignedBatchIds: cleanBatchIds };
+    }
+    return t;
+  });
+
+  if (updated) {
+    accounts.teachers = updatedTeachers;
+    if (accounts.teacher && accounts.teacher.id === teacherId) {
+      accounts.teacher = { ...accounts.teacher, assignedBatchIds: cleanBatchIds };
+    }
+    saveStaffAccounts(accounts);
+
+    // Update active session if this teacher is currently logged in
+    const session = getAuthSession();
+    if (session && session.user && session.user.id === teacherId) {
+      const updatedUser = { ...session.user, assignedBatchIds: cleanBatchIds };
+      setAuthSession(updatedUser);
+    }
+    return { success: true, teachers: updatedTeachers };
+  }
+  return { success: false, message: 'Teacher not found' };
+}
+
+// Assign/reassign specific students by name to a teacher
+export function assignStudentsToTeacher(teacherId, studentIds) {
+  const accounts = getStaffAccounts();
+  const cleanStudentIds = Array.isArray(studentIds) 
+    ? studentIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : String(id)) 
+    : [];
+  let updated = false;
+
+  const updatedTeachers = (accounts.teachers || []).map(t => {
+    if (t.id === teacherId) {
+      updated = true;
+      return { ...t, assignedStudentIds: cleanStudentIds };
+    }
+    return t;
+  });
+
+  if (updated) {
+    accounts.teachers = updatedTeachers;
+    if (accounts.teacher && accounts.teacher.id === teacherId) {
+      accounts.teacher = { ...accounts.teacher, assignedStudentIds: cleanStudentIds };
+    }
+    saveStaffAccounts(accounts);
+
+    // Update active session if this teacher is currently logged in
+    const session = getAuthSession();
+    if (session && session.user && session.user.id === teacherId) {
+      const updatedUser = { ...session.user, assignedStudentIds: cleanStudentIds };
+      setAuthSession(updatedUser);
+    }
+    return { success: true, teachers: updatedTeachers };
+  }
+  return { success: false, message: 'Teacher not found' };
+}
+
 // Add a new teacher account
-export function addTeacherAccount({ name, subject, username, password, phone, email }) {
+export function addTeacherAccount({ name, subject, username, password, phone, email, assignedBatchIds = [], assignedStudentIds = [] }) {
   const accounts = getStaffAccounts();
   const cleanUsername = (username || '').trim().toLowerCase();
   const cleanPassword = (password || '').trim();
@@ -132,6 +223,12 @@ export function addTeacherAccount({ name, subject, username, password, phone, em
     phone: phone ? phone.trim() : '',
     email: email ? email.trim() : '',
     role: USER_ROLES.TEACHER,
+    assignedBatchIds: Array.isArray(assignedBatchIds) 
+      ? assignedBatchIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id) 
+      : [],
+    assignedStudentIds: Array.isArray(assignedStudentIds)
+      ? assignedStudentIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id)
+      : [],
     createdAt: new Date().toISOString()
   };
 
@@ -204,6 +301,7 @@ export function updateStaffAccount(role, updates) {
 // Get active session from storage
 export function getAuthSession() {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
@@ -215,18 +313,26 @@ export function getAuthSession() {
 
 // Save active session
 export function setAuthSession(session) {
-  if (!session) {
-    localStorage.removeItem(AUTH_SESSION_KEY);
-  } else {
-    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  if (typeof localStorage !== 'undefined') {
+    if (!session) {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+    } else {
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+    }
   }
-  window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: session }));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: session }));
+  }
 }
 
 // Clear session / Logout
 export function clearAuthSession() {
-  localStorage.removeItem(AUTH_SESSION_KEY);
-  window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
+  }
 }
 
 // Authenticate Admin or Teacher
@@ -284,7 +390,13 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
           role: USER_ROLES.TEACHER,
           title: matchedTeacher.title || (matchedTeacher.subject ? `Faculty (${matchedTeacher.subject})` : 'Senior Faculty'),
           subject: matchedTeacher.subject || '',
-          email: matchedTeacher.email || ''
+          email: matchedTeacher.email || '',
+          assignedBatchIds: Array.isArray(matchedTeacher.assignedBatchIds) 
+            ? matchedTeacher.assignedBatchIds.map(id => !isNaN(Number(id)) ? Number(id) : id) 
+            : [],
+          assignedStudentIds: Array.isArray(matchedTeacher.assignedStudentIds)
+            ? matchedTeacher.assignedStudentIds.map(id => !isNaN(Number(id)) ? Number(id) : id)
+            : []
         }
       };
     }

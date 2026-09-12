@@ -6,6 +6,7 @@ import Batches from './components/Batches';
 import Attendance from './components/Attendance';
 import Fees from './components/Fees';
 import Exams from './components/Exams';
+import BroadcastNotifications from './components/BroadcastNotifications';
 import SettingsModal from './components/SettingsModal';
 import LoginModal from './components/LoginModal';
 import ParentPortal from './components/ParentPortal';
@@ -13,12 +14,69 @@ import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData }
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase } from './lib/supabase';
 import { getAuthSession, clearAuthSession, USER_ROLES } from './lib/auth';
 
+class TabErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Caught error in TabErrorBoundary:", error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.tabKey !== this.props.tabKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="glass-card text-center p-6 my-4" style={{ maxWidth: 640, margin: '40px auto' }}>
+          <div className="text-amber font-semibold text-base mb-2">
+            Notice: Error loading {this.props.tabName || 'Section'}
+          </div>
+          <p className="text-xs text-muted mb-4 font-mono">
+            {this.state.error?.message || 'An unexpected rendering error occurred.'}
+          </p>
+          <div className="flex justify-center gap-3">
+            <button 
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => this.setState({ hasError: false, error: null })}
+            >
+              Retry View
+            </button>
+            <button 
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                if (this.props.onResetTab) this.props.onResetTab();
+              }}
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(getAuthSession);
   const [activeTab, setActiveTab] = useState(getAuthSession()?.role === USER_ROLES.PARENT ? 'parent-portal' : 'dashboard');
   const [data, setData] = useState(getStoredData);
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [attendanceViewMode, setAttendanceViewMode] = useState('all-absentees');
+  const [selectedAttendanceBatchId, setSelectedAttendanceBatchId] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
 
 
@@ -40,12 +98,37 @@ export default function App() {
       setIsSupabaseLive(e.detail?.isConnected || false);
     };
 
+    const handleAuthChange = (e) => {
+      setCurrentUser(e.detail || getAuthSession());
+    };
+
+    const handleStaffChange = () => {
+      const session = getAuthSession();
+      if (session && session.role === USER_ROLES.TEACHER) {
+        const accounts = getStaffAccounts();
+        const freshTeacher = (accounts.teachers || []).find(t => t.id === session.id || t.username === session.username);
+        if (freshTeacher) {
+          const updatedUser = {
+            ...session,
+            assignedBatchIds: freshTeacher.assignedBatchIds || [],
+            assignedStudentIds: freshTeacher.assignedStudentIds || []
+          };
+          setCurrentUser(updatedUser);
+          setAuthSession(updatedUser);
+        }
+      }
+    };
+
     window.addEventListener('tuition-db-updated', handleDbUpdate);
     window.addEventListener('tuition-supabase-config-changed', handleConfigChange);
+    window.addEventListener('hayagriva-auth-changed', handleAuthChange);
+    window.addEventListener('hayagriva-staff-accounts-changed', handleStaffChange);
 
     return () => {
       window.removeEventListener('tuition-db-updated', handleDbUpdate);
       window.removeEventListener('tuition-supabase-config-changed', handleConfigChange);
+      window.removeEventListener('hayagriva-auth-changed', handleAuthChange);
+      window.removeEventListener('hayagriva-staff-accounts-changed', handleStaffChange);
     };
   }, []);
 
@@ -219,6 +302,10 @@ export default function App() {
                 onSaveData={handleSaveData}
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
+                onSelectBatchForAttendance={(batchId) => {
+                  setSelectedAttendanceBatchId(batchId);
+                  setAttendanceViewMode('batch');
+                }}
               />
             )}
 
@@ -229,6 +316,8 @@ export default function App() {
                 onSaveData={handleSaveData}
                 viewMode={attendanceViewMode}
                 onViewModeChange={setAttendanceViewMode}
+                selectedBatchId={selectedAttendanceBatchId}
+                onSelectedBatchChange={setSelectedAttendanceBatchId}
               />
             )}
 
@@ -248,6 +337,16 @@ export default function App() {
                 onSaveData={handleSaveData}
               />
             )}
+
+            {activeTab === 'notifications' && (
+              <TabErrorBoundary tabName="Broadcast & Notices" tabKey="notifications" onResetTab={() => setActiveTab('dashboard')}>
+                <BroadcastNotifications 
+                  data={data}
+                  currentUser={currentUser}
+                  onSaveData={handleSaveData}
+                />
+              </TabErrorBoundary>
+            )}
           </>
         )}
       </main>
@@ -258,6 +357,8 @@ export default function App() {
           isOpen={settingsModalOpen}
           onClose={() => setSettingsModalOpen(false)}
           onDataReset={(newData) => setData(newData)}
+          batches={data.batches || []}
+          students={data.students || []}
         />
       )}
 

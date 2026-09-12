@@ -15,7 +15,8 @@ import {
   BookOpen,
   LogOut,
   ShieldCheck,
-  Settings
+  Settings,
+  Megaphone
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -36,7 +37,8 @@ export default function Navbar({
     { id: 'batches', label: 'Batches & Timing', icon: CalendarDays, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
     { id: 'attendance', label: 'Attendance', icon: CheckSquare, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
     { id: 'fees', label: 'Fee Management', icon: IndianRupee, roles: [USER_ROLES.ADMIN] },
-    { id: 'exams', label: 'Exams & Marks', icon: BookOpen, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] }
+    { id: 'exams', label: 'Exams & Marks', icon: BookOpen, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'notifications', label: 'Broadcast & Notices', icon: Megaphone, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] }
   ];
 
   // Filter navigation items by role

@@ -18,7 +18,11 @@ import {
   FolderArchive,
   Plus,
   GraduationCap,
-  Users
+  Users,
+  Search,
+  UserCheck,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase } from '../lib/supabase';
 import { 
@@ -41,10 +45,12 @@ import {
   saveStaffAccounts, 
   getTeacherAccounts, 
   addTeacherAccount, 
-  deleteTeacherAccount 
+  deleteTeacherAccount,
+  assignBatchesToTeacher,
+  assignStudentsToTeacher
 } from '../lib/auth';
 
-export default function SettingsModal({ isOpen, onClose, onDataReset }) {
+export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [] }) {
   if (!isOpen) return null;
 
   const [activeSettingsTab, setActiveSettingsTab] = useState('database');
@@ -65,14 +71,74 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
   const [showAdminPass, setShowAdminPass] = useState(false);
 
   // Teacher Accounts State
+  const allBatches = batches.length > 0 ? batches : (getStoredData().batches || INITIAL_BATCHES);
+  const allStudents = students.length > 0 ? students : (getStoredData().students || INITIAL_STUDENTS);
   const [teachers, setTeachers] = useState(initialAccounts.teachers || []);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [newTeacherName, setNewTeacherName] = useState('');
   const [newTeacherSubject, setNewTeacherSubject] = useState('');
   const [newTeacherUsername, setNewTeacherUsername] = useState('');
   const [newTeacherPassword, setNewTeacherPassword] = useState('');
+  const [newTeacherBatches, setNewTeacherBatches] = useState([]);
+  const [newTeacherStudents, setNewTeacherStudents] = useState([]);
+  const [newTeacherStudentQuery, setNewTeacherStudentQuery] = useState('');
   const [teacherPassVisible, setTeacherPassVisible] = useState({});
   const [staffMsg, setStaffMsg] = useState(null);
+
+  const [expandedTeacherStudentPicker, setExpandedTeacherStudentPicker] = useState({});
+  const [teacherStudentSearchQuery, setTeacherStudentSearchQuery] = useState('');
+
+  const handleToggleTeacherBatch = (teacherId, batchId) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return;
+    const current = Array.isArray(teacher.assignedBatchIds) ? teacher.assignedBatchIds : [];
+    const exists = current.some(id => String(id) === String(batchId));
+    const updated = exists
+      ? current.filter(id => String(id) !== String(batchId))
+      : [...current, batchId];
+
+    assignBatchesToTeacher(teacherId, updated);
+    setTeachers(getTeacherAccounts());
+    setStaffMsg({ type: 'success', text: `Assigned batches updated for ${teacher.name}!` });
+    setTimeout(() => setStaffMsg(null), 2500);
+  };
+
+  const handleAssignAllBatches = (teacherId) => {
+    const allIds = allBatches.map(b => b.id);
+    assignBatchesToTeacher(teacherId, allIds);
+    setTeachers(getTeacherAccounts());
+    setStaffMsg({ type: 'success', text: `Assigned all batches to teacher!` });
+    setTimeout(() => setStaffMsg(null), 2500);
+  };
+
+  const handleClearBatches = (teacherId) => {
+    assignBatchesToTeacher(teacherId, []);
+    setTeachers(getTeacherAccounts());
+    setStaffMsg({ type: 'success', text: `Cleared batch assignments for teacher!` });
+    setTimeout(() => setStaffMsg(null), 2500);
+  };
+
+  const handleToggleTeacherStudent = (teacherId, studentId) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return;
+    const current = Array.isArray(teacher.assignedStudentIds) ? teacher.assignedStudentIds : [];
+    const exists = current.some(id => String(id) === String(studentId));
+    const updated = exists
+      ? current.filter(id => String(id) !== String(studentId))
+      : [...current, studentId];
+
+    assignStudentsToTeacher(teacherId, updated);
+    setTeachers(getTeacherAccounts());
+    setStaffMsg({ type: 'success', text: `Student assignments updated for ${teacher.name}!` });
+    setTimeout(() => setStaffMsg(null), 2500);
+  };
+
+  const handleClearTeacherStudents = (teacherId) => {
+    assignStudentsToTeacher(teacherId, []);
+    setTeachers(getTeacherAccounts());
+    setStaffMsg({ type: 'success', text: `Cleared direct student assignments for teacher!` });
+    setTimeout(() => setStaffMsg(null), 2500);
+  };
 
   const handleTestAndSave = async (e) => {
     e.preventDefault();
@@ -142,7 +208,9 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
       name: newTeacherName,
       subject: newTeacherSubject,
       username: newTeacherUsername,
-      password: newTeacherPassword
+      password: newTeacherPassword,
+      assignedBatchIds: newTeacherBatches,
+      assignedStudentIds: newTeacherStudents
     });
 
     if (res.success) {
@@ -152,6 +220,9 @@ export default function SettingsModal({ isOpen, onClose, onDataReset }) {
       setNewTeacherSubject('');
       setNewTeacherUsername('');
       setNewTeacherPassword('');
+      setNewTeacherBatches([]);
+      setNewTeacherStudents([]);
+      setNewTeacherStudentQuery('');
       setStaffMsg({ type: 'success', text: `Teacher "${newTeacherName}" account created! They can now log in using username "${newTeacherUsername}".` });
       setTimeout(() => setStaffMsg(null), 4000);
     } else {
@@ -289,10 +360,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
         {/* Header */}
         <div className="modal-header">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={22} className="text-primary" />
+            <ShieldCheck size={22} className="text-primary flex-shrink-0" />
             <h2 className="modal-title">Settings & System Management</h2>
           </div>
-          <button className="close-btn" onClick={onClose}>
+          <button className="close-btn" onClick={onClose} title="Close Settings">
             <X size={20} />
           </button>
         </div>
@@ -541,6 +612,102 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
                         />
                       </div>
                     </div>
+
+                    <div className="form-group mb-2 mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0 text-xs text-slate-300 font-semibold">Assign Batches (Multi-Class Student Scope)</label>
+                        <span className="text-xs text-muted">Teacher accesses all students in selected batches regardless of class</span>
+                      </div>
+                      <div className="teacher-batch-chips">
+                        {allBatches.map(b => {
+                          const isAssigned = newTeacherBatches.some(id => String(id) === String(b.id));
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              className={`batch-chip-btn ${isAssigned ? 'assigned' : ''}`}
+                              onClick={() => {
+                                setNewTeacherBatches(prev => {
+                                  const exists = prev.some(id => String(id) === String(b.id));
+                                  return exists 
+                                    ? prev.filter(id => String(id) !== String(b.id)) 
+                                    : [...prev, b.id];
+                                });
+                              }}
+                            >
+                              <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
+                              <span>{b.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Direct Students by Name Picker */}
+                    <div className="form-group mb-2 mt-2 pt-2 border-top-subtle">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="form-label mb-0 text-xs text-slate-300 font-semibold flex items-center gap-2">
+                          <UserCheck size={14} className="text-emerald flex-shrink-0" />
+                          <span>Assign Specific Students by Name ({newTeacherStudents.length} selected)</span>
+                        </label>
+                        {newTeacherStudents.length > 0 && (
+                          <button
+                            type="button"
+                            className="btn-link-action text-xs text-rose-400"
+                            onClick={() => setNewTeacherStudents([])}
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      <div className="search-input-box mb-2">
+                        <Search size={13} className="search-icon" />
+                        <input
+                          type="text"
+                          className="form-input text-xs"
+                          placeholder="Search student names by typing..."
+                          value={newTeacherStudentQuery}
+                          onChange={(e) => setNewTeacherStudentQuery(e.target.value)}
+                        />
+                      </div>
+                      <div className="teacher-student-chips-list" style={{ maxHeight: '140px', overflowY: 'auto' }}>
+                        {allStudents
+                          .filter(s => {
+                            if (!s) return false;
+                            const st = String(s.status || '').toUpperCase();
+                            return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED';
+                          })
+                          .filter(s => {
+                            if (!newTeacherStudentQuery.trim()) return true;
+                            const q = newTeacherStudentQuery.toLowerCase().trim();
+                            return (s.name && s.name.toLowerCase().includes(q)) || 
+                                   (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
+                          })
+                          .map(student => {
+                            const isAssigned = newTeacherStudents.some(id => String(id) === String(student.id));
+                            return (
+                              <button
+                                key={student.id}
+                                type="button"
+                                className={`student-select-pill ${isAssigned ? 'assigned' : ''}`}
+                                onClick={() => {
+                                  setNewTeacherStudents(prev => {
+                                    const exists = prev.some(id => String(id) === String(student.id));
+                                    return exists
+                                      ? prev.filter(id => String(id) !== String(student.id))
+                                      : [...prev, student.id];
+                                  });
+                                }}
+                              >
+                                <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
+                                <span>{student.name}</span>
+                                <span className="pill-class-badge font-mono">({(student.classCode || '').replace('CLASS_', '')})</span>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </div>
+
                     <div className="flex justify-end gap-2 mt-3">
                       <button 
                         type="button" 
@@ -563,44 +730,241 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
                 {teachers.map((teacher) => {
                   const isVisible = !!teacherPassVisible[teacher.id];
                   return (
-                    <div key={teacher.id} className="teacher-account-row">
-                      <div className="teacher-info-col">
-                        <div className="font-semibold text-sm text-white flex items-center gap-2">
-                          <span>{teacher.name}</span>
-                          {teacher.subject && (
-                            <span className="badge badge-class text-xs">{teacher.subject}</span>
+                    <div key={teacher.id} className="teacher-account-card">
+                      <div className="teacher-account-header-row">
+                        <div className="teacher-info-col">
+                          <div className="font-semibold text-sm text-white flex items-center gap-2">
+                            <span>{teacher.name}</span>
+                            {teacher.subject && (
+                              <span className="badge badge-class text-xs">{teacher.subject}</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted font-mono mt-0.5">
+                            Username: <strong className="text-emerald">@{teacher.username}</strong>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="teacher-creds-col">
+                            <span className="text-xs text-muted">Password:</span>
+                            <span className="font-mono text-xs text-secondary teacher-pass-field">
+                              {isVisible ? teacher.password : '••••••••'}
+                            </span>
+                            <button 
+                              type="button" 
+                              className="pass-eye-btn-inline"
+                              onClick={() => toggleTeacherPass(teacher.id)}
+                              title={isVisible ? "Hide password" : "Reveal password"}
+                            >
+                              {isVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          </div>
+
+                          <div className="teacher-actions-col">
+                            <button 
+                              type="button" 
+                              className="btn-delete-mini"
+                              title="Delete Teacher Account"
+                              onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
+                              disabled={teachers.length <= 1}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Scoped Batch Assignment Row */}
+                      {/* Scoped Batch Assignment Row */}
+                      <div className="teacher-batches-selector-row">
+                        <div className="teacher-batches-header">
+                          <div className="teacher-batches-title-row">
+                            <Users size={14} className="text-emerald flex-shrink-0" />
+                            <span className="font-semibold text-slate-200 text-xs">
+                              Assigned Batches ({(teacher.assignedBatchIds || []).length}):
+                            </span>
+                            <span className="text-xs text-muted teacher-batches-desc">— Teacher can access all students enrolled in these batches across any standard</span>
+                          </div>
+                          <div className="teacher-batches-actions">
+                            <button 
+                              type="button" 
+                              className="btn-link-action text-primary"
+                              onClick={() => handleAssignAllBatches(teacher.id)}
+                            >
+                              All
+                            </button>
+                            <span className="text-muted">•</span>
+                            <button 
+                              type="button" 
+                              className="btn-link-action text-rose-400"
+                              onClick={() => handleClearBatches(teacher.id)}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="teacher-batch-chips">
+                          {allBatches.map(b => {
+                            const isAssigned = (teacher.assignedBatchIds || []).some(id => String(id) === String(b.id));
+                            const studentsInB = allStudents.filter(s => {
+                              if (!s) return false;
+                              const st = String(s.status || '').toUpperCase();
+                              if (st === 'INACTIVE' || st === 'DISABLED' || st === 'DELETED') return false;
+                              return String(s.batchId) === String(b.id);
+                            });
+                            const namesInB = studentsInB.map(s => s.name).join(', ');
+                            return (
+                              <button
+                                key={b.id}
+                                type="button"
+                                className={`batch-chip-btn ${isAssigned ? 'assigned' : ''}`}
+                                onClick={() => handleToggleTeacherBatch(teacher.id, b.id)}
+                                title={`${b.name} (${b.timing})\nEnrolled students (${studentsInB.length}): ${namesInB || 'None'}`}
+                              >
+                                <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
+                                <span>{b.name} ({studentsInB.length})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Student-wise Direct Assignment by Name */}
+                        <div className="teacher-direct-students-section mt-2 pt-2 border-top-subtle">
+                          <div className="teacher-direct-students-header">
+                            <button
+                              type="button"
+                              className="btn-toggle-expand"
+                              onClick={() => {
+                                setExpandedTeacherStudentPicker(prev => ({
+                                  ...prev,
+                                  [teacher.id]: prev[teacher.id] !== undefined ? !prev[teacher.id] : true
+                                }));
+                              }}
+                            >
+                              <UserCheck size={14} className="text-emerald flex-shrink-0" />
+                              <span className="font-semibold text-slate-200 text-xs">
+                                Select Specific Students by Name ({(teacher.assignedStudentIds || []).length} assigned)
+                              </span>
+                              {(expandedTeacherStudentPicker[teacher.id] ?? ((teacher.assignedStudentIds || []).length > 0)) ? <ChevronUp size={14} className="flex-shrink-0 text-muted" /> : <ChevronDown size={14} className="flex-shrink-0 text-muted" />}
+                            </button>
+
+                            <div className="flex items-center gap-1.5 text-xs">
+                              {(teacher.assignedStudentIds || []).length > 0 && (
+                                <button
+                                  type="button"
+                                  className="btn-link-action text-rose-400"
+                                  onClick={() => handleClearTeacherStudents(teacher.id)}
+                                >
+                                  Clear Students
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {(expandedTeacherStudentPicker[teacher.id] ?? ((teacher.assignedStudentIds || []).length > 0)) && (
+                            <div className="teacher-student-picker-box mt-2">
+                              <div className="search-input-box mb-2">
+                                <Search size={14} className="search-icon" />
+                                <input
+                                  type="text"
+                                  className="form-input text-xs"
+                                  placeholder="Filter student names..."
+                                  value={teacherStudentSearchQuery}
+                                  onChange={(e) => setTeacherStudentSearchQuery(e.target.value)}
+                                />
+                              </div>
+
+                              <div className="teacher-student-chips-list">
+                                {allStudents
+                                  .filter(s => {
+                                    if (!s) return false;
+                                    const st = String(s.status || '').toUpperCase();
+                                    return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED';
+                                  })
+                                  .filter(s => {
+                                    if (!teacherStudentSearchQuery.trim()) return true;
+                                    const q = teacherStudentSearchQuery.toLowerCase().trim();
+                                    return (s.name && s.name.toLowerCase().includes(q)) || 
+                                           (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
+                                  })
+                                  .map(student => {
+                                    const isAssigned = (teacher.assignedStudentIds || []).some(id => String(id) === String(student.id));
+                                    const sBatch = allBatches.find(b => String(b.id) === String(student.batchId));
+                                    return (
+                                      <button
+                                        key={student.id}
+                                        type="button"
+                                        className={`student-select-pill ${isAssigned ? 'assigned' : ''}`}
+                                        onClick={() => handleToggleTeacherStudent(teacher.id, student.id)}
+                                        title={`Class: ${student.classCode} • Current Batch: ${sBatch?.name || 'Unassigned'}`}
+                                      >
+                                        <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
+                                        <span>{student.name}</span>
+                                        <span className="pill-class-badge font-mono">({(student.classCode || '').replace('CLASS_', '')})</span>
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+
+                              {/* Save & Confirm Footer Bar */}
+                              <div className="picker-footer-bar mt-2 pt-2 border-top-subtle flex items-center justify-between flex-wrap gap-2">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-xs text-primary"
+                                    onClick={() => {
+                                      const filteredIds = allStudents
+                                        .filter(s => {
+                                          if (!s) return false;
+                                          const st = String(s.status || '').toUpperCase();
+                                          return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED';
+                                        })
+                                        .filter(s => {
+                                          if (!teacherStudentSearchQuery.trim()) return true;
+                                          const q = teacherStudentSearchQuery.toLowerCase().trim();
+                                          return (s.name && s.name.toLowerCase().includes(q)) || 
+                                                 (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
+                                        })
+                                        .map(s => s.id);
+
+                                      const current = Array.isArray(teacher.assignedStudentIds) ? teacher.assignedStudentIds : [];
+                                      const combined = [...new Set([...current.map(String), ...filteredIds.map(String)])];
+                                      assignStudentsToTeacher(teacher.id, combined);
+                                      setTeachers(getTeacherAccounts());
+                                      setStaffMsg({ type: 'success', text: `✓ Added all filtered students to ${teacher.name}!` });
+                                      setTimeout(() => setStaffMsg(null), 2500);
+                                    }}
+                                  >
+                                    Select Filtered
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-xs text-rose-400"
+                                    onClick={() => handleClearTeacherStudents(teacher.id)}
+                                  >
+                                    Clear All
+                                  </button>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-xs flex items-center gap-1.5"
+                                  onClick={() => {
+                                    setStaffMsg({ 
+                                      type: 'success', 
+                                      text: `✓ Saved! ${teacher.name} will now only see these ${(teacher.assignedStudentIds || []).length} assigned students.` 
+                                    });
+                                    setTimeout(() => setStaffMsg(null), 3500);
+                                  }}
+                                >
+                                  <Check size={13} />
+                                  <span>Save Student Scope ({(teacher.assignedStudentIds || []).length} Selected)</span>
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
-                        <div className="text-xs text-muted font-mono mt-0.5">
-                          Username: <strong className="text-emerald">@{teacher.username}</strong>
-                        </div>
-                      </div>
-
-                      <div className="teacher-creds-col">
-                        <span className="text-xs text-muted">Password:</span>
-                        <span className="font-mono text-xs text-secondary teacher-pass-field">
-                          {isVisible ? teacher.password : '••••••••'}
-                        </span>
-                        <button 
-                          type="button"
-                          className="pass-eye-btn-inline"
-                          onClick={() => toggleTeacherPass(teacher.id)}
-                          title={isVisible ? "Hide password" : "Reveal password"}
-                        >
-                          {isVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-
-                      <div className="teacher-actions-col">
-                        <button 
-                          type="button"
-                          className="btn-delete-mini"
-                          title="Delete Teacher Account"
-                          onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
-                          disabled={teachers.length <= 1}
-                        >
-                          <Trash2 size={14} />
-                        </button>
                       </div>
                     </div>
                   );
@@ -674,6 +1038,39 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
       <style>{`
         .settings-modal {
           max-width: 650px;
+        }
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 20px;
+          width: 100%;
+        }
+        .modal-title {
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          margin: 0;
+        }
+        .close-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-sm);
+          transition: all 0.15s ease;
+          padding: 0;
+          flex-shrink: 0;
+        }
+        .close-btn:hover {
+          color: white;
+          background: rgba(255, 255, 255, 0.08);
         }
         .settings-notice {
           font-size: 0.8125rem;
@@ -801,17 +1198,96 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
           flex-direction: column;
           gap: 8px;
         }
-        .teacher-account-row {
+        .teacher-account-card {
+          display: flex;
+          flex-direction: column;
+          padding: 12px 14px;
+          background: rgba(255, 255, 255, 0.025);
+          border: 1px solid rgba(255, 255, 255, 0.07);
+          border-radius: var(--radius-md);
+          gap: 10px;
+        }
+        .teacher-account-header-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 10px 14px;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: var(--radius-md);
           gap: 12px;
           flex-wrap: wrap;
         }
+        .teacher-batches-selector-row {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding-top: 8px;
+          border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .teacher-batches-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-bottom: 2px;
+        }
+        .teacher-batches-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          flex: 1;
+        }
+        .teacher-batches-desc {
+          color: var(--text-muted);
+          font-size: 0.725rem;
+        }
+        .teacher-batches-actions {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.75rem;
+        }
+        .teacher-batch-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+        .batch-chip-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 9px;
+          border-radius: var(--radius-full);
+          font-size: 0.725rem;
+          font-weight: 500;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .batch-chip-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+        .batch-chip-btn.assigned {
+          background: rgba(16, 185, 129, 0.15);
+          border-color: rgba(16, 185, 129, 0.4);
+          color: #A7F3D0;
+          font-weight: 600;
+        }
+        .btn-link-action {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 0.75rem;
+          padding: 0 4px;
+        }
+        .btn-link-action:hover {
+          text-decoration: underline;
+        }
+        .icon-show { display: inline-block; }
+        .icon-hide { display: none; }
         .teacher-info-col {
           display: flex;
           flex-direction: column;
@@ -859,11 +1335,111 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;
           border-color: rgba(244, 63, 94, 0.25);
           background: rgba(244, 63, 94, 0.05);
         }
+        .teacher-direct-students-section {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: var(--radius-sm);
+          padding: 8px 10px;
+        }
+        .teacher-direct-students-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .btn-toggle-expand {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 3px 0;
+          color: #E2E8F0;
+          font-size: 0.78rem;
+          font-weight: 600;
+          transition: color 0.15s ease;
+          text-align: left;
+        }
+        .btn-toggle-expand:hover {
+          color: white;
+        }
+        .btn-toggle-expand svg {
+          flex-shrink: 0;
+        }
+        .search-input-box {
+          position: relative;
+          display: flex;
+          align-items: center;
+          width: 100%;
+        }
+        .search-input-box .search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text-muted);
+          pointer-events: none;
+          flex-shrink: 0;
+        }
+        .search-input-box input {
+          padding-left: 32px !important;
+          width: 100%;
+          font-size: 0.78rem;
+        }
+        .teacher-student-picker-box {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .teacher-student-chips-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          max-height: 160px;
+          overflow-y: auto;
+          padding: 6px;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: var(--radius-sm);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .student-select-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 8px;
+          border-radius: var(--radius-full);
+          font-size: 0.725rem;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .student-select-pill:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+        }
+        .student-select-pill.assigned {
+          background: rgba(16, 185, 129, 0.15);
+          border-color: rgba(16, 185, 129, 0.4);
+          color: #A7F3D0;
+          font-weight: 600;
+        }
+        .pill-class-badge {
+          font-size: 0.65rem;
+          color: var(--text-muted);
+        }
+
         .flex { display: flex; }
         .justify-between { justify-content: space-between; }
         .justify-end { justify-content: flex-end; }
         .items-center { align-items: center; }
+        .gap-1 { gap: 4px; }
+        .gap-1\.5 { gap: 6px; }
         .gap-2 { gap: 8px; }
+        .gap-3 { gap: 12px; }
+        .flex-shrink-0 { flex-shrink: 0; }
         .mt-3 { margin-top: 12px; }
         .mt-4 { margin-top: 16px; }
         .mb-3 { margin-bottom: 12px; }

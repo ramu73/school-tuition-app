@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -17,7 +17,8 @@ import {
   Filter,
   Sparkles,
   ListChecks,
-  CheckCheck
+  CheckCheck,
+  UserCheck
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
@@ -27,13 +28,45 @@ export default function Attendance({
   currentUser, 
   onSaveData, 
   viewMode: propViewMode, 
-  onViewModeChange 
+  onViewModeChange,
+  selectedBatchId: propSelectedBatchId,
+  onSelectedBatchChange
 }) {
   const { students = [], batches = [], classes = [], attendance = [] } = data;
   const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
+  const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds) 
+    ? currentUser.assignedBatchIds.map(String) 
+    : [];
+  const assignedStudentIds = Array.isArray(currentUser?.assignedStudentIds)
+    ? currentUser.assignedStudentIds.map(String)
+    : [];
+
+  // Scoped datasets for teacher
+  const accessibleBatches = isTeacher 
+    ? batches.filter(b => {
+        const inBatch = assignedBatchIds.includes(String(b.id));
+        const hasAssignedStudent = assignedStudentIds.length > 0 && 
+          students.some(s => assignedStudentIds.includes(String(s.id)) && String(s.batchId) === String(b.id));
+        return inBatch || hasAssignedStudent;
+      })
+    : batches;
+
+  const accessibleStudents = isTeacher 
+    ? students.filter(s => {
+        const inBatch = s.batchId && assignedBatchIds.includes(String(s.batchId));
+        const directStudent = assignedStudentIds.includes(String(s.id));
+        return inBatch || directStudent;
+      })
+    : students;
+
+  // Classes represented among accessible students
+  const accessibleClassCodes = new Set(accessibleStudents.map(s => s.classCode));
+  const accessibleClasses = isTeacher && accessibleClassCodes.size > 0
+    ? classes.filter(c => accessibleClassCodes.has(c.code))
+    : classes;
 
   // View Mode: 'all-absentees' (Consolidated master list) vs 'batch' (Batch-by-batch roll call)
-  const [internalViewMode, setInternalViewMode] = useState(propViewMode || 'all-absentees');
+  const [internalViewMode, setInternalViewMode] = useState(propViewMode || (isTeacher ? 'batch' : 'all-absentees'));
   const currentViewMode = propViewMode !== undefined ? propViewMode : internalViewMode;
 
   const setViewMode = (mode) => {
@@ -49,12 +82,50 @@ export default function Attendance({
 
   const [selectedDate, setSelectedDate] = useState(todayDateStr);
 
-  // Batch View Specific States
-  const [selectedClass, setSelectedClass] = useState('CLASS_10');
-  const [selectedBatchId, setSelectedBatchId] = useState('');
+  // Compute sensible default batch ID
+  const defaultBatchId = useMemo(() => {
+    if (!isTeacher) return accessibleBatches[0]?.id ? String(accessibleBatches[0].id) : '';
+    // If teacher: find first accessible batch that actually has assigned students
+    const batchWithStudents = accessibleBatches.find(b => 
+      accessibleStudents.some(s => String(s.batchId) === String(b.id))
+    );
+    if (batchWithStudents) return String(batchWithStudents.id);
+    if (accessibleBatches[0]?.id) return String(accessibleBatches[0].id);
+    if (assignedStudentIds.length > 0) return 'DIRECT_ASSIGNED';
+    return '';
+  }, [isTeacher, accessibleBatches, accessibleStudents, assignedStudentIds]);
+
+  // Batch View Specific States (Batch-Centric: Students can be from ANY class!)
+  const [internalSelectedBatchId, setInternalSelectedBatchId] = useState(
+    propSelectedBatchId || defaultBatchId
+  );
+
+  // Sync internal selected batch if teacher scope changes
+  useEffect(() => {
+    if (isTeacher) {
+      const validBatchIds = accessibleBatches.map(b => String(b.id));
+      if (assignedStudentIds.length > 0) validBatchIds.push('DIRECT_ASSIGNED');
+      if (validBatchIds.length > 0 && (!internalSelectedBatchId || !validBatchIds.includes(String(internalSelectedBatchId)))) {
+        setInternalSelectedBatchId(defaultBatchId);
+      }
+    }
+  }, [isTeacher, accessibleBatches, assignedStudentIds, defaultBatchId, internalSelectedBatchId]);
+
+  const selectedBatchId = propSelectedBatchId !== undefined && propSelectedBatchId !== ''
+    ? propSelectedBatchId
+    : internalSelectedBatchId;
+
+  const handleSelectBatch = (bId) => {
+    setInternalSelectedBatchId(bId);
+    if (onSelectedBatchChange) onSelectedBatchChange(bId);
+    setBatchClassFilter('ALL');
+  };
+
+  const [batchClassFilter, setBatchClassFilter] = useState('ALL');
   const [batchSearchQuery, setBatchSearchQuery] = useState('');
 
   // All Absentees View Specific States
+  const [absenteeBatchFilter, setAbsenteeBatchFilter] = useState('ALL');
   const [absenteeClassFilter, setAbsenteeClassFilter] = useState('ALL');
   const [absenteeSearchQuery, setAbsenteeSearchQuery] = useState('');
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -153,12 +224,12 @@ export default function Attendance({
   // ==========================================
   // MASTER "ALL ABSENTEES" CALCULATIONS
   // ==========================================
-  const activeStudentsTotal = students.filter(s => s.status === 'ACTIVE').length;
+  const activeStudentsTotal = accessibleStudents.filter(s => s.status === 'ACTIVE').length;
 
   const allAbsenteesForDate = attendance
     .filter(a => a.date === selectedDate && a.status === 'ABSENT')
     .map(record => {
-      const student = students.find(s => s.id === record.studentId);
+      const student = accessibleStudents.find(s => s.id === record.studentId);
       if (!student || student.status !== 'ACTIVE') return null;
       const studentClass = classes.find(c => c.code === student.classCode);
       const studentBatch = batches.find(b => b.id === (record.batchId || student.batchId));
@@ -181,6 +252,7 @@ export default function Attendance({
 
   // Filtered All Absentees list for table
   const filteredAllAbsentees = allAbsenteesForDate.filter(s => {
+    if (absenteeBatchFilter !== 'ALL' && String(s.batchId) !== String(absenteeBatchFilter)) return false;
     if (absenteeClassFilter !== 'ALL' && s.classCode !== absenteeClassFilter) return false;
     if (absenteeSearchQuery.trim()) {
       const q = absenteeSearchQuery.toLowerCase().trim();
@@ -205,19 +277,28 @@ export default function Attendance({
     text += `📅 Date: ${dateFormatted}\n`;
     text += `Total Absentees: ${allAbsenteesForDate.length} of ${activeStudentsTotal} (Turnout: ${overallTurnout}%)\n\n`;
 
-    // Group by Class
-    classes.forEach(cls => {
-      const classAbs = allAbsenteesForDate.filter(s => s.classCode === cls.code);
-      if (classAbs.length > 0) {
-        text += `*${cls.name}* (${classAbs.length} absent):\n`;
-        classAbs.forEach((s, idx) => {
-          text += `  ${idx + 1}. ${s.name} (${s.admissionNo || 'Roll -'}) - ${s.batchName}\n`;
+    // Group by Tuition Batch (since batches contain multiple classes)
+    text += `*BATCH-WISE ABSENTEES:*\n`;
+    accessibleBatches.forEach(b => {
+      const bAbs = allAbsenteesForDate.filter(s => Number(s.batchId) === Number(b.id));
+      if (bAbs.length > 0) {
+        text += `⏰ *${b.name}* (${b.timing}) — ${bAbs.length} absent:\n`;
+        bAbs.forEach((s, idx) => {
+          text += `  ${idx + 1}. ${s.name} (${s.className || s.classCode}) - Roll: ${s.admissionNo || '-'}\n`;
         });
         text += `\n`;
       }
     });
 
-    text += `_Generated from Hayagriva Management App_`;
+    // Also summary by Standard
+    text += `*CLASS-WISE BREAKDOWN:*\n`;
+    accessibleClasses.forEach(cls => {
+      const classAbs = allAbsenteesForDate.filter(s => s.classCode === cls.code);
+      if (classAbs.length > 0) {
+        text += `• *${cls.name}*: ${classAbs.length} absent\n`;
+      }
+    });
+    text += `\n_Generated from Hayagriva Management App_`;
 
     navigator.clipboard.writeText(text).then(() => {
       setCopiedSummary(true);
@@ -226,13 +307,37 @@ export default function Attendance({
   };
 
   // ==========================================
-  // BATCH VIEW CALCULATIONS
+  // BATCH VIEW CALCULATIONS (BATCH-CENTRIC, NOT CLASSWISE!)
+  // Students in this batch can belong to ANY class!
   // ==========================================
-  const classBatches = batches.filter(b => b.classCode === selectedClass);
-  const eligibleBatchStudents = students.filter(s => {
-    if (s.status !== 'ACTIVE') return false;
-    if (s.classCode !== selectedClass) return false;
-    if (selectedBatchId && s.batchId !== Number(selectedBatchId)) return false;
+  const currentBatch = accessibleBatches.find(b => String(b.id) === String(selectedBatchId)) || accessibleBatches[0];
+
+  // All active students enrolled in this batch across any class
+  const studentsInSelectedBatch = accessibleStudents.filter(s => {
+    if (!s) return false;
+    const st = String(s.status || '').toUpperCase();
+    if (st === 'INACTIVE' || st === 'DISABLED' || st === 'DELETED') return false;
+    if (selectedBatchId === 'DIRECT_ASSIGNED') {
+      return assignedStudentIds.includes(String(s.id));
+    }
+    if (!selectedBatchId) return true;
+    return String(s.batchId) === String(selectedBatchId);
+  });
+
+  // Distinct classes represented among students in this batch
+  const classesInSelectedBatchCodes = [...new Set(studentsInSelectedBatch.map(s => s.classCode))];
+  const classesInSelectedBatch = classes.filter(c => classesInSelectedBatchCodes.includes(c.code));
+
+  // Eligible students for the batch roll call (filtered by optional class filter & search)
+  const eligibleBatchStudents = studentsInSelectedBatch.filter(s => {
+    if (batchClassFilter !== 'ALL' && s.classCode !== batchClassFilter) return false;
+    if (batchSearchQuery.trim()) {
+      const q = batchSearchQuery.toLowerCase().trim();
+      const matchName = s.name.toLowerCase().includes(q);
+      const matchRoll = s.admissionNo && s.admissionNo.toLowerCase().includes(q);
+      const matchSchool = s.school && s.school.toLowerCase().includes(q);
+      if (!matchName && !matchRoll && !matchSchool) return false;
+    }
     return true;
   });
 
@@ -245,11 +350,7 @@ export default function Attendance({
     ? Math.round((batchPresentCount / eligibleBatchStudents.length) * 100) 
     : 100;
 
-  const displayBatchStudents = eligibleBatchStudents.filter(s => {
-    if (!batchSearchQuery.trim()) return true;
-    const q = batchSearchQuery.toLowerCase().trim();
-    return s.name.toLowerCase().includes(q) || (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
-  });
+  const displayBatchStudents = eligibleBatchStudents;
 
   const formattedSelectedDate = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {
     weekday: 'short',
@@ -260,6 +361,22 @@ export default function Attendance({
 
   return (
     <div className="attendance-page">
+      {isTeacher && (
+        <div className="teacher-scope-banner glass-card mb-3" style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)' }}>
+          <div className="flex items-center gap-2">
+            <UserCheck size={16} className="text-emerald flex-shrink-0" />
+            <span className="font-semibold text-white text-xs">
+              Faculty Scoped Attendance:
+            </span>
+            <span className="text-xs text-muted">
+              {accessibleBatches.length > 0 || accessibleStudents.length > 0
+                ? `Showing your ${accessibleBatches.length} assigned ${accessibleBatches.length === 1 ? 'batch' : 'batches'} (${activeStudentsTotal} active ${activeStudentsTotal === 1 ? 'student' : 'students'}).`
+                : 'No batches assigned to your account yet. Please contact Administrator.'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Top Header & Dual Mode Switcher */}
       <div className="attendance-header-card glass-card">
         <div className="header-meta-left">
@@ -398,15 +515,36 @@ export default function Attendance({
 
               <div className="metric-pill text-muted text-xs">
                 <span>
-                  {classes.filter(c => allAbsenteesForDate.some(a => a.classCode === c.code)).length} of {classes.length} classes have absentees
+                  {accessibleClasses.filter(c => allAbsenteesForDate.some(a => a.classCode === c.code)).length} of {accessibleClasses.length} classes have absentees
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Filters Bar: Class Dropdown + Search Input */}
+          {/* Filters Bar: Batch Filter + Class Dropdown + Search Input */}
           <div className="glass-card absentees-filters-card">
             <div className="filters-row">
+              {/* Batch Filter */}
+              <div className="filter-group">
+                <Clock size={15} className="text-muted" />
+                <label className="text-xs text-muted font-medium">Batch:</label>
+                <select
+                  className="form-select filter-select font-semibold"
+                  value={absenteeBatchFilter}
+                  onChange={(e) => setAbsenteeBatchFilter(e.target.value)}
+                >
+                  <option value="ALL">All Batches ({accessibleBatches.length})</option>
+                  {accessibleBatches.map(b => {
+                    const countInB = allAbsenteesForDate.filter(s => String(s.batchId) === String(b.id)).length;
+                    return (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({countInB} absent)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
               {/* Class Filter */}
               <div className="filter-group">
                 <Filter size={15} className="text-muted" />
@@ -416,8 +554,8 @@ export default function Attendance({
                   value={absenteeClassFilter}
                   onChange={(e) => setAbsenteeClassFilter(e.target.value)}
                 >
-                  <option value="ALL">All Standards (Classes 1–10)</option>
-                  {classes.map(cls => {
+                  <option value="ALL">All Standards ({accessibleClasses.length} Classes)</option>
+                  {accessibleClasses.map(cls => {
                     const countInClass = allAbsenteesForDate.filter(s => s.classCode === cls.code).length;
                     return (
                       <option key={cls.code} value={cls.code}>
@@ -611,6 +749,65 @@ export default function Attendance({
           {/* Selector Controls Card */}
           <div className="glass-card attendance-controls-card">
             <div className="controls-grid">
+              {/* Batch Selector (Primary Dimension!) */}
+              <div className="form-group mb-0">
+                <label className="form-label font-semibold text-white">
+                  <span>Tuition Batch Slot</span>
+                  {isTeacher && <span className="text-emerald text-xs ml-1">(Assigned)</span>}
+                </label>
+                <select 
+                  className="form-select font-semibold"
+                  value={selectedBatchId}
+                  onChange={(e) => handleSelectBatch(e.target.value)}
+                >
+                  {!isTeacher && <option value="">All Batches ({accessibleBatches.length} Slots)</option>}
+                  {isTeacher && accessibleBatches.length > 1 && (
+                    <option value="">All My Assigned Batches ({accessibleBatches.length} Batches)</option>
+                  )}
+                  {assignedStudentIds.length > 0 && (
+                    <option value="DIRECT_ASSIGNED">
+                      ⭐ Direct Assigned Students ({assignedStudentIds.length} Students)
+                    </option>
+                  )}
+                  {accessibleBatches.map(b => {
+                    const bCount = accessibleStudents.filter(s => {
+                      if (!s) return false;
+                      const st = String(s.status || '').toUpperCase();
+                      if (st === 'INACTIVE' || st === 'DISABLED' || st === 'DELETED') return false;
+                      return String(s.batchId) === String(b.id);
+                    }).length;
+                    return (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.timing}) — {bCount} Students
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Class Filter (Optional - students can be in any class) */}
+              <div className="form-group mb-0">
+                <label className="form-label">
+                  <span>Filter by Class</span>
+                  <span className="text-muted text-xs ml-1">(Optional)</span>
+                </label>
+                <select 
+                  className="form-select"
+                  value={batchClassFilter}
+                  onChange={(e) => setBatchClassFilter(e.target.value)}
+                >
+                  <option value="ALL">All Classes in Batch ({studentsInSelectedBatch.length} students)</option>
+                  {classesInSelectedBatch.map(cls => {
+                    const countInCls = studentsInSelectedBatch.filter(s => s.classCode === cls.code).length;
+                    return (
+                      <option key={cls.code} value={cls.code}>
+                        {cls.name} ({countInCls} students)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
               {/* Date Picker */}
               <div className="form-group mb-0">
                 <label className="form-label">Attendance Date</label>
@@ -623,38 +820,6 @@ export default function Attendance({
                     onChange={(e) => setSelectedDate(e.target.value)}
                   />
                 </div>
-              </div>
-
-              {/* Class 1 to 10 Selector */}
-              <div className="form-group mb-0">
-                <label className="form-label">Select Standard (Class 1 to 10)</label>
-                <select 
-                  className="form-select"
-                  value={selectedClass}
-                  onChange={(e) => {
-                    setSelectedClass(e.target.value);
-                    setSelectedBatchId('');
-                  }}
-                >
-                  {classes.map(cls => (
-                    <option key={cls.code} value={cls.code}>{cls.name} ({cls.category})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Batch Selector */}
-              <div className="form-group mb-0">
-                <label className="form-label">Batch Slot</label>
-                <select 
-                  className="form-select"
-                  value={selectedBatchId}
-                  onChange={(e) => setSelectedBatchId(e.target.value)}
-                >
-                  <option value="">All Batches ({classBatches.length} slots)</option>
-                  {classBatches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name} ({b.timing})</option>
-                  ))}
-                </select>
               </div>
             </div>
 
@@ -752,6 +917,7 @@ export default function Attendance({
                   <tr>
                     <th style={{ width: '90px' }}>Roll No</th>
                     <th>Student Name</th>
+                    <th style={{ width: '130px' }}>Standard</th>
                     {!isTeacher && <th>Parent Phone</th>}
                     <th style={{ textAlign: 'center', width: '220px' }}>Take Attendance</th>
                     <th style={{ width: '110px' }}>Status</th>
@@ -760,9 +926,9 @@ export default function Attendance({
                 <tbody>
                   {displayBatchStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={!isTeacher ? 5 : 4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      <td colSpan={!isTeacher ? 6 : 5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                         {eligibleBatchStudents.length === 0 
-                          ? 'No active students enrolled in this class / batch yet.' 
+                          ? 'No active students enrolled in this batch yet.' 
                           : `No students matching "${batchSearchQuery}".`}
                       </td>
                     </tr>
@@ -771,6 +937,7 @@ export default function Attendance({
                       const status = getStudentStatus(student.id);
                       const isAbsent = status === 'ABSENT';
                       const isLate = status === 'LATE';
+                      const sClass = classes.find(c => c.code === student.classCode);
 
                       return (
                         <tr key={student.id} className={isAbsent ? 'row-absent' : ''}>
@@ -778,6 +945,11 @@ export default function Attendance({
                           <td>
                             <div className="font-semibold text-white">{student.name}</div>
                             <div className="text-xs text-muted">{student.school || 'School unspecified'}</div>
+                          </td>
+                          <td>
+                            <span className="badge badge-class">
+                              {sClass?.name || student.classCode}
+                            </span>
                           </td>
                           
                           {/* Privacy: Parent phone is strictly hidden from Teachers */}

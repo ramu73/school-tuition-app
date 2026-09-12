@@ -85,12 +85,30 @@ export const INITIAL_ATTENDANCE = [
   { id: 5, studentId: 5, date: new Date().toISOString().split('T')[0], status: 'PRESENT', batchId: 3 }
 ];
 
+export const INITIAL_ANNOUNCEMENTS = [
+  {
+    id: 1,
+    title: 'Special Sunday Tuition Class',
+    message: 'Dear Sir/Mam, Please note that there will be a Special Sunday Revision Class for Class 10 on Sunday from 09:00 AM to 12:00 PM for board exam preparation. Attendance is compulsory.',
+    targetType: 'ALL',
+    targetId: null,
+    targetName: 'All Students & Batches',
+    postedBy: 'Admin (Director)',
+    date: new Date().toISOString().split('T')[0],
+    createdAt: new Date().toISOString()
+  }
+];
+
 // Initialize Storage
 export function getStoredData() {
   const existing = localStorage.getItem(STORAGE_KEY);
   if (existing) {
     try {
-      return JSON.parse(existing);
+      const parsed = JSON.parse(existing);
+      if (!parsed.announcements || !Array.isArray(parsed.announcements)) {
+        parsed.announcements = INITIAL_ANNOUNCEMENTS;
+      }
+      return parsed;
     } catch (e) {
       console.error('Failed to parse local storage', e);
     }
@@ -103,7 +121,8 @@ export function getStoredData() {
     receipts: INITIAL_RECEIPTS,
     exams: INITIAL_EXAMS,
     marks: INITIAL_MARKS,
-    attendance: INITIAL_ATTENDANCE
+    attendance: INITIAL_ATTENDANCE,
+    announcements: INITIAL_ANNOUNCEMENTS
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
   return defaultData;
@@ -161,7 +180,8 @@ export function getEmptyTuitionData() {
     receipts: [],
     exams: [],
     marks: [],
-    attendance: []
+    attendance: [],
+    announcements: []
   };
 }
 

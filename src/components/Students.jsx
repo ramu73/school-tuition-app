@@ -70,7 +70,7 @@ export default function Students({
       // Update
       const updatedStudents = students.map(s => 
         s.id === editingStudent.id 
-          ? { ...s, ...formData, monthlyFee: Number(formData.monthlyFee) }
+          ? { ...s, ...formData, monthlyFee: Number(formData.monthlyFee), status: editingStudent.status || s.status || 'ACTIVE' }
           : s
       );
       onSaveData({ ...data, students: updatedStudents });

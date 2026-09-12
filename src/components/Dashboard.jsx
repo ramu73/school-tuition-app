@@ -16,7 +16,9 @@ import {
   Award,
   Edit3,
   X,
-  Check
+  Check,
+  Megaphone,
+  UserCheck
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
@@ -34,6 +36,29 @@ export default function Dashboard({
 }) {
   const { students = [], batches = [], fees = [], attendance = [], classes = [], exams = [] } = data;
   const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
+  const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds) 
+    ? currentUser.assignedBatchIds.map(String) 
+    : [];
+  const assignedStudentIds = Array.isArray(currentUser?.assignedStudentIds) 
+    ? currentUser.assignedStudentIds.map(String) 
+    : [];
+
+  const accessibleBatches = isTeacher
+    ? batches.filter(b => {
+        const inBatch = assignedBatchIds.includes(String(b.id));
+        const hasAssignedStudent = assignedStudentIds.length > 0 && 
+          students.some(s => assignedStudentIds.includes(String(s.id)) && String(s.batchId) === String(b.id));
+        return inBatch || hasAssignedStudent;
+      })
+    : batches;
+
+  const accessibleStudents = isTeacher
+    ? students.filter(s => {
+        const inBatch = s.batchId && assignedBatchIds.includes(String(s.batchId));
+        const directStudent = assignedStudentIds.includes(String(s.id));
+        return inBatch || directStudent;
+      })
+    : students;
 
   // State for Editing Standard Class Fees
   const [editFeesModalOpen, setEditFeesModalOpen] = useState(false);
@@ -73,12 +98,18 @@ export default function Dashboard({
   };
 
   // 1. Calculations
-  const activeStudents = students.filter(s => s.status === 'ACTIVE');
+  const activeStudents = accessibleStudents.filter(s => s.status === 'ACTIVE');
   const totalStudents = activeStudents.length;
 
-  // Today's attendance
+  // Today's attendance (scoped to teacher's students if teacher)
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayAttendance = attendance.filter(a => a.date === todayStr);
+  const todayAttendance = attendance.filter(a => {
+    if (a.date !== todayStr) return false;
+    if (isTeacher) {
+      return accessibleStudents.some(s => s.id === a.studentId);
+    }
+    return true;
+  });
   const todayAbsentees = todayAttendance.filter(a => a.status === 'ABSENT');
   const todayAbsenteesCount = todayAbsentees.length;
   const presentCount = todayAttendance.filter(a => a.status === 'PRESENT').length;
@@ -166,6 +197,10 @@ export default function Dashboard({
                 <span>Collect Fee</span>
               </button>
             )}
+            <button className="btn btn-warning" onClick={() => setActiveTab('notifications')} title="Broadcast custom message or notices to students/parents">
+              <Megaphone size={16} />
+              <span>Broadcast Notice</span>
+            </button>
           </div>
 
           <div className="contact-pills-box mt-3">
@@ -178,6 +213,34 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
+      {isTeacher && (
+        <div className="teacher-scope-banner glass-card mb-4" style={{ padding: '12px 18px', background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-lg)' }}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <UserCheck size={20} className="text-emerald" />
+              <div>
+                <div className="font-semibold text-white text-sm">
+                  Faculty Portal — Assigned Teaching Batches ({accessibleBatches.length}):
+                </div>
+                <div className="text-xs text-slate-300 mt-0.5">
+                  {accessibleBatches.length > 0 
+                    ? accessibleBatches.map(b => `${b.name} (${b.timing})`).join(' • ')
+                    : 'No batches currently assigned. Please ask Admin to assign your batches in Settings.'}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button className="btn btn-secondary btn-sm" onClick={() => setActiveTab('batches')}>
+                <span>View Timetable</span>
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('attendance')}>
+                <span>Take Roll Call</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 5 Pillars We Offer Strip */}
       <div className="we-offer-strip glass-card">
@@ -263,9 +326,9 @@ export default function Dashboard({
                   <Clock size={20} />
                 </div>
               </div>
-              <div className="kpi-value">{batches.length}</div>
+              <div className="kpi-value">{accessibleBatches.length}</div>
               <div className="kpi-footer">
-                <span className="kpi-tag tag-sky">Classes 1–10</span>
+                <span className="kpi-tag tag-sky">Assigned Batches</span>
                 <span className="kpi-note" onClick={() => setActiveTab('batches')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
                   View timetable
                 </span>
@@ -473,7 +536,7 @@ export default function Dashboard({
           <div className="card-header-flex">
             <div>
               <h2 className="card-title">Today's Batches</h2>
-              <p className="card-subtitle">{batches.length} scheduled time slots</p>
+              <p className="card-subtitle">{accessibleBatches.length} scheduled time slots</p>
             </div>
             <button 
               className="btn btn-secondary btn-sm"
@@ -485,8 +548,8 @@ export default function Dashboard({
           </div>
 
           <div className="batches-mini-list">
-            {batches.slice(0, 5).map((b) => {
-              const enrolledInBatch = activeStudents.filter(s => s.batchId === b.id).length;
+            {accessibleBatches.slice(0, 5).map((b) => {
+              const enrolledInBatch = activeStudents.filter(s => Number(s.batchId) === Number(b.id)).length;
               return (
                 <div key={b.id} className="batch-mini-item">
                   <div className="batch-time-box">

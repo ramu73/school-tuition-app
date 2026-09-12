@@ -8,12 +8,20 @@ import {
   MessageSquare, 
   BookOpen, 
   Award, 
-  Sparkles
+  Sparkles,
+  Megaphone
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 
-export default function ParentPortal({ currentUser, data, onLogout }) {
-  const { students = [], classes = [], batches = [], attendance = [], exams = [], marks = [] } = data;
+export default function ParentPortal({ currentUser, data = {}, onLogout }) {
+  const safeData = data || {};
+  const students = Array.isArray(safeData.students) ? safeData.students : [];
+  const classes = Array.isArray(safeData.classes) ? safeData.classes : [];
+  const batches = Array.isArray(safeData.batches) ? safeData.batches : [];
+  const attendance = Array.isArray(safeData.attendance) ? safeData.attendance : [];
+  const exams = Array.isArray(safeData.exams) ? safeData.exams : [];
+  const marks = Array.isArray(safeData.marks) ? safeData.marks : [];
+  const announcements = Array.isArray(safeData.announcements) ? safeData.announcements : [];
 
   // Find all children belonging to this parent phone or ID
   const parentPhone = currentUser?.parentPhone;
@@ -60,6 +68,14 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
     ? Math.round(studentMarks.reduce((sum, m) => sum + (m.marksObtained / m.totalMarks) * 100, 0) / testsCount)
     : null;
 
+  const relevantAnnouncements = announcements.filter(a => {
+    if (!a.targetType || a.targetType === 'ALL') return true;
+    if (a.targetType === 'BATCH' && String(a.targetId) === String(currentStudent?.batchId)) return true;
+    if (a.targetType === 'CLASS' && String(a.targetId) === String(currentStudent?.classCode)) return true;
+    if (a.targetType === 'STUDENTS' && Array.isArray(a.targetId) && a.targetId.map(Number).includes(Number(currentStudent?.id))) return true;
+    return false;
+  });
+
   const tuitionWhatsAppUrl = `https://wa.me/919848266892?text=${encodeURIComponent(
     `Hello Hayagriva Tutorials, I am ${currentUser?.name || currentStudent?.parentName || 'Parent'}, parent of ${currentStudent?.name} (${studentClass?.name || 'Class'}). I would like an update regarding my child's studies.`
   )}`;
@@ -95,6 +111,42 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
           </div>
         )}
       </div>
+
+      {/* Announcements / Notice Board for Parents */}
+      {relevantAnnouncements.length > 0 && (
+        <div className="portal-announcements-card glass-card mb-4">
+          <div className="announcements-card-header">
+            <div className="flex items-center gap-2">
+              <div className="notice-icon-box">
+                <Megaphone size={16} className="text-amber" />
+              </div>
+              <div>
+                <span className="font-bold text-xs uppercase tracking-wider text-amber">
+                  Tuition Notices & Class Updates ({relevantAnnouncements.length})
+                </span>
+                <div className="text-3xs text-muted">Official announcements from Hayagriva Tutorials</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="portal-notices-list">
+            {relevantAnnouncements.map(ann => (
+              <div key={ann.id} className="portal-notice-item">
+                <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-white">{ann.title}</span>
+                    <span className="badge badge-class text-3xs">{ann.targetName || 'All Students'}</span>
+                  </div>
+                  <span className="text-3xs text-muted font-mono">{ann.date}</span>
+                </div>
+                <p className="notice-msg-text text-xs text-slate-300 leading-relaxed whitespace-pre-line mb-0">
+                  {ann.message}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Student Profile Overview Card */}
       <div className="student-hero-card glass-card">
@@ -448,6 +500,34 @@ export default function ParentPortal({ currentUser, data, onLogout }) {
           display: inline-flex;
           align-items: center;
           gap: 5px;
+        }
+        .portal-announcements-card {
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(15, 23, 42, 0.6) 100%);
+          padding: 16px 18px;
+          border-radius: var(--radius-lg);
+        }
+        .announcements-card-header {
+          margin-bottom: 12px;
+        }
+        .notice-icon-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px;
+          border-radius: var(--radius-md);
+          background: rgba(245, 158, 11, 0.15);
+        }
+        .portal-notices-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .portal-notice-item {
+          padding: 12px 14px;
+          border-radius: var(--radius-md);
+          background: rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         /* Mobile Responsive for Parent Portal */

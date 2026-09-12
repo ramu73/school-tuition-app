@@ -171,6 +171,26 @@ export async function fetchTuitionDataFromSupabase() {
       remarks: m.remarks || ''
     }));
 
+    let announcements = [];
+    try {
+      const annRes = await supabase.from('announcements').select('*').order('id', { ascending: false });
+      if (annRes.data && annRes.data.length > 0) {
+        announcements = annRes.data.map(a => ({
+          id: a.id,
+          title: a.title,
+          message: a.message,
+          targetType: a.target_type || 'ALL',
+          targetId: a.target_id,
+          targetName: a.target_name || 'All Students',
+          postedBy: a.posted_by || 'Admin',
+          date: a.announcement_date || (a.created_at ? a.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+          createdAt: a.created_at
+        }));
+      }
+    } catch (annErr) {
+      // Optional if table not yet created in remote DB
+    }
+
     return {
       hasData: students.length > 0 || batches.length > 0,
       classes,
@@ -180,7 +200,8 @@ export async function fetchTuitionDataFromSupabase() {
       fees,
       receipts,
       exams,
-      marks
+      marks,
+      announcements
     };
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
@@ -337,6 +358,25 @@ export async function syncTuitionDataToSupabase(data) {
         }));
       if (markRows.length > 0) {
         await supabase.from('exam_marks').upsert(markRows, { onConflict: 'exam_id, student_id' });
+      }
+    }
+
+    // 7. Announcements / Broadcast Notifications
+    if (data.announcements && data.announcements.length > 0) {
+      try {
+        const annRows = data.announcements.map(a => ({
+          id: a.id,
+          title: a.title,
+          message: a.message,
+          target_type: a.targetType || 'ALL',
+          target_id: a.targetId ? String(a.targetId) : null,
+          target_name: a.targetName || 'All Students',
+          posted_by: a.postedBy || 'Admin',
+          announcement_date: a.date || new Date().toISOString().split('T')[0]
+        }));
+        await supabase.from('announcements').upsert(annRows, { onConflict: 'id' });
+      } catch (annSyncErr) {
+        console.warn('Could not sync announcements to Supabase (table may not exist yet):', annSyncErr);
       }
     }
 

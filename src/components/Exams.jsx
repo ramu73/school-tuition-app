@@ -3,10 +3,40 @@ import { Award, Plus, FileText, CheckCircle2, User, X, Check, BookOpen } from 'l
 import { generateNextId } from '../lib/storage';
 
 
-export default function Exams({ data, onSaveData }) {
-  const { exams = [], marks = [], students = [], classes = [] } = data;
+export default function Exams({ data, currentUser, onSaveData }) {
+  const { exams = [], marks = [], students = [], classes = [], batches = [] } = data;
+  const isTeacher = currentUser?.role === 'TEACHER';
+  const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds) 
+    ? currentUser.assignedBatchIds.map(String) 
+    : [];
+  const assignedStudentIds = Array.isArray(currentUser?.assignedStudentIds) 
+    ? currentUser.assignedStudentIds.map(String) 
+    : [];
 
-  const [selectedClass, setSelectedClass] = useState('CLASS_10');
+  const accessibleBatches = isTeacher
+    ? batches.filter(b => {
+        const inBatch = assignedBatchIds.includes(String(b.id));
+        const hasAssignedStudent = assignedStudentIds.length > 0 && 
+          students.some(s => assignedStudentIds.includes(String(s.id)) && String(s.batchId) === String(b.id));
+        return inBatch || hasAssignedStudent;
+      })
+    : batches;
+
+  const accessibleStudents = isTeacher
+    ? students.filter(s => {
+        const inBatch = s.batchId && assignedBatchIds.includes(String(s.batchId));
+        const directStudent = assignedStudentIds.includes(String(s.id));
+        return inBatch || directStudent;
+      })
+    : students;
+
+  // Derive classes from students who are actually in the teacher's assigned batches
+  const accessibleClassCodes = new Set(accessibleStudents.map(s => s.classCode));
+  const accessibleClasses = isTeacher && accessibleClassCodes.size > 0
+    ? classes.filter(c => accessibleClassCodes.has(c.code))
+    : classes;
+
+  const [selectedClass, setSelectedClass] = useState(accessibleClasses[0]?.code || 'CLASS_10');
   const [selectedExamId, setSelectedExamId] = useState(exams[0]?.id || '');
   const [newExamModalOpen, setNewExamModalOpen] = useState(false);
   const [reportCardStudent, setReportCardStudent] = useState(null);
@@ -14,7 +44,7 @@ export default function Exams({ data, onSaveData }) {
   // New Exam Form
   const [newExamData, setNewExamData] = useState({
     title: '',
-    classCode: 'CLASS_10',
+    classCode: accessibleClasses[0]?.code || 'CLASS_10',
     subject: 'Mathematics',
     totalMarks: 50,
     passingMarks: 18,
@@ -25,9 +55,9 @@ export default function Exams({ data, onSaveData }) {
   const classExams = exams.filter(e => e.classCode === selectedClass);
   const currentExam = exams.find(e => e.id === Number(selectedExamId)) || classExams[0];
 
-  // Eligible students for the current exam's class
+  // Eligible students for the current exam's class (scoped to teacher batches if teacher)
   const examStudents = currentExam 
-    ? students.filter(s => s.classCode === currentExam.classCode && s.status === 'ACTIVE')
+    ? accessibleStudents.filter(s => s.classCode === currentExam.classCode && s.status === 'ACTIVE')
     : [];
 
   const handleCreateExam = (e) => {
@@ -121,6 +151,22 @@ export default function Exams({ data, onSaveData }) {
         </button>
       </div>
 
+      {isTeacher && (
+        <div className="teacher-scope-banner glass-card mb-3" style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)' }}>
+          <div className="flex items-center gap-2">
+            <Award size={16} className="text-emerald" />
+            <span className="font-semibold text-white text-xs">
+              Faculty Scoped Marks Entry:
+            </span>
+            <span className="text-xs text-muted">
+              {accessibleBatches.length > 0
+                ? `Showing students from your ${accessibleBatches.length} assigned batches (${examStudents.length} students in this standard).`
+                : 'No batches assigned to your account yet.'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Selectors Bar */}
       <div className="glass-card exam-selectors-card">
         <div className="exam-selectors-grid">
@@ -136,7 +182,7 @@ export default function Exams({ data, onSaveData }) {
                 if (firstExam) setSelectedExamId(firstExam.id);
               }}
             >
-              {classes.map(cls => (
+              {accessibleClasses.map(cls => (
                 <option key={cls.code} value={cls.code}>{cls.name}</option>
               ))}
             </select>

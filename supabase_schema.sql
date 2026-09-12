@@ -123,6 +123,19 @@ CREATE TABLE IF NOT EXISTS exam_marks (
     UNIQUE(exam_id, student_id)
 );
 
+-- 7. Announcements / Broadcast Notifications (Sunday tuition, timing changes, holidays)
+CREATE TABLE IF NOT EXISTS announcements (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    target_type VARCHAR(50) DEFAULT 'ALL', -- ALL, BATCH, CLASS
+    target_id VARCHAR(50),
+    target_name VARCHAR(100),
+    posted_by VARCHAR(100) DEFAULT 'Admin',
+    announcement_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- =========================================================
 -- Enable Supabase Realtime Replication on Key Tables
 -- =========================================================
@@ -132,6 +145,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE fee_records;
 ALTER PUBLICATION supabase_realtime ADD TABLE payment_receipts;
 ALTER PUBLICATION supabase_realtime ADD TABLE exams;
 ALTER PUBLICATION supabase_realtime ADD TABLE exam_marks;
+ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
 
 -- RLS (Row Level Security) - Permissive for tuition institute staff
 ALTER TABLE class_levels ENABLE ROW LEVEL SECURITY;
@@ -142,6 +156,7 @@ ALTER TABLE fee_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_marks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read/write for class_levels" ON class_levels FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for batches" ON batches FOR ALL USING (true);
@@ -151,3 +166,5 @@ CREATE POLICY "Allow public read/write for fee_records" ON fee_records FOR ALL U
 CREATE POLICY "Allow public read/write for payment_receipts" ON payment_receipts FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for exams" ON exams FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for exam_marks" ON exam_marks FOR ALL USING (true);
+CREATE POLICY "Allow public read/write for announcements" ON announcements FOR ALL USING (true);
+
