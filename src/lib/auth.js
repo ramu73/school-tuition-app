@@ -96,7 +96,7 @@ export function getStaffAccounts() {
 
     return {
       admin: { ...INITIAL_STAFF_ACCOUNTS.admin, ...(parsed.admin || {}) },
-      teacher: { ...INITIAL_STAFF_ACCOUNTS.teacher, ...(parsed.teacher || teachers[0] || {}) },
+      teacher: teachers[0] || INITIAL_STAFF_ACCOUNTS.teacher,
       teachers
     };
   } catch (err) {
@@ -105,15 +105,42 @@ export function getStaffAccounts() {
   }
 }
 
+// Get unvalidated raw session (internal helper to prevent circular calls)
+function getRawAuthSession() {
+  try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 // Save customized staff credentials (Admin can update passwords/usernames)
 export function saveStaffAccounts(accounts) {
   try {
+    if (accounts && accounts.teachers && accounts.teachers.length > 0) {
+      accounts.teacher = accounts.teachers[0];
+    }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(STAFF_ACCOUNTS_KEY, JSON.stringify(accounts));
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('hayagriva-staff-accounts-changed', { detail: accounts }));
     }
+
+    // Also verify active session: if active teacher was deleted, invalidate session immediately
+    const session = getRawAuthSession();
+    if (session && session.role === USER_ROLES.TEACHER) {
+      const exists = (accounts.teachers || []).some(
+        t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
+      );
+      if (!exists) {
+        clearAuthSession();
+      }
+    }
+
     return { success: true };
   } catch (err) {
     console.error('Failed to save staff accounts:', err);
@@ -277,9 +304,22 @@ export function deleteTeacherAccount(id) {
   if (teachers.length <= 1) {
     return { success: false, message: 'At least one teacher account must remain in the system.' };
   }
+  const deletedTeacher = teachers.find(t => t.id === id);
   accounts.teachers = teachers.filter(t => t.id !== id);
   accounts.teacher = accounts.teachers[0];
-  return saveStaffAccounts(accounts);
+  const saveRes = saveStaffAccounts(accounts);
+
+  // Invalidate active session if currently logged in as the deleted teacher
+  const session = getRawAuthSession();
+  if (session && session.role === USER_ROLES.TEACHER) {
+    const isDeleted = (session.id && session.id === id) || 
+      (deletedTeacher && session.username?.toLowerCase() === deletedTeacher.username?.toLowerCase());
+    if (isDeleted) {
+      clearAuthSession();
+    }
+  }
+
+  return saveRes;
 }
 
 // Update single staff account password / info
@@ -298,13 +338,58 @@ export function updateStaffAccount(role, updates) {
   return saveStaffAccounts(accounts);
 }
 
-// Get active session from storage
+// Get active session from storage with real-time validation against registered staff accounts
 export function getAuthSession() {
   try {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const session = JSON.parse(raw);
+    if (!session || !session.role) return null;
+
+    // Validate Teacher role against active registered teachers
+    if (session.role === USER_ROLES.TEACHER) {
+      const accounts = getStaffAccounts();
+      const currentTeacher = (accounts.teachers || []).find(
+        t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
+      );
+      if (!currentTeacher) {
+        // Teacher has been deleted by Admin! Invalidate stored session
+        localStorage.removeItem(AUTH_SESSION_KEY);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
+        }
+        return null;
+      }
+      // Return fresh, up-to-date teacher credentials & assignments
+      return {
+        ...session,
+        id: currentTeacher.id,
+        name: currentTeacher.name,
+        username: currentTeacher.username,
+        role: USER_ROLES.TEACHER,
+        title: currentTeacher.title || session.title,
+        subject: currentTeacher.subject || session.subject,
+        email: currentTeacher.email || session.email,
+        phone: currentTeacher.phone || session.phone,
+        assignedBatchIds: Array.isArray(currentTeacher.assignedBatchIds) ? currentTeacher.assignedBatchIds : [],
+        assignedStudentIds: Array.isArray(currentTeacher.assignedStudentIds) ? currentTeacher.assignedStudentIds : []
+      };
+    }
+
+    // Refresh Admin role with latest credentials from accounts
+    if (session.role === USER_ROLES.ADMIN) {
+      const accounts = getStaffAccounts();
+      const adminAcc = accounts.admin;
+      return {
+        ...session,
+        name: adminAcc?.name || session.name,
+        title: adminAcc?.title || session.title,
+        email: adminAcc?.email || session.email
+      };
+    }
+
+    return session;
   } catch (err) {
     console.error('Failed to parse auth session:', err);
     return null;

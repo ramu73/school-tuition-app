@@ -4,7 +4,8 @@
 // ==========================================================================
 
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseConfig, INITIAL_CLASSES } from './storage';
+import { getSupabaseConfig, INITIAL_CLASSES } from './storage.js';
+import { getStaffAccounts } from './auth.js';
 
 let supabaseInstance = null;
 
@@ -189,6 +190,13 @@ export async function fetchTuitionDataFromSupabase() {
       }
     } catch (annErr) {
       // Optional if table not yet created in remote DB
+    }
+
+    // Fetch and sync staff accounts from Supabase PostgreSQL
+    try {
+      await fetchStaffAccountsFromSupabase();
+    } catch (staffErr) {
+      // Optional if table not yet created
     }
 
     return {
@@ -380,6 +388,13 @@ export async function syncTuitionDataToSupabase(data) {
       }
     }
 
+    // 8. Staff Accounts (sync admin & teachers)
+    try {
+      await syncStaffAccountsToSupabase(getStaffAccounts());
+    } catch (staffErr) {
+      console.warn('Could not sync staff accounts to Supabase:', staffErr);
+    }
+
     return { success: true };
   } catch (err) {
     console.error('Error syncing data to Supabase:', err);
@@ -404,6 +419,144 @@ export async function clearSupabaseDatabase() {
     return { success: true };
   } catch (err) {
     console.error('Error clearing Supabase database:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Fetch Staff & Faculty accounts from Supabase PostgreSQL
+export async function fetchStaffAccountsFromSupabase() {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  try {
+    const { data: staffRows, error } = await supabase.from('staff_accounts').select('*');
+    if (error || !staffRows || staffRows.length === 0) {
+      return null;
+    }
+
+    const adminRow = staffRows.find(r => r.role === 'ADMIN');
+    const teacherRows = staffRows.filter(r => r.role === 'TEACHER');
+
+    const admin = adminRow ? {
+      username: adminRow.username,
+      password: adminRow.password,
+      pin: adminRow.pin || '1234',
+      name: adminRow.name,
+      role: 'ADMIN',
+      title: adminRow.title || 'Administrator',
+      email: adminRow.email || 'admin@hayagriva.edu'
+    } : null;
+
+    const teachers = teacherRows.map(t => ({
+      id: t.id,
+      username: t.username,
+      password: t.password,
+      pin: t.pin || '1234',
+      name: t.name,
+      role: 'TEACHER',
+      title: t.title || (t.subject ? `Faculty (${t.subject})` : 'Senior Faculty'),
+      subject: t.subject || '',
+      phone: t.phone || '',
+      email: t.email || '',
+      assignedBatchIds: Array.isArray(t.assigned_batch_ids) ? t.assigned_batch_ids : [],
+      assignedStudentIds: Array.isArray(t.assigned_student_ids) ? t.assigned_student_ids : [],
+      createdAt: t.created_at
+    }));
+
+    if (teachers.length === 0 && !admin) return null;
+
+    const staffAccounts = {
+      admin: admin || {
+        username: 'admin',
+        password: 'admin123',
+        pin: '1234',
+        name: 'Tuition Director',
+        role: 'ADMIN',
+        title: 'Administrator',
+        email: 'admin@hayagriva.edu'
+      },
+      teacher: teachers[0] || null,
+      teachers: teachers.length > 0 ? teachers : []
+    };
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('hayagriva_staff_accounts_v1', JSON.stringify(staffAccounts));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hayagriva-staff-accounts-changed', { detail: staffAccounts }));
+    }
+
+    return staffAccounts;
+  } catch (err) {
+    console.warn('Could not fetch staff accounts from Supabase:', err);
+    return null;
+  }
+}
+
+// Sync Staff & Faculty accounts to Supabase PostgreSQL
+export async function syncStaffAccountsToSupabase(accounts) {
+  const supabase = getSupabaseClient();
+  if (!supabase || !accounts) return { success: false, message: 'Supabase not connected' };
+
+  try {
+    const rowsToUpsert = [];
+
+    // 1. Admin account row
+    if (accounts.admin) {
+      rowsToUpsert.push({
+        id: 'admin-01',
+        username: accounts.admin.username || 'admin',
+        password: accounts.admin.password || 'admin123',
+        pin: accounts.admin.pin || '1234',
+        name: accounts.admin.name || 'Tuition Director',
+        role: 'ADMIN',
+        title: accounts.admin.title || 'Administrator',
+        email: accounts.admin.email || 'admin@hayagriva.edu',
+        assigned_batch_ids: [],
+        assigned_student_ids: []
+      });
+    }
+
+    // 2. Teachers accounts rows
+    const teachersList = accounts.teachers || (accounts.teacher ? [accounts.teacher] : []);
+    teachersList.forEach(t => {
+      rowsToUpsert.push({
+        id: t.id || `teacher-${Date.now()}`,
+        username: t.username,
+        password: t.password,
+        pin: t.pin || '1234',
+        name: t.name,
+        role: 'TEACHER',
+        title: t.title || '',
+        subject: t.subject || '',
+        phone: t.phone || '',
+        email: t.email || '',
+        assigned_batch_ids: Array.isArray(t.assignedBatchIds) ? t.assignedBatchIds : [],
+        assigned_student_ids: Array.isArray(t.assignedStudentIds) ? t.assignedStudentIds : []
+      });
+    });
+
+    if (rowsToUpsert.length > 0) {
+      const { error: upsertErr } = await supabase.from('staff_accounts').upsert(rowsToUpsert, { onConflict: 'id' });
+      if (upsertErr) {
+        console.warn('Could not upsert staff_accounts to Supabase:', upsertErr);
+        return { success: false, error: upsertErr.message };
+      }
+
+      // Delete any teacher accounts from Supabase that were deleted locally
+      const validTeacherIds = teachersList.map(t => t.id).filter(Boolean);
+      if (validTeacherIds.length > 0) {
+        await supabase
+          .from('staff_accounts')
+          .delete()
+          .eq('role', 'TEACHER')
+          .not('id', 'in', `(${validTeacherIds.map(id => `'${id}'`).join(',')})`);
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error syncing staff accounts to Supabase:', err);
     return { success: false, error: err.message };
   }
 }

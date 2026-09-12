@@ -24,7 +24,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
-import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase } from '../lib/supabase';
+import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase, syncStaffAccountsToSupabase } from '../lib/supabase';
 import { 
   getSupabaseConfig, 
   saveSupabaseConfig, 
@@ -50,7 +50,7 @@ import {
   assignStudentsToTeacher
 } from '../lib/auth';
 
-export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [] }) {
+export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [], onSaveData }) {
   if (!isOpen) return null;
 
   const [activeSettingsTab, setActiveSettingsTab] = useState('database');
@@ -198,6 +198,9 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
       }
     };
     saveStaffAccounts(updated);
+    if (getSupabaseConfig().isConnected) {
+      syncStaffAccountsToSupabase(updated).catch(() => {});
+    }
     setStaffMsg({ type: 'success', text: 'Admin login credentials updated successfully!' });
     setTimeout(() => setStaffMsg(null), 3500);
   };
@@ -216,6 +219,28 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     if (res.success) {
       setTeachers(getTeacherAccounts());
       setShowAddTeacher(false);
+
+      // If batches were assigned, update their tutor in data.batches so Batches and Timetable display the new teacher!
+      if (newTeacherBatches.length > 0) {
+        const stored = getStoredData();
+        const updatedBatches = (stored.batches || []).map(b => {
+          if (newTeacherBatches.includes(b.id)) {
+            return { ...b, tutor: `${newTeacherName.trim()} (${newTeacherSubject.trim() || 'Faculty'})` };
+          }
+          return b;
+        });
+        if (typeof onSaveData === 'function') {
+          onSaveData({ ...stored, batches: updatedBatches });
+        } else {
+          saveStoredData({ ...stored, batches: updatedBatches });
+        }
+      }
+
+      // Sync to Supabase PostgreSQL so other devices / logins immediately have the new teacher
+      if (getSupabaseConfig().isConnected) {
+        syncStaffAccountsToSupabase(getStaffAccounts()).catch(() => {});
+      }
+
       setNewTeacherName('');
       setNewTeacherSubject('');
       setNewTeacherUsername('');
@@ -235,8 +260,41 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     if (window.confirm(`Are you sure you want to remove the teacher account for "${teacherName}"?`)) {
       const res = deleteTeacherAccount(teacherId);
       if (res.success) {
-        setTeachers(getTeacherAccounts());
-        setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted.` });
+        const remainingTeachers = getTeacherAccounts();
+        setTeachers(remainingTeachers);
+
+        // Update any batches that listed this deleted teacher as tutor
+        const stored = getStoredData();
+        const replacementTutor = remainingTeachers[0] 
+          ? `${remainingTeachers[0].name} (${remainingTeachers[0].subject || 'Faculty'})` 
+          : 'Faculty';
+        const cleanName = (teacherName || '').trim();
+        const firstName = cleanName.split(' ')[0] || '';
+        const lastName = cleanName.split(' ').pop() || '';
+
+        const updatedBatches = (stored.batches || []).map(b => {
+          if (b.tutor && (
+            b.tutor.includes(cleanName) || 
+            (lastName.length >= 3 && b.tutor.includes(lastName)) ||
+            (firstName.length >= 3 && b.tutor.includes(firstName))
+          )) {
+            return { ...b, tutor: replacementTutor };
+          }
+          return b;
+        });
+
+        if (typeof onSaveData === 'function') {
+          onSaveData({ ...stored, batches: updatedBatches });
+        } else {
+          saveStoredData({ ...stored, batches: updatedBatches });
+        }
+
+        // Sync deletion to Supabase PostgreSQL cloud so all other devices and logins purge the deleted teacher
+        if (getSupabaseConfig().isConnected) {
+          syncStaffAccountsToSupabase(getStaffAccounts()).catch(() => {});
+        }
+
+        setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted and batch assignments updated.` });
         setTimeout(() => setStaffMsg(null), 3000);
       } else {
         alert(res.message);
@@ -346,7 +404,33 @@ CREATE TABLE IF NOT EXISTS fee_records (
     balance NUMERIC(10,2),
     status VARCHAR(20) DEFAULT 'PENDING'
 );
-ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records;`;
+CREATE TABLE IF NOT EXISTS announcements (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    target_type VARCHAR(50) DEFAULT 'ALL',
+    target_id VARCHAR(50),
+    target_name VARCHAR(100),
+    posted_by VARCHAR(100) DEFAULT 'Admin',
+    announcement_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS staff_accounts (
+    id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    pin VARCHAR(20) DEFAULT '1234',
+    name VARCHAR(150) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    title VARCHAR(150),
+    subject VARCHAR(150),
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    assigned_batch_ids JSONB DEFAULT '[]'::jsonb,
+    assigned_student_ids JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records, announcements, staff_accounts;`;
 
   const copySql = () => {
     navigator.clipboard.writeText(sqlCode);

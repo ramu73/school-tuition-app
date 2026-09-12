@@ -176,7 +176,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           </div>
           <div className="batch-tutor-val">
             <User size={13} />
-            <span>Faculty: {studentBatch?.tutor || 'Mr. R. Sharma (Maths & Physics)'}</span>
+            <span>Faculty: {studentBatch?.tutor || 'Assigned Faculty'}</span>
           </div>
         </div>
       </div>

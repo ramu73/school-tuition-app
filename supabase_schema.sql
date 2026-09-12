@@ -136,6 +136,23 @@ CREATE TABLE IF NOT EXISTS announcements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 8. Staff & Faculty Accounts (Teachers & Admin accounts, passwords, assigned batches & students)
+CREATE TABLE IF NOT EXISTS staff_accounts (
+    id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    pin VARCHAR(20) DEFAULT '1234',
+    name VARCHAR(150) NOT NULL,
+    role VARCHAR(20) NOT NULL, -- ADMIN, TEACHER
+    title VARCHAR(150),
+    subject VARCHAR(150),
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    assigned_batch_ids JSONB DEFAULT '[]'::jsonb,
+    assigned_student_ids JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- =========================================================
 -- Enable Supabase Realtime Replication on Key Tables
 -- =========================================================
@@ -146,6 +163,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE payment_receipts;
 ALTER PUBLICATION supabase_realtime ADD TABLE exams;
 ALTER PUBLICATION supabase_realtime ADD TABLE exam_marks;
 ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
+ALTER PUBLICATION supabase_realtime ADD TABLE staff_accounts;
 
 -- RLS (Row Level Security) - Permissive for tuition institute staff
 ALTER TABLE class_levels ENABLE ROW LEVEL SECURITY;
@@ -157,6 +175,7 @@ ALTER TABLE payment_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_marks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_accounts ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read/write for class_levels" ON class_levels FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for batches" ON batches FOR ALL USING (true);
@@ -167,4 +186,5 @@ CREATE POLICY "Allow public read/write for payment_receipts" ON payment_receipts
 CREATE POLICY "Allow public read/write for exams" ON exams FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for exam_marks" ON exam_marks FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for announcements" ON announcements FOR ALL USING (true);
+CREATE POLICY "Allow public read/write for staff_accounts" ON staff_accounts FOR ALL USING (true);
 

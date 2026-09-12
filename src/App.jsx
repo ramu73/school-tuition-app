@@ -11,8 +11,8 @@ import SettingsModal from './components/SettingsModal';
 import LoginModal from './components/LoginModal';
 import ParentPortal from './components/ParentPortal';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
-import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase } from './lib/supabase';
-import { getAuthSession, clearAuthSession, USER_ROLES } from './lib/auth';
+import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
+import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES } from './lib/auth';
 
 class TabErrorBoundary extends React.Component {
   constructor(props) {
@@ -106,16 +106,53 @@ export default function App() {
       const session = getAuthSession();
       if (session && session.role === USER_ROLES.TEACHER) {
         const accounts = getStaffAccounts();
-        const freshTeacher = (accounts.teachers || []).find(t => t.id === session.id || t.username === session.username);
+        const freshTeacher = (accounts.teachers || []).find(
+          t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
+        );
         if (freshTeacher) {
           const updatedUser = {
             ...session,
+            id: freshTeacher.id,
+            name: freshTeacher.name,
+            title: freshTeacher.title || session.title,
+            subject: freshTeacher.subject || session.subject,
+            email: freshTeacher.email || session.email,
+            phone: freshTeacher.phone || session.phone,
             assignedBatchIds: freshTeacher.assignedBatchIds || [],
             assignedStudentIds: freshTeacher.assignedStudentIds || []
           };
           setCurrentUser(updatedUser);
           setAuthSession(updatedUser);
+        } else {
+          // The teacher account was deleted by Admin! Invalidate immediately
+          clearAuthSession();
+          setCurrentUser(null);
         }
+      } else if (session && session.role === USER_ROLES.ADMIN) {
+        const accounts = getStaffAccounts();
+        if (accounts.admin) {
+          const updatedAdmin = {
+            ...session,
+            name: accounts.admin.name || session.name,
+            title: accounts.admin.title || session.title,
+            email: accounts.admin.email || session.email
+          };
+          setCurrentUser(updatedAdmin);
+        }
+      } else {
+        setCurrentUser(getAuthSession());
+      }
+    };
+
+    // Cross-tab synchronization listener (fires in all OTHER tabs when localStorage updates)
+    const handleStorageEvent = (e) => {
+      if (e.key === 'hayagriva_staff_accounts_v1' || e.key === 'hayagriva_auth_session_v1') {
+        const latestSession = getAuthSession();
+        setCurrentUser(latestSession);
+        handleStaffChange();
+      }
+      if (e.key === 'vidyatrack_tuition_data_v1') {
+        setData(getStoredData());
       }
     };
 
@@ -123,12 +160,14 @@ export default function App() {
     window.addEventListener('tuition-supabase-config-changed', handleConfigChange);
     window.addEventListener('hayagriva-auth-changed', handleAuthChange);
     window.addEventListener('hayagriva-staff-accounts-changed', handleStaffChange);
+    window.addEventListener('storage', handleStorageEvent);
 
     return () => {
       window.removeEventListener('tuition-db-updated', handleDbUpdate);
       window.removeEventListener('tuition-supabase-config-changed', handleConfigChange);
       window.removeEventListener('hayagriva-auth-changed', handleAuthChange);
       window.removeEventListener('hayagriva-staff-accounts-changed', handleStaffChange);
+      window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
 
@@ -142,13 +181,21 @@ export default function App() {
 
       setIsSyncing(true);
       try {
-        const remote = await fetchTuitionDataFromSupabase();
-        if (isMounted && remote) {
-          if (remote.hasData) {
-            setData(remote);
-            saveStoredData(remote);
-          } else {
-            console.log('Connected to Supabase PostgreSQL. Tables are ready.');
+        const [remote, remoteStaff] = await Promise.all([
+          fetchTuitionDataFromSupabase(),
+          fetchStaffAccountsFromSupabase()
+        ]);
+        if (isMounted) {
+          if (remoteStaff) {
+            handleStaffChange();
+          }
+          if (remote) {
+            if (remote.hasData) {
+              setData(remote);
+              saveStoredData(remote);
+            } else {
+              console.log('Connected to Supabase PostgreSQL. Tables are ready.');
+            }
           }
         }
       } catch (err) {
@@ -198,6 +245,19 @@ export default function App() {
         if (refreshed) {
           setData(refreshed);
           saveStoredData(refreshed);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff_accounts' }, async () => {
+        const refreshedStaff = await fetchStaffAccountsFromSupabase();
+        if (refreshedStaff) {
+          handleStaffChange();
         }
       })
       .subscribe();
@@ -359,6 +419,7 @@ export default function App() {
           onDataReset={(newData) => setData(newData)}
           batches={data.batches || []}
           students={data.students || []}
+          onSaveData={handleSaveData}
         />
       )}
 
