@@ -17,7 +17,7 @@ export const INITIAL_CLASSES = [
   { id: 7, code: 'CLASS_7', name: 'Class 7', category: 'Middle', defaultFee: 850, subjects: ['Mathematics', 'General Science', 'Social Studies', 'English', 'Language II'] },
   { id: 8, code: 'CLASS_8', name: 'Class 8', category: 'Middle', defaultFee: 900, subjects: ['Mathematics', 'Physical Science', 'Biological Science', 'Social Studies', 'English'] },
   { id: 9, code: 'CLASS_9', name: 'Class 9', category: 'High School', defaultFee: 1100, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English'] },
-  { id: 10, code: 'CLASS_10', name: 'Class 10 (SSC/CBSE)', category: 'High School', defaultFee: 1250, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English'] }
+  { id: 10, code: 'CLASS_10', name: 'Class 10', category: 'High School', defaultFee: 1250, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English'] }
 ];
 
 export const INITIAL_BATCHES = [
@@ -107,6 +107,19 @@ export function getStoredData() {
       const parsed = JSON.parse(existing);
       if (!parsed.announcements || !Array.isArray(parsed.announcements)) {
         parsed.announcements = INITIAL_ANNOUNCEMENTS;
+      }
+      if (Array.isArray(parsed.classes)) {
+        let changed = false;
+        parsed.classes = parsed.classes.map(c => {
+          if (c.code === 'CLASS_10' && c.name && c.name.includes('SSC/CBSE')) {
+            changed = true;
+            return { ...c, name: 'Class 10' };
+          }
+          return c;
+        });
+        if (changed) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
       }
       return parsed;
     } catch (e) {

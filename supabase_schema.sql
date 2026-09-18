@@ -24,7 +24,7 @@ INSERT INTO class_levels (code, display_name, category, default_monthly_fee) VAL
 ('CLASS_7', 'Class 7', 'Middle', 850.00),
 ('CLASS_8', 'Class 8', 'Middle', 900.00),
 ('CLASS_9', 'Class 9', 'High School', 1100.00),
-('CLASS_10', 'Class 10 (SSC/CBSE)', 'High School', 1200.00)
+('CLASS_10', 'Class 10', 'High School', 1200.00)
 ON CONFLICT (code) DO NOTHING;
 
 -- 2. Batches (Sections / Time slots per class)

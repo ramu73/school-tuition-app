@@ -574,7 +574,7 @@ export default function Dashboard({
           <div className="quick-tip-box mt-4">
             <BookOpen size={18} className="tip-icon" />
             <div>
-              <strong>Class 10 Board / SSC Alert:</strong> Morning & Evening revision batches are active. Weekly mock tests are scheduled for Sunday.
+              <strong>Class 10 Board Alert:</strong> Morning & Evening revision batches are active. Weekly mock tests are scheduled for Sunday.
             </div>
           </div>
         </div>
