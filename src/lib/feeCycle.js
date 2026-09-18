@@ -115,7 +115,6 @@ export function generateFeeReminderMessage(cycleInfo, instituteName = 'HAYAGRIVA
 
   // Polite formal greeting as requested
   const greeting = 'Dear Sir/Mam,';
-  const formattedBalance = Number(balance || 0).toLocaleString('en-IN');
 
   let statusNote = `This is a reminder regarding the tuition fee for *${studentName}*.`;
   if (cycleStatus === 'DUE_TODAY') {
@@ -131,10 +130,10 @@ export function generateFeeReminderMessage(cycleInfo, instituteName = 'HAYAGRIVA
 ${statusNote}
 
 • Due Date: *${formattedDueDate}*
-• Pending Amount: *₹${formattedBalance}*
-• Payment Mode: Cash / UPI (PhonePe, GPay)
+• UPI Number: *9493641959* (PhonePe / GPay)
+• Payment Mode: UPI / Cash
 
-Kindly clear the pending fee at your convenience.
+Kindly clear the tuition fee at your convenience.
 
 Thank you,
 *${instituteName}*
