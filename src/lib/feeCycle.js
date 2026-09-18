@@ -109,7 +109,6 @@ export function generateFeeReminderMessage(cycleInfo, instituteName = 'HAYAGRIVA
     studentName,
     parentName,
     formattedDueDate,
-    balance,
     cycleStatus
   } = cycleInfo;
 
