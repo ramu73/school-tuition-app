@@ -107,35 +107,28 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
 export function generateFeeReminderMessage(cycleInfo, instituteName = 'HAYAGRIVA TUTORIALS') {
   const {
     studentName,
-    parentName,
     formattedDueDate,
     cycleStatus
   } = cycleInfo;
 
-  // Polite formal greeting as requested
-  const greeting = 'Dear Sir/Mam,';
-
-  let statusNote = `This is a reminder regarding the tuition fee for *${studentName}*.`;
+  let statusNote = `This is a reminder regarding the tuition fee for ${studentName}.`;
   if (cycleStatus === 'DUE_TODAY') {
-    statusNote = `This is a reminder that the tuition fee for *${studentName}* is due today.`;
+    statusNote = `This is a reminder that the tuition fee for ${studentName} is due today.`;
   } else if (cycleStatus === 'UPCOMING') {
-    statusNote = `This is a reminder for the upcoming tuition fee for *${studentName}*.`;
+    statusNote = `This is a reminder for the upcoming tuition fee for ${studentName}.`;
   }
 
-  return `${greeting}
-
-*Fee Reminder - ${instituteName}*
+  return `Fee Reminder - ${instituteName}
 
 ${statusNote}
 
-• Due Date: *${formattedDueDate}*
-• UPI Number: *9493641959* (PhonePe / GPay)
-• Payment Mode: UPI / Cash
+* Due Date: ${formattedDueDate}
+* Payment Mode: Cash / UPI (PhonePe, GPay) - 9493641959
 
-Kindly clear the tuition fee at your convenience.
+Kindly clear the pending fee at your convenience.
 
 Thank you,
-*${instituteName}*
+${instituteName}
 Contact: +91 98482 66892`;
 }
 
