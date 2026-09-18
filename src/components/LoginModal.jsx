@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   GraduationCap, 
@@ -10,10 +10,11 @@ import {
   CheckCircle2, 
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Clock
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
-import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession } from '../lib/auth';
+import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession, getLockoutStatus } from '../lib/auth';
 
 export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [activeRole, setActiveRole] = useState(USER_ROLES.ADMIN);
@@ -21,7 +22,32 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [parentIdentifier, setParentIdentifier] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  // Check lockout countdown timer
+  useEffect(() => {
+    const currentId = activeRole === USER_ROLES.PARENT ? parentIdentifier : username;
+    const status = getLockoutStatus(currentId);
+    setIsLocked(status.isLocked);
+    setLockoutSeconds(status.remainingSeconds);
+
+    if (status.isLocked && status.remainingSeconds > 0) {
+      const timer = setInterval(() => {
+        setLockoutSeconds(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setIsLocked(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [activeRole, username, parentIdentifier]);
 
   const handleRoleTabChange = (role) => {
     setActiveRole(role);
@@ -35,21 +61,34 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
     e.preventDefault();
     setErrorMsg('');
 
+    if (isLocked) {
+      setErrorMsg(`Account temporarily locked. Please retry in ${lockoutSeconds}s.`);
+      return;
+    }
+
     if (activeRole === USER_ROLES.PARENT) {
       const res = authenticateParent(parentIdentifier, students);
       if (res.success) {
-        setAuthSession(res.user);
-        onLoginSuccess(res.user);
+        const session = setAuthSession(res.user, rememberMe);
+        onLoginSuccess(session);
       } else {
         setErrorMsg(res.message);
+        if (res.isLocked) {
+          setIsLocked(true);
+          setLockoutSeconds(res.remainingSeconds || 120);
+        }
       }
     } else {
       const res = authenticateStaff(username, password, activeRole);
       if (res.success) {
-        setAuthSession(res.user);
-        onLoginSuccess(res.user);
+        const session = setAuthSession(res.user, rememberMe);
+        onLoginSuccess(session);
       } else {
         setErrorMsg(res.message);
+        if (res.isLocked) {
+          setIsLocked(true);
+          setLockoutSeconds(res.remainingSeconds || 120);
+        }
       }
     }
   };
@@ -117,18 +156,17 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                   placeholder="Enter 10-digit mobile number"
                   value={parentIdentifier}
                   onChange={(e) => setParentIdentifier(e.target.value)}
+                  disabled={isLocked}
                   className="form-input with-left-icon"
                 />
               </div>
-              <p className="field-hint">
-                Enter the mobile number given during your child's tuition admission. No password needed.
-              </p>
+              <p className="field-hint">E.g. 9876543210 or ADM-1001</p>
             </div>
           ) : (
             <>
               <div className="form-group">
                 <label className="form-label">
-                  {activeRole === USER_ROLES.ADMIN ? 'Admin Username or Email' : 'Teacher Username or Email'}
+                  {activeRole === USER_ROLES.ADMIN ? 'Admin Username / Email' : 'Teacher Username / Email'}
                 </label>
                 <div className="input-with-icon">
                   <User size={16} className="input-icon" />
@@ -136,9 +174,10 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                     type="text"
                     required
                     autoFocus
-                    placeholder={activeRole === USER_ROLES.ADMIN ? 'Enter admin username' : 'Enter teacher username'}
+                    placeholder={activeRole === USER_ROLES.ADMIN ? "Enter admin username" : "Enter teacher username"}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    disabled={isLocked}
                     className="form-input with-left-icon"
                   />
                 </div>
@@ -154,6 +193,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                     placeholder="Enter password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLocked}
                     className="form-input with-left-icon with-right-icon"
                   />
                   <button
@@ -170,8 +210,28 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
             </>
           )}
 
-          <button type="submit" className="btn btn-primary submit-login-btn">
-            <span>Login to {activeRole === USER_ROLES.ADMIN ? 'Admin Dashboard' : activeRole === USER_ROLES.TEACHER ? 'Teacher Portal' : 'Parent Portal'}</span>
+          {/* Remember Me & Session Duration Options */}
+          <div className="login-options-row">
+            <label className="remember-me-label">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="remember-checkbox"
+              />
+              <span>Remember me (7 days)</span>
+            </label>
+            <span className="session-policy-hint" title="Sessions auto-lock after 45 minutes of inactivity for security.">
+              45m auto-lock
+            </span>
+          </div>
+
+          <button 
+            type="submit" 
+            className={`btn btn-primary submit-login-btn ${isLocked ? 'disabled-btn' : ''}`}
+            disabled={isLocked}
+          >
+            <span>{isLocked ? `Locked (${lockoutSeconds}s)` : `Login to ${activeRole === USER_ROLES.ADMIN ? 'Admin Dashboard' : activeRole === USER_ROLES.TEACHER ? 'Teacher Portal' : 'Parent Portal'}`}</span>
             <ArrowRight size={16} />
           </button>
         </form>
@@ -301,6 +361,43 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           font-size: 0.725rem;
           color: var(--text-muted);
           margin-top: 4px;
+        }
+        .login-lockout-alert {
+          background: rgba(245, 158, 11, 0.15) !important;
+          border-color: rgba(245, 158, 11, 0.35) !important;
+          color: #FBBF24 !important;
+        }
+        .login-options-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.775rem;
+          color: var(--text-secondary);
+          margin-top: -4px;
+        }
+        .remember-me-label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          cursor: pointer;
+          user-select: none;
+        }
+        .remember-checkbox {
+          accent-color: var(--primary-500, #6366F1);
+          width: 14px;
+          height: 14px;
+          cursor: pointer;
+        }
+        .session-policy-hint {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          border-bottom: 1px dotted var(--text-muted);
+          cursor: help;
+        }
+        .disabled-btn {
+          opacity: 0.55;
+          cursor: not-allowed !important;
+          filter: grayscale(0.5);
         }
         .submit-login-btn {
           width: 100%;

@@ -104,14 +104,17 @@ export default function Navbar({
             </button>
           )}
 
-          {/* Current User Badge */}
+          {/* Current User Badge with Session Metadata */}
           {currentUser && (
-            <div className="current-user-badge">
+            <div 
+              className="current-user-badge"
+              title={`Active Session: ${currentUser.name} (${currentUser.role})\nSession Type: ${currentUser.rememberMe ? 'Persistent (7 Days)' : 'Standard (2 Hours)'}\nAuto-Lock: 45m Inactivity Protection Active`}
+            >
               {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={13} className="text-primary" />}
               {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={13} className="text-emerald" />}
               {currentUser.role === USER_ROLES.PARENT && <Users size={13} className="text-amber" />}
               <span className="user-badge-name">{currentUser.name}</span>
-              <span className="user-role-tag">{currentUser.role}</span>
+              <span className={`user-role-tag role-${currentUser.role?.toLowerCase()}`}>{currentUser.role}</span>
             </div>
           )}
 
@@ -298,11 +301,25 @@ export default function Navbar({
         .user-role-tag {
           font-size: 0.65rem;
           font-weight: 700;
-          padding: 1px 6px;
+          padding: 2px 7px;
           border-radius: var(--radius-full);
-          background: rgba(99, 102, 241, 0.2);
-          color: #C7D2FE;
           text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .user-role-tag.role-admin {
+          background: rgba(99, 102, 241, 0.25);
+          color: #A5B4FC;
+          border: 1px solid rgba(99, 102, 241, 0.4);
+        }
+        .user-role-tag.role-teacher {
+          background: rgba(16, 185, 129, 0.2);
+          color: #6EE7B7;
+          border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+        .user-role-tag.role-parent {
+          background: rgba(245, 158, 11, 0.2);
+          color: #FCD34D;
+          border: 1px solid rgba(245, 158, 11, 0.4);
         }
         .logout-nav-btn {
           display: flex;

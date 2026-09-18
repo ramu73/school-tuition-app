@@ -4,12 +4,197 @@
 // ==========================================================================
 
 const AUTH_SESSION_KEY = 'hayagriva_auth_session_v1';
+const FAILED_LOGINS_KEY = 'hayagriva_failed_logins_v1';
 
 export const USER_ROLES = {
   ADMIN: 'ADMIN',
   TEACHER: 'TEACHER',
   PARENT: 'PARENT'
 };
+
+// Fine-Grained Role-Based Access Control (RBAC) Permissions
+export const PERMISSIONS = {
+  // Navigation & Core
+  VIEW_DASHBOARD: 'VIEW_DASHBOARD',
+  VIEW_STUDENTS: 'VIEW_STUDENTS',
+  MANAGE_STUDENTS: 'MANAGE_STUDENTS',
+  DELETE_STUDENTS: 'DELETE_STUDENTS',
+
+  // Batches
+  VIEW_BATCHES: 'VIEW_BATCHES',
+  MANAGE_BATCHES: 'MANAGE_BATCHES',
+
+  // Attendance
+  VIEW_ATTENDANCE: 'VIEW_ATTENDANCE',
+  MARK_ATTENDANCE: 'MARK_ATTENDANCE',
+
+  // Fees
+  VIEW_FEES: 'VIEW_FEES',
+  COLLECT_FEES: 'COLLECT_FEES',
+  MANAGE_FEES: 'MANAGE_FEES',
+
+  // Exams
+  VIEW_EXAMS: 'VIEW_EXAMS',
+  MANAGE_EXAMS: 'MANAGE_EXAMS',
+  ENTER_MARKS: 'ENTER_MARKS',
+
+  // Notices & Settings
+  BROADCAST_NOTICES: 'BROADCAST_NOTICES',
+  MANAGE_SETTINGS: 'MANAGE_SETTINGS',
+  MANAGE_STAFF: 'MANAGE_STAFF',
+  RESET_DATABASE: 'RESET_DATABASE',
+
+  // Parent Portal
+  VIEW_PARENT_PORTAL: 'VIEW_PARENT_PORTAL'
+};
+
+export const ROLE_PERMISSIONS = {
+  [USER_ROLES.ADMIN]: [
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.VIEW_STUDENTS,
+    PERMISSIONS.MANAGE_STUDENTS,
+    PERMISSIONS.DELETE_STUDENTS,
+    PERMISSIONS.VIEW_BATCHES,
+    PERMISSIONS.MANAGE_BATCHES,
+    PERMISSIONS.VIEW_ATTENDANCE,
+    PERMISSIONS.MARK_ATTENDANCE,
+    PERMISSIONS.VIEW_FEES,
+    PERMISSIONS.COLLECT_FEES,
+    PERMISSIONS.MANAGE_FEES,
+    PERMISSIONS.VIEW_EXAMS,
+    PERMISSIONS.MANAGE_EXAMS,
+    PERMISSIONS.ENTER_MARKS,
+    PERMISSIONS.BROADCAST_NOTICES,
+    PERMISSIONS.MANAGE_SETTINGS,
+    PERMISSIONS.MANAGE_STAFF,
+    PERMISSIONS.RESET_DATABASE
+  ],
+  [USER_ROLES.TEACHER]: [
+    PERMISSIONS.VIEW_DASHBOARD,
+    PERMISSIONS.VIEW_BATCHES,
+    PERMISSIONS.VIEW_ATTENDANCE,
+    PERMISSIONS.MARK_ATTENDANCE,
+    PERMISSIONS.VIEW_EXAMS,
+    PERMISSIONS.MANAGE_EXAMS,
+    PERMISSIONS.ENTER_MARKS,
+    PERMISSIONS.BROADCAST_NOTICES
+  ],
+  [USER_ROLES.PARENT]: [
+    PERMISSIONS.VIEW_PARENT_PORTAL
+  ]
+};
+
+// Session Timing & Inactivity Configuration
+export const SESSION_DURATIONS = {
+  SHORT_SESSION_MS: 2 * 60 * 60 * 1000, // 2 hours (without Remember Me)
+  REMEMBER_ME_MS: 7 * 24 * 60 * 60 * 1000, // 7 days (with Remember Me)
+  IDLE_TIMEOUT_MS: 45 * 60 * 1000, // 45 minutes idle inactivity timeout
+  WARNING_BEFORE_EXPIRY_MS: 2 * 60 * 1000 // 2 minutes warning countdown
+};
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 2 * 60 * 1000; // 2 minutes temporary lockout
+
+// Check if user has explicit permission
+export function hasPermission(user, permission) {
+  if (!user || !user.role) return false;
+  const perms = ROLE_PERMISSIONS[user.role] || [];
+  return perms.includes(permission);
+}
+
+// Check tab accessibility based on user role and permissions
+export function canAccessTab(user, tabId) {
+  if (!user || !user.role) return false;
+  if (user.role === USER_ROLES.PARENT) {
+    return tabId === 'parent-portal';
+  }
+  const tabPermissionMap = {
+    'dashboard': PERMISSIONS.VIEW_DASHBOARD,
+    'students': PERMISSIONS.VIEW_STUDENTS,
+    'batches': PERMISSIONS.VIEW_BATCHES,
+    'attendance': PERMISSIONS.VIEW_ATTENDANCE,
+    'fees': PERMISSIONS.VIEW_FEES,
+    'exams': PERMISSIONS.VIEW_EXAMS,
+    'notifications': PERMISSIONS.BROADCAST_NOTICES
+  };
+  const requiredPerm = tabPermissionMap[tabId];
+  if (!requiredPerm) return false;
+  return hasPermission(user, requiredPerm);
+}
+
+// Brute-force & failed login tracking
+export function getLockoutStatus(identifier) {
+  if (!identifier) return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+  const cleanId = String(identifier).trim().toLowerCase();
+  try {
+    if (typeof localStorage === 'undefined') return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+    const raw = localStorage.getItem(FAILED_LOGINS_KEY);
+    if (!raw) return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+    const tracker = JSON.parse(raw);
+    const entry = tracker[cleanId];
+    if (!entry) return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+
+    if (entry.count >= MAX_FAILED_ATTEMPTS) {
+      const elapsed = Date.now() - (entry.lockedAt || entry.lastAttempt || Date.now());
+      if (elapsed < LOCKOUT_DURATION_MS) {
+        const remainingSeconds = Math.ceil((LOCKOUT_DURATION_MS - elapsed) / 1000);
+        return { isLocked: true, remainingSeconds, attemptsLeft: 0 };
+      } else {
+        delete tracker[cleanId];
+        localStorage.setItem(FAILED_LOGINS_KEY, JSON.stringify(tracker));
+        return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+      }
+    }
+    return {
+      isLocked: false,
+      remainingSeconds: 0,
+      attemptsLeft: Math.max(0, MAX_FAILED_ATTEMPTS - (entry.count || 0))
+    };
+  } catch {
+    return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };
+  }
+}
+
+export function recordFailedLogin(identifier) {
+  if (!identifier) return;
+  const cleanId = String(identifier).trim().toLowerCase();
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const raw = localStorage.getItem(FAILED_LOGINS_KEY);
+    const tracker = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    const entry = tracker[cleanId] || { count: 0, lastAttempt: now };
+
+    if (entry.lastAttempt && (now - entry.lastAttempt) > LOCKOUT_DURATION_MS * 2) {
+      entry.count = 0;
+    }
+
+    entry.count = (entry.count || 0) + 1;
+    entry.lastAttempt = now;
+    if (entry.count >= MAX_FAILED_ATTEMPTS) {
+      entry.lockedAt = now;
+    }
+    tracker[cleanId] = entry;
+    localStorage.setItem(FAILED_LOGINS_KEY, JSON.stringify(tracker));
+  } catch (err) {
+    console.warn('Failed to record login attempt:', err);
+  }
+}
+
+export function clearFailedLogins(identifier) {
+  if (!identifier) return;
+  const cleanId = String(identifier).trim().toLowerCase();
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const raw = localStorage.getItem(FAILED_LOGINS_KEY);
+    if (!raw) return;
+    const tracker = JSON.parse(raw);
+    delete tracker[cleanId];
+    localStorage.setItem(FAILED_LOGINS_KEY, JSON.stringify(tracker));
+  } catch {
+    // ignore
+  }
+}
 
 // Default staff accounts (baseline)
 export const INITIAL_STAFF_ACCOUNTS = {
@@ -338,7 +523,7 @@ export function updateStaffAccount(role, updates) {
   return saveStaffAccounts(accounts);
 }
 
-// Get active session from storage with real-time validation against registered staff accounts
+// Get active session from storage with real-time validation against registered staff accounts & expiry
 export function getAuthSession() {
   try {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
@@ -347,6 +532,27 @@ export function getAuthSession() {
     const session = JSON.parse(raw);
     if (!session || !session.role) return null;
 
+    const now = Date.now();
+    // Validate session expiration timestamp
+    if (session.expiresAt && now > session.expiresAt) {
+      console.warn('Session expired. Auto-logging out.');
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
+      }
+      return null;
+    }
+
+    // Validate idle inactivity timeout
+    if (session.lastActiveAt && (now - session.lastActiveAt) > SESSION_DURATIONS.IDLE_TIMEOUT_MS) {
+      console.warn('Session idle timeout reached. Auto-logging out.');
+      localStorage.removeItem(AUTH_SESSION_KEY);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
+      }
+      return null;
+    }
+
     // Validate Teacher role against active registered teachers
     if (session.role === USER_ROLES.TEACHER) {
       const accounts = getStaffAccounts();
@@ -354,14 +560,12 @@ export function getAuthSession() {
         t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
       );
       if (!currentTeacher) {
-        // Teacher has been deleted by Admin! Invalidate stored session
         localStorage.removeItem(AUTH_SESSION_KEY);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
         }
         return null;
       }
-      // Return fresh, up-to-date teacher credentials & assignments
       return {
         ...session,
         id: currentTeacher.id,
@@ -396,18 +600,71 @@ export function getAuthSession() {
   }
 }
 
-// Save active session
-export function setAuthSession(session) {
+// Generate session payload with security metadata
+export function createSessionData(user, rememberMe = true) {
+  const now = Date.now();
+  const duration = rememberMe ? SESSION_DURATIONS.REMEMBER_ME_MS : SESSION_DURATIONS.SHORT_SESSION_MS;
+  return {
+    ...user,
+    sessionId: user.sessionId || `sess_${now}_${Math.random().toString(36).substring(2, 9)}`,
+    createdAt: user.createdAt || now,
+    lastActiveAt: now,
+    expiresAt: user.expiresAt || (now + duration),
+    rememberMe: Boolean(rememberMe)
+  };
+}
+
+// Save active session with optional rememberMe parameter
+export function setAuthSession(session, rememberMe = true) {
+  let sessionToSave = session;
+  if (session && !session.sessionId) {
+    sessionToSave = createSessionData(session, rememberMe);
+  }
   if (typeof localStorage !== 'undefined') {
-    if (!session) {
+    if (!sessionToSave) {
       localStorage.removeItem(AUTH_SESSION_KEY);
     } else {
-      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionToSave));
     }
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: session }));
+    window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: sessionToSave }));
   }
+  return sessionToSave;
+}
+
+// Refresh session lastActiveAt on user activity
+export function refreshSessionActivity() {
+  const session = getRawAuthSession();
+  if (!session) return null;
+  const now = Date.now();
+  if (session.expiresAt && now > session.expiresAt) {
+    clearAuthSession();
+    return null;
+  }
+  const updated = {
+    ...session,
+    lastActiveAt: now
+  };
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
+// Extend active session duration (e.g. from idle warning modal)
+export function extendSession(additionalMinutes = 60) {
+  const session = getRawAuthSession();
+  if (!session) return null;
+  const now = Date.now();
+  const extensionMs = additionalMinutes * 60 * 1000;
+  const updated = {
+    ...session,
+    lastActiveAt: now,
+    expiresAt: Math.max(session.expiresAt || now, now) + extensionMs
+  };
+  setAuthSession(updated, session.rememberMe);
+  return updated;
 }
 
 // Clear session / Logout
@@ -420,13 +677,24 @@ export function clearAuthSession() {
   }
 }
 
-// Authenticate Admin or Teacher
+// Authenticate Admin or Teacher with rate limiting & brute-force prevention
 export function authenticateStaff(usernameOrEmail, password, requestedRole) {
   const cleanUser = (usernameOrEmail || '').trim().toLowerCase();
   const cleanPass = (password || '').trim();
 
   if (!cleanUser || !cleanPass) {
     return { success: false, message: 'Please enter both username and password.' };
+  }
+
+  // Check brute-force lockout status
+  const lockout = getLockoutStatus(cleanUser);
+  if (lockout.isLocked) {
+    return {
+      success: false,
+      message: `Account temporarily locked due to 5 failed attempts. Please retry in ${lockout.remainingSeconds}s.`,
+      isLocked: true,
+      remainingSeconds: lockout.remainingSeconds
+    };
   }
 
   const accounts = getStaffAccounts();
@@ -438,6 +706,7 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
     const isPassMatch = cleanPass === adminAcc.password || (adminAcc.pin && cleanPass === adminAcc.pin);
 
     if (isUserMatch && isPassMatch) {
+      clearFailedLogins(cleanUser);
       return {
         success: true,
         user: {
@@ -450,7 +719,21 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
         }
       };
     }
-    return { success: false, message: 'Invalid Admin username or password. Please try again.' };
+
+    recordFailedLogin(cleanUser);
+    const updatedLock = getLockoutStatus(cleanUser);
+    if (updatedLock.isLocked) {
+      return {
+        success: false,
+        message: `Account locked due to 5 failed attempts. Please retry in ${updatedLock.remainingSeconds}s.`,
+        isLocked: true,
+        remainingSeconds: updatedLock.remainingSeconds
+      };
+    }
+    return {
+      success: false,
+      message: `Invalid Admin username or password. (${updatedLock.attemptsLeft} attempt${updatedLock.attemptsLeft === 1 ? '' : 's'} remaining)`
+    };
   }
 
   if (requestedRole === USER_ROLES.TEACHER) {
@@ -466,6 +749,7 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
     });
 
     if (matchedTeacher) {
+      clearFailedLogins(cleanUser);
       return {
         success: true,
         user: {
@@ -485,7 +769,21 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
         }
       };
     }
-    return { success: false, message: 'Invalid Teacher username or password. Please try again.' };
+
+    recordFailedLogin(cleanUser);
+    const updatedLock = getLockoutStatus(cleanUser);
+    if (updatedLock.isLocked) {
+      return {
+        success: false,
+        message: `Account locked due to 5 failed attempts. Please retry in ${updatedLock.remainingSeconds}s.`,
+        isLocked: true,
+        remainingSeconds: updatedLock.remainingSeconds
+      };
+    }
+    return {
+      success: false,
+      message: `Invalid Teacher username or password. (${updatedLock.attemptsLeft} attempt${updatedLock.attemptsLeft === 1 ? '' : 's'} remaining)`
+    };
   }
 
   return { success: false, message: 'Invalid role requested.' };
@@ -498,23 +796,33 @@ export function authenticateParent(identifier, tuitionStudents = []) {
     return { success: false, message: 'Please enter your registered mobile number or admission number.' };
   }
 
-  // Clean numbers (e.g. "+91 98765-43210" -> "9876543210")
-  const numericQuery = query.replace(/\D/g, '');
+  const cleanQuery = query.replace(/\D/g, '');
+  const lockKey = cleanQuery.length >= 7 ? cleanQuery : query;
+  const lockout = getLockoutStatus(lockKey);
+  if (lockout.isLocked) {
+    return {
+      success: false,
+      message: `Access temporarily locked due to multiple failed attempts. Retry in ${lockout.remainingSeconds}s.`,
+      isLocked: true,
+      remainingSeconds: lockout.remainingSeconds
+    };
+  }
 
   const matched = tuitionStudents.filter(s => {
     const parentPhoneClean = (s.parentPhone || '').replace(/\D/g, '');
     const admNoClean = (s.admissionNo || '').toLowerCase();
     
-    if (numericQuery.length >= 7 && parentPhoneClean.includes(numericQuery)) {
+    if (cleanQuery.length >= 7 && parentPhoneClean.includes(cleanQuery)) {
       return true;
     }
-    if (admNoClean === query || admNoClean.replace(/\D/g, '') === numericQuery) {
+    if (admNoClean === query || admNoClean.replace(/\D/g, '') === cleanQuery) {
       return true;
     }
     return false;
   });
 
   if (matched.length > 0) {
+    clearFailedLogins(lockKey);
     const primaryStudent = matched[0];
     return {
       success: true,
@@ -530,8 +838,19 @@ export function authenticateParent(identifier, tuitionStudents = []) {
     };
   }
 
+  recordFailedLogin(lockKey);
+  const updatedLock = getLockoutStatus(lockKey);
+  if (updatedLock.isLocked) {
+    return {
+      success: false,
+      message: `Locked due to multiple failed attempts. Please retry in ${updatedLock.remainingSeconds}s.`,
+      isLocked: true,
+      remainingSeconds: updatedLock.remainingSeconds
+    };
+  }
+
   return {
     success: false,
-    message: 'Mobile number or admission number not found in registered tuition students. Please contact the tuition office.'
+    message: `Mobile number or admission number not found in registered students. (${updatedLock.attemptsLeft} attempt${updatedLock.attemptsLeft === 1 ? '' : 's'} remaining)`
   };
 }

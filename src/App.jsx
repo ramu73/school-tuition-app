@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import Students from './components/Students';
@@ -10,9 +10,11 @@ import BroadcastNotifications from './components/BroadcastNotifications';
 import SettingsModal from './components/SettingsModal';
 import LoginModal from './components/LoginModal';
 import ParentPortal from './components/ParentPortal';
+import SessionExpiryModal from './components/SessionExpiryModal';
+import { useSessionManager } from './hooks/useSessionManager';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
-import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES } from './lib/auth';
+import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES, canAccessTab, hasPermission, PERMISSIONS } from './lib/auth';
 
 class TabErrorBoundary extends React.Component {
   constructor(props) {
@@ -87,6 +89,28 @@ export default function App() {
 
   // Supabase connection state
   const [isSupabaseLive, setIsSupabaseLive] = useState(getSupabaseConfig().isConnected);
+
+  // Centralized Logout Handler
+  const handleLogout = useCallback(() => {
+    clearAuthSession();
+    setCurrentUser(null);
+    setActiveTab('dashboard');
+  }, []);
+
+  // Automatic Session Management & Inactivity Monitoring
+  const { showWarningModal, warningSecondsLeft, extendSession } = useSessionManager({
+    currentUser,
+    onLogout: handleLogout
+  });
+
+  // Role-Based Authorization Guard: Redirect if attempting to access unauthorized tab
+  useEffect(() => {
+    if (currentUser) {
+      if (!canAccessTab(currentUser, activeTab)) {
+        setActiveTab(currentUser.role === USER_ROLES.PARENT ? 'parent-portal' : 'dashboard');
+      }
+    }
+  }, [currentUser, activeTab]);
 
   // Sync data whenever changed locally or by custom event
   useEffect(() => {
@@ -306,14 +330,11 @@ export default function App() {
       <Navbar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenSettings={() => hasPermission(currentUser, PERMISSIONS.MANAGE_SETTINGS) && setSettingsModalOpen(true)}
         isSupabaseLive={isSupabaseLive}
         isSyncing={isSyncing}
         currentUser={currentUser}
-        onLogout={() => {
-          clearAuthSession();
-          setCurrentUser(null);
-        }}
+        onLogout={handleLogout}
       />
 
       {/* Main Content View based on Active Tab & User Role */}
@@ -323,10 +344,7 @@ export default function App() {
           <ParentPortal 
             currentUser={currentUser} 
             data={data} 
-            onLogout={() => {
-              clearAuthSession();
-              setCurrentUser(null);
-            }} 
+            onLogout={handleLogout} 
           />
         ) : (
 
@@ -339,12 +357,12 @@ export default function App() {
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
                 setAttendanceViewMode={setAttendanceViewMode}
-                onOpenAdmitModal={() => currentUser?.role === USER_ROLES.ADMIN && setAdmitModalOpen(true)}
-                onOpenFeeCollectModal={() => currentUser?.role === USER_ROLES.ADMIN && setFeeCollectModalOpen(true)}
+                onOpenAdmitModal={() => hasPermission(currentUser, PERMISSIONS.MANAGE_STUDENTS) && setAdmitModalOpen(true)}
+                onOpenFeeCollectModal={() => hasPermission(currentUser, PERMISSIONS.COLLECT_FEES) && setFeeCollectModalOpen(true)}
               />
             )}
 
-            {activeTab === 'students' && currentUser?.role === USER_ROLES.ADMIN && (
+            {activeTab === 'students' && canAccessTab(currentUser, 'students') && (
               <Students 
                 data={data}
                 onSaveData={handleSaveData}
@@ -381,7 +399,7 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'fees' && currentUser?.role === USER_ROLES.ADMIN && (
+            {activeTab === 'fees' && canAccessTab(currentUser, 'fees') && (
               <Fees 
                 data={data}
                 onSaveData={handleSaveData}
@@ -412,7 +430,7 @@ export default function App() {
       </main>
 
       {/* Settings Modal (Admin Only) */}
-      {currentUser.role === USER_ROLES.ADMIN && (
+      {hasPermission(currentUser, PERMISSIONS.MANAGE_SETTINGS) && (
         <SettingsModal 
           isOpen={settingsModalOpen}
           onClose={() => setSettingsModalOpen(false)}
@@ -423,6 +441,14 @@ export default function App() {
         />
       )}
 
+      {/* Inactivity & Session Expiry Countdown Warning Modal */}
+      <SessionExpiryModal 
+        isOpen={showWarningModal}
+        secondsLeft={warningSecondsLeft}
+        onExtend={extendSession}
+        onLogout={handleLogout}
+        userRole={currentUser?.role || 'Staff'}
+      />
 
       {/* Footer */}
       <footer className="tuition-footer">
