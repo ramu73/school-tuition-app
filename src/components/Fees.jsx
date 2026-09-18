@@ -389,7 +389,8 @@ export default function Fees({
                   </tr>
                 ) : (
                   filteredCycles.map((item) => {
-                    const className = classes.find(c => c.code === item.classCode)?.name || item.classCode;
+                    const rawClassName = classes.find(c => c.code === item.classCode)?.name || item.classCode;
+                    const className = (rawClassName || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
                     const whatsappUrl = generateFeeReminderWhatsAppUrl(item, 'HAYAGRIVA TUTORIALS');
 
                     return (

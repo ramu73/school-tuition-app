@@ -415,7 +415,8 @@ export default function Dashboard({
           <div className="cycle-alerts-grid">
             {dueOrOverdue.slice(0, 4).map(item => {
               const whatsappUrl = generateFeeReminderWhatsAppUrl(item, 'HAYAGRIVA TUTORIALS');
-              const className = classes.find(c => c.code === item.classCode)?.name || item.classCode;
+              const rawClassName = classes.find(c => c.code === item.classCode)?.name || item.classCode;
+              const className = (rawClassName || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
               return (
                 <div key={item.studentId} className="cycle-alert-item">
                   <div className="cycle-student-meta">
@@ -497,7 +498,7 @@ export default function Dashboard({
                   onClick={() => handleClassCardClick(cls.code)}
                 >
                   <div className="class-label-meta">
-                    <span className="class-name">{cls.name}</span>
+                    <span className="class-name">{(cls.name || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim()}</span>
                     <span className="class-category-badge">{cls.category}</span>
                   </div>
                   <div className="class-bar-track">
@@ -617,7 +618,7 @@ export default function Dashboard({
                 {classes.map(cls => (
                   <div key={cls.code} className="class-fee-input-card">
                     <div className="fee-card-meta">
-                      <span className="font-bold text-sm text-white">{cls.name}</span>
+                      <span className="font-bold text-sm text-white">{(cls.name || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim()}</span>
                       <span className="badge badge-class text-xs">{cls.category}</span>
                     </div>
                     <div className="fee-input-wrap">

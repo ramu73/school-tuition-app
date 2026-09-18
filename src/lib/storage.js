@@ -111,9 +111,13 @@ export function getStoredData() {
       if (Array.isArray(parsed.classes)) {
         let changed = false;
         parsed.classes = parsed.classes.map(c => {
-          if (c.code === 'CLASS_10' && c.name && c.name.includes('SSC/CBSE')) {
+          if (c.code === 'CLASS_10' && (c.name?.includes('SSC') || c.name?.includes('CBSE'))) {
             changed = true;
             return { ...c, name: 'Class 10' };
+          }
+          if (c.name && c.name.includes('(SSC/CBSE)')) {
+            changed = true;
+            return { ...c, name: c.name.replace(/\s*\(SSC\/CBSE\)/gi, '').trim() };
           }
           return c;
         });
@@ -142,6 +146,17 @@ export function getStoredData() {
 }
 
 export function saveStoredData(data) {
+  if (data && Array.isArray(data.classes)) {
+    data.classes = data.classes.map(c => {
+      if (c.code === 'CLASS_10' && (c.name?.includes('SSC') || c.name?.includes('CBSE'))) {
+        return { ...c, name: 'Class 10' };
+      }
+      if (c.name && c.name.includes('(SSC/CBSE)')) {
+        return { ...c, name: c.name.replace(/\s*\(SSC\/CBSE\)/gi, '').trim() };
+      }
+      return c;
+    });
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   // Dispatch reactive event so all components update in real time
   window.dispatchEvent(new CustomEvent('tuition-db-updated', { detail: data }));

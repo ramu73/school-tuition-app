@@ -77,15 +77,34 @@ export async function fetchTuitionDataFromSupabase() {
     }
 
     const classes = (classesRes.data && classesRes.data.length > 0)
-      ? classesRes.data.map(c => ({
-          id: c.id,
-          code: c.code,
-          name: c.display_name,
-          category: c.category,
-          defaultFee: Number(c.default_monthly_fee),
-          subjects: INITIAL_CLASSES.find(ic => ic.code === c.code)?.subjects || ['English', 'Mathematics', 'Science']
-        }))
+      ? classesRes.data.map(c => {
+          let cleanName = (c.display_name || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
+          if (c.code === 'CLASS_10' && (!cleanName || cleanName.toLowerCase().includes('cbse') || cleanName.toLowerCase().includes('ssc'))) {
+            cleanName = 'Class 10';
+          }
+          return {
+            id: c.id,
+            code: c.code,
+            name: cleanName || c.display_name || 'Class 10',
+            category: c.category,
+            defaultFee: Number(c.default_monthly_fee),
+            subjects: INITIAL_CLASSES.find(ic => ic.code === c.code)?.subjects || ['English', 'Mathematics', 'Science']
+          };
+        })
       : INITIAL_CLASSES;
+
+    // Auto-update CLASS_10 in Supabase class_levels if it still has (SSC/CBSE)
+    const class10ToUpdate = classesRes.data?.find(c => c.code === 'CLASS_10' && c.display_name && (c.display_name.includes('SSC') || c.display_name.includes('CBSE')));
+    if (class10ToUpdate) {
+      supabase
+        .from('class_levels')
+        .update({ display_name: 'Class 10' })
+        .eq('code', 'CLASS_10')
+        .then(({ error }) => {
+          if (!error) console.log('Successfully updated CLASS_10 display_name in Supabase to Class 10');
+        })
+        .catch(err => console.warn('Could not update CLASS_10 in Supabase:', err));
+    }
 
     const batches = (batchesRes.data || []).map(b => ({
       id: b.id,
