@@ -11,7 +11,6 @@ import SettingsModal from './components/SettingsModal';
 import LoginModal from './components/LoginModal';
 import ParentPortal from './components/ParentPortal';
 import SessionExpiryModal from './components/SessionExpiryModal';
-import LogsViewerModal from './components/LogsViewerModal';
 import { useSessionManager } from './hooks/useSessionManager';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
@@ -93,7 +92,6 @@ export default function App() {
   const [admitModalOpen, setAdmitModalOpen] = useState(false);
   const [feeCollectModalOpen, setFeeCollectModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [logsModalOpen, setLogsModalOpen] = useState(false);
 
   // Supabase connection state
   const [isSupabaseLive, setIsSupabaseLive] = useState(getSupabaseConfig().isConnected);
@@ -348,7 +346,6 @@ export default function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onOpenSettings={() => hasPermission(currentUser, PERMISSIONS.MANAGE_SETTINGS) && setSettingsModalOpen(true)}
-        onOpenLogs={() => setLogsModalOpen(true)}
         isSupabaseLive={isSupabaseLive}
         isSyncing={isSyncing}
         currentUser={currentUser}
@@ -467,15 +464,8 @@ export default function App() {
           batches={data.batches || []}
           students={data.students || []}
           onSaveData={handleSaveData}
-          onOpenLogs={() => setLogsModalOpen(true)}
         />
       )}
-
-      {/* Runtime & Exception Logs Viewer Modal */}
-      <LogsViewerModal 
-        isOpen={logsModalOpen}
-        onClose={() => setLogsModalOpen(false)}
-      />
 
       {/* Inactivity & Session Expiry Countdown Warning Modal */}
       <SessionExpiryModal 

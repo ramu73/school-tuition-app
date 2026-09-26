@@ -54,7 +54,7 @@ import {
   assignStudentsToTeacher
 } from '../lib/auth';
 
-export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [], onSaveData, onOpenLogs }) {
+export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [], onSaveData }) {
   if (!isOpen) return null;
 
   const [activeSettingsTab, setActiveSettingsTab] = useState('database');
@@ -637,14 +637,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
           >
             <FolderArchive size={15} />
             <span>Data & Backup</span>
-          </button>
-          <button 
-            type="button"
-            className={`settings-nav-btn ${activeSettingsTab === 'logs' ? 'active' : ''}`}
-            onClick={() => setActiveSettingsTab('logs')}
-          >
-            <Terminal size={15} />
-            <span>System Logs</span>
           </button>
         </div>
 
@@ -1373,142 +1365,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                 <Trash2 size={14} />
                 <span>Clear All Records</span>
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: SYSTEM LOGS & EXCEPTION VIEWER */}
-        {activeSettingsTab === 'logs' && (
-          <div className="settings-tab-content">
-            <div className="settings-notice mb-3 flex items-center justify-between" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-              <div>
-                <strong>Telemetry & Exception Logs:</strong>
-                <div className="text-xs text-muted mt-0.5">
-                  Track form validations, user logins, and runtime exceptions.
-                </div>
-              </div>
-              <button 
-                type="button" 
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  if (typeof onOpenLogs === 'function') onOpenLogs();
-                }}
-              >
-                <Terminal size={14} />
-                <span>Open Logs Console</span>
-              </button>
-            </div>
-
-            {/* Log Stats Highlights */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
-              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="text-xs text-muted">Total Events</div>
-                <div className="text-xl font-bold font-mono text-white mt-1">{logger.getLogs().length}</div>
-              </div>
-              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(239,68,68,0.06)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
-                <div className="text-xs" style={{ color: '#f87171' }}>Exceptions</div>
-                <div className="text-xl font-bold font-mono mt-1" style={{ color: '#f87171' }}>
-                  {logger.getLogs().filter(l => l.level === LOG_LEVELS.ERROR || l.level === LOG_LEVELS.EXCEPTION).length}
-                </div>
-              </div>
-              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(245,158,11,0.06)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <div className="text-xs" style={{ color: '#fbbf24' }}>Warnings</div>
-                <div className="text-xl font-bold font-mono mt-1" style={{ color: '#fbbf24' }}>
-                  {logger.getLogs().filter(l => l.level === LOG_LEVELS.WARN).length}
-                </div>
-              </div>
-              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                <div className="text-xs" style={{ color: '#34d399' }}>User Actions</div>
-                <div className="text-xl font-bold font-mono mt-1" style={{ color: '#34d399' }}>
-                  {logger.getLogs().filter(l => l.level === LOG_LEVELS.ACTION).length}
-                </div>
-              </div>
-            </div>
-
-            {/* Actions Toolbar */}
-            <div className="flex items-center gap-2 mb-3" style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  const txt = logger.exportLogsText();
-                  const blob = new Blob([txt], { type: 'text/plain' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `hayagriva_logs_${new Date().toISOString().split('T')[0]}.txt`;
-                  a.click();
-                }}
-              >
-                <Download size={13} />
-                <span>Export TXT</span>
-              </button>
-
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  const json = logger.exportLogsJson();
-                  const blob = new Blob([json], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `hayagriva_logs_${new Date().toISOString().split('T')[0]}.json`;
-                  a.click();
-                }}
-              >
-                <Download size={13} />
-                <span>Export JSON</span>
-              </button>
-
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  try {
-                    throw new Error('Diagnostic: JavaScript runtime exception verification');
-                  } catch (err) {
-                    logger.exception(err, { source: 'Settings Diagnostics Tab' });
-                  }
-                }}
-                title="Simulate a real JavaScript exception to verify logging"
-              >
-                <span>Test Exception</span>
-              </button>
-
-              <button 
-                type="button" 
-                className="btn btn-danger btn-sm"
-                style={{ marginLeft: 'auto' }}
-                onClick={() => {
-                  if (window.confirm('Clear all recorded logs?')) {
-                    logger.clearLogs();
-                  }
-                }}
-              >
-                <Trash2 size={13} />
-                <span>Clear Logs</span>
-              </button>
-            </div>
-
-            {/* Live Log Stream Preview */}
-            <div className="recent-logs-preview" style={{ maxHeight: '250px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.725rem', background: 'rgba(0,0,0,0.4)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {logger.getLogs().slice(0, 20).map(log => (
-                <div key={log.id} style={{ display: 'flex', gap: '8px', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ color: '#94a3b8' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
-                  <span style={{ 
-                    fontWeight: 700, 
-                    color: log.level === 'EXCEPTION' || log.level === 'ERROR' ? '#f87171' : log.level === 'WARN' ? '#fbbf24' : log.level === 'ACTION' ? '#34d399' : '#38bdf8' 
-                  }}>
-                    [{log.level}]
-                  </span>
-                  <span style={{ color: '#c084fc' }}>[{log.category}]</span>
-                  <span style={{ color: '#f1f5f9', flex: 1 }}>{log.message}</span>
-                </div>
-              ))}
-              {logger.getLogs().length === 0 && (
-                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>No runtime events recorded yet.</div>
-              )}
             </div>
           </div>
         )}

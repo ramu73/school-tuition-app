@@ -95,14 +95,39 @@ export function addLog(level, category, message, details = null) {
     // ignore
   }
 
+  // Sanitize category & user if category was passed as an object (e.g. currentUser)
+  let safeCategory = 'GENERAL';
+  if (category && typeof category === 'object') {
+    if (category.name) {
+      activeUser = `${category.name} (${category.role || 'USER'})`;
+    } else if (category.username) {
+      activeUser = category.username;
+    }
+    safeCategory = 'ACTION';
+  } else if (typeof category === 'string' && category.trim()) {
+    safeCategory = category.trim();
+  }
+
+  // Sanitize message to guaranteed string
+  let safeMessage = 'Unspecified event';
+  if (typeof message === 'string') {
+    safeMessage = message;
+  } else if (message !== null && message !== undefined) {
+    try {
+      safeMessage = typeof message === 'object' ? JSON.stringify(message) : String(message);
+    } catch {
+      safeMessage = String(message);
+    }
+  }
+
   const logEntry = {
     id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     timestamp: now.toISOString(),
     displayTime: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
     displayDate: now.toLocaleDateString('en-IN'),
-    level,
-    category,
-    message: String(message || 'Unspecified event'),
+    level: String(level || 'INFO'),
+    category: safeCategory,
+    message: safeMessage,
     details: serializedDetails,
     user: activeUser
   };
@@ -111,13 +136,13 @@ export function addLog(level, category, message, details = null) {
   persistLogs(updatedLogs);
 
   // Mirror to console with styling
-  const prefix = `[TuitionLogger][${level}][${category}]`;
+  const prefix = `[TuitionLogger][${level}][${safeCategory}]`;
   if (level === LOG_LEVELS.ERROR || level === LOG_LEVELS.EXCEPTION) {
-    console.error(prefix, message, details || '');
+    console.error(prefix, safeMessage, details || '');
   } else if (level === LOG_LEVELS.WARN) {
-    console.warn(prefix, message, details || '');
+    console.warn(prefix, safeMessage, details || '');
   } else {
-    console.log(prefix, message, details || '');
+    console.log(prefix, safeMessage, details || '');
   }
 
   return logEntry;
@@ -129,7 +154,13 @@ export const logger = {
   warn: (category, message, details) => addLog(LOG_LEVELS.WARN, category, message, details),
   error: (category, message, details) => addLog(LOG_LEVELS.ERROR, category, message, details),
   exception: (category, message, error) => addLog(LOG_LEVELS.EXCEPTION, category, message, error),
-  action: (category, message, details) => addLog(LOG_LEVELS.ACTION, category, message, details),
+  action: (categoryOrUser, message, details) => {
+    if (categoryOrUser && typeof categoryOrUser === 'object') {
+      const u = categoryOrUser.name ? `${categoryOrUser.name} (${categoryOrUser.role || 'USER'})` : (categoryOrUser.username || 'User');
+      return addLog(LOG_LEVELS.ACTION, 'ACTION', message, { ...(details || {}), actor: u });
+    }
+    return addLog(LOG_LEVELS.ACTION, categoryOrUser || 'ACTION', message, details);
+  },
   
   getLogs: () => [...loadStoredLogs()],
   
