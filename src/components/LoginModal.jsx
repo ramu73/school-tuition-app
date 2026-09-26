@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession, getLockoutStatus } from '../lib/auth';
+import { fetchStaffAccountsFromSupabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 
 export default function LoginModal({ onLoginSuccess, students = [] }) {
@@ -53,6 +54,11 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [logoClickCount, setLogoClickCount] = useState(0);
   const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
   const [adminUnlockToast, setAdminUnlockToast] = useState(false);
+
+  // Fetch latest staff & admin credentials from Supabase on mount
+  useEffect(() => {
+    fetchStaffAccountsFromSupabase().catch(() => {});
+  }, []);
 
   // Keyboard shortcut listener: Ctrl + Shift + A or Alt + A toggles Admin access
   useEffect(() => {

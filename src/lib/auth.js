@@ -208,8 +208,8 @@ export function clearFailedLogins(identifier) {
 // Default staff accounts (baseline)
 export const INITIAL_STAFF_ACCOUNTS = {
   admin: {
-    username: 'admin',
-    password: 'admin123',
+    username: 'Hayagriva',
+    password: 'Lakshmi@0995',
     pin: '1234',
     name: 'Tuition Director',
     role: USER_ROLES.ADMIN,
