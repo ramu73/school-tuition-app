@@ -47,6 +47,34 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
   const [batchSaveFeedback, setBatchSaveFeedback] = useState(null);
   const [batchErrors, setBatchErrors] = useState({});
 
+  // Integrated Student Assignment during Batch Creation
+  const [createBatchSelectedStudentIds, setCreateBatchSelectedStudentIds] = useState([]);
+  const [createBatchStudentSearch, setCreateBatchStudentSearch] = useState('');
+  const [createBatchClassFilter, setCreateBatchClassFilter] = useState('ALL');
+  const [createBatchUnassignedOnly, setCreateBatchUnassignedOnly] = useState(false);
+
+  // Unassigned filter for existing batch student management
+  const [manageUnassignedOnly, setManageUnassignedOnly] = useState(false);
+
+  // Timing Presets for quick 1-click selection
+  const TIMING_PRESETS = [
+    '05:00 PM - 06:30 PM',
+    '06:30 PM - 08:00 PM',
+    '07:00 AM - 08:30 AM',
+    '04:00 PM - 05:30 PM',
+    '10:00 AM - 12:00 PM'
+  ];
+
+  // Distinct tutors list for suggestions
+  const existingTutors = Array.from(new Set(batches.map(b => b.tutor).filter(Boolean)));
+
+  // Total active unassigned students
+  const totalUnassignedStudentsCount = students.filter(s => {
+    if (!s) return false;
+    const st = String(s.status || '').toUpperCase();
+    return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED' && !s.batchId;
+  }).length;
+
   const [newBatch, setNewBatch] = useState({
     name: '',
     classCode: 'ALL',
@@ -80,8 +108,9 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
       return;
     }
 
+    const createdId = generateNextId(batches);
     const created = {
-      id: generateNextId(batches),
+      id: createdId,
       name: newBatch.name.trim(),
       classCode: newBatch.classCode,
       timing: newBatch.timing.trim(),
@@ -90,15 +119,35 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
       capacity: Number(newBatch.capacity) || 25
     };
 
+    // If students were assigned during creation, assign them to the new batch
+    let updatedStudents = [...students];
+    if (createBatchSelectedStudentIds.length > 0) {
+      updatedStudents = updatedStudents.map(s => {
+        if (createBatchSelectedStudentIds.some(id => String(id) === String(s.id))) {
+          return { ...s, batchId: createdId };
+        }
+        return s;
+      });
+    }
+
     onSaveData({
       ...data,
-      batches: [...batches, created]
+      batches: [...batches, created],
+      students: updatedStudents
     });
 
-    logger.action(currentUser, 'CREATE_BATCH', `Created batch slot "${created.name}"`, { batchId: created.id, tutor: created.tutor });
+    logger.action(currentUser, 'CREATE_BATCH', `Created batch slot "${created.name}" with ${createBatchSelectedStudentIds.length} assigned students`, {
+      batchId: created.id,
+      tutor: created.tutor,
+      assignedCount: createBatchSelectedStudentIds.length
+    });
 
     setBatchModalOpen(false);
     setBatchErrors({});
+    setCreateBatchSelectedStudentIds([]);
+    setCreateBatchStudentSearch('');
+    setCreateBatchClassFilter('ALL');
+    setCreateBatchUnassignedOnly(false);
     setNewBatch({
       name: '',
       classCode: 'ALL',
@@ -170,6 +219,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
     if (!s) return false;
     const st = String(s.status || '').toUpperCase();
     if (st === 'INACTIVE' || st === 'DISABLED' || st === 'DELETED') return false;
+    if (manageUnassignedOnly && s.batchId && Number(s.batchId) !== Number(manageStudentsBatch?.id)) return false;
     if (batchStudentClassFilter !== 'ALL' && s.classCode !== batchStudentClassFilter) return false;
     if (batchStudentSearchQuery.trim()) {
       const q = batchStudentSearchQuery.toLowerCase().trim();
@@ -180,6 +230,48 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
     }
     return true;
   });
+
+  // Filtered students for the Create Batch modal
+  const filteredStudentsForCreateBatch = students.filter(s => {
+    if (!s) return false;
+    const st = String(s.status || '').toUpperCase();
+    if (st === 'INACTIVE' || st === 'DISABLED' || st === 'DELETED') return false;
+    if (createBatchUnassignedOnly && s.batchId) return false;
+    if (createBatchClassFilter !== 'ALL' && s.classCode !== createBatchClassFilter) return false;
+    if (createBatchStudentSearch.trim()) {
+      const q = createBatchStudentSearch.toLowerCase().trim();
+      const matchName = s.name && s.name.toLowerCase().includes(q);
+      const matchRoll = s.admissionNo && s.admissionNo.toLowerCase().includes(q);
+      const matchSchool = s.school && s.school.toLowerCase().includes(q);
+      if (!matchName && !matchRoll && !matchSchool) return false;
+    }
+    return true;
+  });
+
+  const handleToggleCreateBatchStudent = (studentId) => {
+    setCreateBatchSelectedStudentIds(prev => {
+      const exists = prev.some(id => String(id) === String(studentId));
+      return exists 
+        ? prev.filter(id => String(id) !== String(studentId)) 
+        : [...prev, studentId];
+    });
+  };
+
+  const handleSelectAllFilteredForCreate = () => {
+    const ids = filteredStudentsForCreateBatch.map(s => s.id);
+    setCreateBatchSelectedStudentIds(prev => {
+      const set = new Set(prev.map(String));
+      ids.forEach(id => set.add(String(id)));
+      return Array.from(set).map(id => {
+        const orig = students.find(s => String(s.id) === String(id));
+        return orig ? orig.id : id;
+      });
+    });
+  };
+
+  const handleClearSelectedForCreate = () => {
+    setCreateBatchSelectedStudentIds([]);
+  };
 
   return (
     <div className="batches-page">
@@ -341,13 +433,28 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
         })}
       </div>
 
-      {/* Add Batch Modal */}
+      {/* Add Batch Modal with Integrated Student Assignment */}
       {batchModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content create-batch-modal-large" style={{ maxWidth: '880px', width: '95%' }}>
             <div className="modal-header">
-              <h2 className="modal-title">Create Class Batch Slot</h2>
-              <button className="close-btn" onClick={() => setBatchModalOpen(false)}>
+              <div>
+                <h2 className="modal-title flex items-center gap-2">
+                  <Plus size={20} className="text-primary" />
+                  <span>Create Class Batch & Assign Students</span>
+                </h2>
+                <div className="text-xs text-muted mt-0.5">
+                  Set batch timetable slot and optionally enroll students immediately
+                </div>
+              </div>
+              <button 
+                className="close-btn" 
+                onClick={() => { 
+                  setBatchModalOpen(false); 
+                  setBatchErrors({});
+                  setCreateBatchSelectedStudentIds([]);
+                }}
+              >
                 <X size={20} />
               </button>
             </div>
@@ -370,119 +477,319 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                 </div>
               )}
 
-              <div className="form-group">
-                <label className="form-label">Batch Name *</label>
-                <input 
-                  type="text"
-                  className={`form-input ${batchErrors.name ? 'input-error' : ''}`}
-                  placeholder="e.g. Class 10 - Evening Batch A"
-                  value={newBatch.name}
-                  onChange={(e) => {
-                    setNewBatch({ ...newBatch, name: e.target.value });
-                    if (batchErrors.name) setBatchErrors(prev => ({ ...prev, name: null }));
-                  }}
-                />
-                {batchErrors.name && (
-                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                    {batchErrors.name}
-                  </span>
-                )}
-              </div>
+              <div className="create-batch-grid-layout">
+                {/* COLUMN 1: Batch Info & Schedule */}
+                <div className="create-batch-col-details">
+                  <div className="section-title-sm mb-3 flex items-center gap-1.5 text-xs text-primary font-bold uppercase tracking-wider">
+                    <Clock size={14} />
+                    <span>1. Batch Schedule & Room Info</span>
+                  </div>
 
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label className="form-label">Grade / Standards Focus</label>
-                  <select 
-                    className="form-select"
-                    value={newBatch.classCode}
-                    onChange={(e) => setNewBatch({ ...newBatch, classCode: e.target.value })}
-                  >
-                    <option value="ALL">All Classes / Mixed Grades (Classes 1 to 10)</option>
-                    <option value="PRIMARY">Primary Standards (Classes 1 to 5)</option>
-                    <option value="HIGH_SCHOOL">High School Standards (Classes 6 to 10)</option>
-                    {classes.map(cls => (
-                      <option key={cls.code} value={cls.code}>{cls.name} Specific</option>
-                    ))}
-                  </select>
-                  <span className="text-xs text-muted mt-1">Students from any class can attend this batch.</span>
+                  <div className="form-group mb-3">
+                    <label className="form-label">Batch Name *</label>
+                    <input 
+                      type="text"
+                      className={`form-input ${batchErrors.name ? 'input-error' : ''}`}
+                      placeholder="e.g. Class 10 - Evening Batch A"
+                      value={newBatch.name}
+                      onChange={(e) => {
+                        setNewBatch({ ...newBatch, name: e.target.value });
+                        if (batchErrors.name) setBatchErrors(prev => ({ ...prev, name: null }));
+                      }}
+                    />
+                    {batchErrors.name && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {batchErrors.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="form-group mb-3">
+                    <label className="form-label">Grade / Standards Focus</label>
+                    <select 
+                      className="form-select"
+                      value={newBatch.classCode}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewBatch({ ...newBatch, classCode: val });
+                        if (val !== 'ALL' && val !== 'PRIMARY' && val !== 'HIGH_SCHOOL') {
+                          setCreateBatchClassFilter(val);
+                        } else {
+                          setCreateBatchClassFilter('ALL');
+                        }
+                      }}
+                    >
+                      <option value="ALL">All Classes / Mixed Grades (Classes 1 to 10)</option>
+                      <option value="PRIMARY">Primary Standards (Classes 1 to 5)</option>
+                      <option value="HIGH_SCHOOL">High School Standards (Classes 6 to 10)</option>
+                      {classes.map(cls => (
+                        <option key={cls.code} value={cls.code}>{cls.name} Specific</option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-muted mt-1 block">Students from any class can be assigned to this batch.</span>
+                  </div>
+
+                  <div className="form-group mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="form-label mb-0">Batch Timing *</label>
+                      <span className="text-3xs text-muted">Click a preset below or type custom</span>
+                    </div>
+                    <input 
+                      type="text"
+                      className={`form-input ${batchErrors.timing ? 'input-error' : ''}`}
+                      placeholder="e.g. 05:30 PM - 07:00 PM"
+                      value={newBatch.timing}
+                      onChange={(e) => {
+                        setNewBatch({ ...newBatch, timing: e.target.value });
+                        if (batchErrors.timing) setBatchErrors(prev => ({ ...prev, timing: null }));
+                      }}
+                    />
+                    {batchErrors.timing && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {batchErrors.timing}
+                      </span>
+                    )}
+
+                    {/* Timing presets chips */}
+                    <div className="timing-presets-wrap mt-1.5 flex flex-wrap gap-1">
+                      {TIMING_PRESETS.map(preset => (
+                        <button
+                          key={preset}
+                          type="button"
+                          className={`btn-timing-chip ${newBatch.timing === preset ? 'active' : ''}`}
+                          onClick={() => {
+                            setNewBatch({ ...newBatch, timing: preset });
+                            if (batchErrors.timing) setBatchErrors(prev => ({ ...prev, timing: null }));
+                          }}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="form-grid-2 mb-3">
+                    <div className="form-group">
+                      <label className="form-label">Tutor / Teacher *</label>
+                      <input 
+                        type="text"
+                        className={`form-input ${batchErrors.tutor ? 'input-error' : ''}`}
+                        placeholder="e.g. Mr. K. Sharma (Maths)"
+                        value={newBatch.tutor}
+                        onChange={(e) => {
+                          setNewBatch({ ...newBatch, tutor: e.target.value });
+                          if (batchErrors.tutor) setBatchErrors(prev => ({ ...prev, tutor: null }));
+                        }}
+                        list="existing-tutors-list"
+                      />
+                      <datalist id="existing-tutors-list">
+                        {existingTutors.map((t, idx) => (
+                          <option key={idx} value={t} />
+                        ))}
+                      </datalist>
+                      {batchErrors.tutor && (
+                        <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                          {batchErrors.tutor}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Room / Hall</label>
+                      <input 
+                        type="text"
+                        className="form-input"
+                        placeholder="e.g. Hall 1 or Room 204"
+                        value={newBatch.room}
+                        onChange={(e) => setNewBatch({ ...newBatch, room: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group mb-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="form-label mb-0">Seat Capacity *</label>
+                      <span className="text-3xs text-muted">Max students allowed</span>
+                    </div>
+                    <input 
+                      type="number"
+                      className={`form-input ${batchErrors.capacity ? 'input-error' : ''}`}
+                      value={newBatch.capacity}
+                      onChange={(e) => {
+                        setNewBatch({ ...newBatch, capacity: e.target.value });
+                        if (batchErrors.capacity) setBatchErrors(prev => ({ ...prev, capacity: null }));
+                      }}
+                    />
+                    {batchErrors.capacity && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {batchErrors.capacity}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Batch Timing *</label>
-                  <input 
-                    type="text"
-                    className={`form-input ${batchErrors.timing ? 'input-error' : ''}`}
-                    placeholder="e.g. 05:30 PM - 07:00 PM"
-                    value={newBatch.timing}
-                    onChange={(e) => {
-                      setNewBatch({ ...newBatch, timing: e.target.value });
-                      if (batchErrors.timing) setBatchErrors(prev => ({ ...prev, timing: null }));
-                    }}
-                  />
-                  {batchErrors.timing && (
-                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                      {batchErrors.timing}
+                {/* COLUMN 2: Student Enrollment / Assignment */}
+                <div className="create-batch-col-students">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="section-title-sm flex items-center gap-1.5 text-xs text-emerald font-bold uppercase tracking-wider">
+                      <UserPlus size={14} />
+                      <span>2. Assign Students to Batch</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className={`badge ${createBatchSelectedStudentIds.length > Number(newBatch.capacity) ? 'badge-warning' : 'badge-success'} text-xs font-mono`}>
+                        {createBatchSelectedStudentIds.length} / {newBatch.capacity} Seats
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted mb-2">
+                    Check students below to enroll them directly. Students can belong to any class standard.
+                  </p>
+
+                  {/* Filter & Search Bar */}
+                  <div className="batch-modal-filter-bar mb-2">
+                    <div className="search-input-box flex-1">
+                      <Search size={13} className="search-icon" />
+                      <input
+                        type="text"
+                        className="form-input text-xs"
+                        placeholder="Search student by name, roll..."
+                        value={createBatchStudentSearch}
+                        onChange={(e) => setCreateBatchStudentSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <select
+                      className="form-select text-xs"
+                      style={{ width: '120px' }}
+                      value={createBatchClassFilter}
+                      onChange={(e) => setCreateBatchClassFilter(e.target.value)}
+                    >
+                      <option value="ALL">All Classes</option>
+                      {classes.map(c => (
+                        <option key={c.code} value={c.code}>{c.name}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${createBatchUnassignedOnly ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setCreateBatchUnassignedOnly(!createBatchUnassignedOnly)}
+                      title="Filter only students who are not assigned to any batch yet"
+                    >
+                      <span>Unassigned ({totalUnassignedStudentsCount})</span>
+                    </button>
+                  </div>
+
+                  {/* Quick selection action buttons */}
+                  <div className="flex items-center justify-between mb-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn-link-action text-xs text-emerald"
+                        onClick={handleSelectAllFilteredForCreate}
+                      >
+                        ✓ Select All Shown ({filteredStudentsForCreateBatch.length})
+                      </button>
+                      {createBatchSelectedStudentIds.length > 0 && (
+                        <button
+                          type="button"
+                          className="btn-link-action text-xs text-rose-400"
+                          onClick={handleClearSelectedForCreate}
+                        >
+                          ✕ Clear ({createBatchSelectedStudentIds.length})
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-3xs text-muted">
+                      Showing {filteredStudentsForCreateBatch.length} of {students.length} students
                     </span>
-                  )}
+                  </div>
+
+                  {/* Student Checklist Container */}
+                  <div className="create-batch-students-list">
+                    {filteredStudentsForCreateBatch.map(student => {
+                      const isSelected = createBatchSelectedStudentIds.some(id => String(id) === String(student.id));
+                      const sClass = classes.find(c => c.code === student.classCode);
+                      const currentBatch = batches.find(b => Number(b.id) === Number(student.batchId));
+
+                      return (
+                        <div
+                          key={student.id}
+                          className={`create-batch-student-item ${isSelected ? 'selected' : ''}`}
+                          onClick={() => handleToggleCreateBatchStudent(student.id)}
+                        >
+                          <div className="checkbox-wrap">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleCreateBatchStudent(student.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="batch-native-checkbox"
+                            />
+                          </div>
+
+                          <div className="batch-avatar">{student.name.charAt(0)}</div>
+
+                          <div className="student-info-col flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-xs text-white">{student.name}</span>
+                              <span className="badge badge-class text-3xs">{sClass?.name || student.classCode}</span>
+                              <span className="font-mono text-3xs text-muted">{student.admissionNo}</span>
+                            </div>
+                            <div className="text-3xs text-muted mt-0.5">
+                              {student.school || 'School unspecified'}
+                            </div>
+                          </div>
+
+                          <div className="student-status-badge">
+                            {isSelected ? (
+                              <span className="badge badge-success text-3xs">
+                                ✓ Enrolling
+                              </span>
+                            ) : currentBatch ? (
+                              <span className="badge badge-warning text-3xs" title={`Currently enrolled in ${currentBatch.name}`}>
+                                In: {currentBatch.name.length > 15 ? currentBatch.name.slice(0, 15) + '...' : currentBatch.name}
+                              </span>
+                            ) : (
+                              <span className="badge badge-class text-3xs" style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>
+                                Unassigned
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {filteredStudentsForCreateBatch.length === 0 && (
+                      <div className="p-4 text-center text-xs text-muted">
+                        No students found matching your search or filters.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label className="form-label">Tutor / Teacher Name *</label>
-                  <input 
-                    type="text"
-                    className={`form-input ${batchErrors.tutor ? 'input-error' : ''}`}
-                    placeholder="e.g. Mr. K. Sharma (Maths)"
-                    value={newBatch.tutor}
-                    onChange={(e) => {
-                      setNewBatch({ ...newBatch, tutor: e.target.value });
-                      if (batchErrors.tutor) setBatchErrors(prev => ({ ...prev, tutor: null }));
-                    }}
-                  />
-                  {batchErrors.tutor && (
-                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                      {batchErrors.tutor}
-                    </span>
-                  )}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Room / Hall</label>
-                  <input 
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. Hall 1 or Room 204"
-                    value={newBatch.room}
-                    onChange={(e) => setNewBatch({ ...newBatch, room: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Seat Capacity</label>
-                <input 
-                  type="number"
-                  className={`form-input ${batchErrors.capacity ? 'input-error' : ''}`}
-                  value={newBatch.capacity}
-                  onChange={(e) => {
-                    setNewBatch({ ...newBatch, capacity: e.target.value });
-                    if (batchErrors.capacity) setBatchErrors(prev => ({ ...prev, capacity: null }));
+              <div className="modal-actions-flex mt-4 pt-3 border-top-subtle">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => { 
+                    setBatchModalOpen(false); 
+                    setBatchErrors({}); 
+                    setCreateBatchSelectedStudentIds([]);
                   }}
-                />
-                {batchErrors.capacity && (
-                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                    {batchErrors.capacity}
-                  </span>
-                )}
-              </div>
-
-              <div className="modal-actions-flex">
-                <button type="button" className="btn btn-secondary" onClick={() => { setBatchModalOpen(false); setBatchErrors({}); }}>
+                >
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Create Batch
+                  <Check size={16} />
+                  <span>
+                    {createBatchSelectedStudentIds.length > 0 
+                      ? `Create Batch & Assign ${createBatchSelectedStudentIds.length} Students`
+                      : 'Create Batch Slot'}
+                  </span>
                 </button>
               </div>
             </form>
@@ -605,6 +912,15 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                   <option key={c.code} value={c.code}>{c.name}</option>
                 ))}
               </select>
+
+              <button
+                type="button"
+                className={`btn btn-xs ${manageUnassignedOnly ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setManageUnassignedOnly(!manageUnassignedOnly)}
+                title="Filter only students who are not assigned to any batch yet"
+              >
+                <span>Unassigned ({totalUnassignedStudentsCount})</span>
+              </button>
 
               <button
                 type="button"
@@ -862,6 +1178,95 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
         }
         .text-3xs {
           font-size: 0.625rem;
+        }
+
+        /* 2-Column Responsive Layout for Create Batch Modal */
+        .create-batch-grid-layout {
+          display: grid;
+          grid-template-columns: 1fr 1.25fr;
+          gap: 20px;
+        }
+        @media (max-width: 820px) {
+          .create-batch-grid-layout {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+        }
+        .create-batch-col-details {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 16px;
+        }
+        .create-batch-col-students {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+        }
+        .create-batch-students-list {
+          max-height: 280px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          background: rgba(0, 0, 0, 0.25);
+          padding: 8px;
+          border-radius: var(--radius-sm);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .create-batch-student-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: var(--radius-sm);
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid transparent;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          user-select: none;
+        }
+        .create-batch-student-item:hover {
+          background: rgba(255, 255, 255, 0.06);
+        }
+        .create-batch-student-item.selected {
+          background: rgba(16, 185, 129, 0.1);
+          border-color: rgba(16, 185, 129, 0.35);
+        }
+        .btn-timing-chip {
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: var(--radius-full);
+          padding: 3px 8px;
+          font-size: 0.675rem;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-timing-chip:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+        }
+        .btn-timing-chip.active {
+          background: var(--primary-600);
+          border-color: var(--primary-500);
+          color: white;
+        }
+        .border-top-subtle {
+          border-top: 1px solid var(--border-subtle);
+        }
+        .btn-link-action {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 0;
+          font-weight: 600;
+        }
+        .btn-link-action:hover {
+          text-decoration: underline;
         }
 
         /* Mobile Responsive for Batches */
