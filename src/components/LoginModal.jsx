@@ -11,14 +11,34 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Clock
+  Clock,
+  Unlock
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession, getLockoutStatus } from '../lib/auth';
 import { logger } from '../lib/logger';
 
 export default function LoginModal({ onLoginSuccess, students = [] }) {
-  const [activeRole, setActiveRole] = useState(USER_ROLES.ADMIN);
+  // Detect if Admin access was explicitly requested via URL parameter or preserved in localStorage
+  const detectInitialAdminAccess = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const hash = window.location.hash || '';
+      if (params.get('admin') === 'true' || params.get('admin') === '1' || params.get('role') === 'admin' || hash.toLowerCase().includes('admin')) {
+        return true;
+      }
+      if (localStorage.getItem('hayagriva_admin_unlocked') === 'true') {
+        return true;
+      }
+    } catch (e) {
+      // safe fallback
+    }
+    return false;
+  };
+
+  const initialAdminVisible = detectInitialAdminAccess();
+  const [isAdminVisible, setIsAdminVisible] = useState(initialAdminVisible);
+  const [activeRole, setActiveRole] = useState(initialAdminVisible ? USER_ROLES.ADMIN : USER_ROLES.PARENT);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +48,67 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  // Easter Egg 3-Click State on Logo
+  const [logoClickCount, setLogoClickCount] = useState(0);
+  const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
+  const [adminUnlockToast, setAdminUnlockToast] = useState(false);
+
+  // Keyboard shortcut listener: Ctrl + Shift + A or Alt + A toggles Admin access
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) || (e.altKey && (e.key === 'A' || e.key === 'a'))) {
+        e.preventDefault();
+        setIsAdminVisible(prev => {
+          const next = !prev;
+          if (next) {
+            setActiveRole(USER_ROLES.ADMIN);
+            setAdminUnlockToast(true);
+            localStorage.setItem('hayagriva_admin_unlocked', 'true');
+            logger.info(logger.CATEGORIES.AUTH, 'Admin login tab revealed via keyboard shortcut (Ctrl+Shift+A)');
+            setTimeout(() => setAdminUnlockToast(false), 3500);
+          } else {
+            localStorage.removeItem('hayagriva_admin_unlocked');
+            setActiveRole(USER_ROLES.PARENT);
+            logger.info(logger.CATEGORIES.AUTH, 'Admin login tab hidden via keyboard shortcut');
+          }
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleLogoClick = () => {
+    const now = Date.now();
+    if (now - lastLogoClickTime > 2500) {
+      setLogoClickCount(1);
+      setLastLogoClickTime(now);
+    } else {
+      const nextCount = logoClickCount + 1;
+      setLogoClickCount(nextCount);
+      setLastLogoClickTime(now);
+
+      if (nextCount >= 3) {
+        setIsAdminVisible(true);
+        setActiveRole(USER_ROLES.ADMIN);
+        setAdminUnlockToast(true);
+        localStorage.setItem('hayagriva_admin_unlocked', 'true');
+        logger.info(logger.CATEGORIES.AUTH, 'Admin login tab unlocked via Logo triple-click gesture');
+        setTimeout(() => setAdminUnlockToast(false), 3500);
+        setLogoClickCount(0);
+      }
+    }
+  };
+
+  const handleLockAdmin = () => {
+    setIsAdminVisible(false);
+    setActiveRole(USER_ROLES.PARENT);
+    localStorage.removeItem('hayagriva_admin_unlocked');
+    logger.info(logger.CATEGORIES.AUTH, 'Admin login tab hidden / re-locked');
+  };
 
   // Check lockout countdown timer
   useEffect(() => {
@@ -129,7 +210,11 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
       <div className="login-card">
         {/* Header with Academy Branding */}
         <div className="login-header">
-          <div className="logo-center">
+          <div 
+            className="logo-center clickable-logo" 
+            onClick={handleLogoClick}
+            title={isAdminVisible ? "Hayagriva Tutorials (Admin Access Enabled)" : "Hayagriva Tutorials"}
+          >
             <HayagrivaLogo size={52} showGlow={true} />
           </div>
           <h1 className="login-title">HAYAGRIVA TUTORIALS</h1>
@@ -137,16 +222,20 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           <div className="role-instruction">Select your portal to continue:</div>
         </div>
 
-        {/* 3 Role Selection Tabs */}
-        <div className="role-tabs">
-          <button
-            type="button"
-            className={`role-tab-btn ${activeRole === USER_ROLES.ADMIN ? 'active' : ''}`}
-            onClick={() => handleRoleTabChange(USER_ROLES.ADMIN)}
-          >
-            <ShieldCheck size={18} />
-            <span>Admin</span>
-          </button>
+        {/* Role Selection Tabs (Admin tab is hidden by default) */}
+        <div className={`role-tabs ${isAdminVisible ? 'has-admin' : 'two-tabs'}`}>
+          {isAdminVisible && (
+            <button
+              type="button"
+              className={`role-tab-btn admin-role-tab ${activeRole === USER_ROLES.ADMIN ? 'active' : ''}`}
+              onClick={() => handleRoleTabChange(USER_ROLES.ADMIN)}
+              title="Admin Management Portal"
+            >
+              <ShieldCheck size={18} />
+              <span>Admin</span>
+              <span className="admin-status-dot" title="Admin Portal Unlocked">●</span>
+            </button>
+          )}
           <button
             type="button"
             className={`role-tab-btn ${activeRole === USER_ROLES.TEACHER ? 'active' : ''}`}
@@ -164,6 +253,31 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
             <span>Parent</span>
           </button>
         </div>
+
+        {/* Admin Unlock Notification Toast */}
+        {adminUnlockToast && (
+          <div className="admin-unlock-banner">
+            <Unlock size={14} className="text-amber-400 flex-shrink-0" />
+            <span>Admin Management Portal Unlocked! Press <strong>Ctrl+Shift+A</strong> anytime to toggle.</span>
+          </div>
+        )}
+
+        {/* When Admin Tab is Revealed, provide discreet re-lock control */}
+        {isAdminVisible && (
+          <div className="admin-visible-bar">
+            <span className="text-xs text-amber-400/90 font-medium flex items-center gap-1">
+              <Unlock size={12} /> Management Portal Enabled
+            </span>
+            <button
+              type="button"
+              className="hide-admin-link"
+              onClick={handleLockAdmin}
+              title="Hide Admin tab from this computer"
+            >
+              Hide Admin Tab
+            </button>
+          </div>
+        )}
 
         {/* Error Alert */}
         {errorMsg && (
@@ -334,8 +448,19 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         </div>
 
         <div className="login-security-footer">
-          <ShieldCheck size={13} className="text-muted" />
-          <span>Secure Tuition Portal • Hayagriva Tutorials</span>
+          <ShieldCheck 
+            size={13} 
+            className="text-muted footer-shield-icon" 
+            onClick={handleLogoClick}
+            title={isAdminVisible ? "Admin Mode Active" : "Click to unlock Management Portal"}
+          />
+          <span 
+            onDoubleClick={handleLogoClick} 
+            title="Secure Tuition Portal • Hayagriva Tutorials"
+            style={{ cursor: 'default' }}
+          >
+            Secure Tuition Portal • Hayagriva Tutorials
+          </span>
         </div>
       </div>
 
@@ -369,6 +494,17 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           justify-content: center;
           margin-bottom: 12px;
         }
+        .clickable-logo {
+          cursor: pointer;
+          user-select: none;
+          transition: transform 0.15s ease, filter 0.2s ease;
+        }
+        .clickable-logo:hover {
+          filter: drop-shadow(0 0 16px rgba(99, 102, 241, 0.5));
+        }
+        .clickable-logo:active {
+          transform: scale(0.92);
+        }
         .login-title {
           font-family: var(--font-heading);
           font-size: 1.35rem;
@@ -391,13 +527,65 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         }
         .role-tabs {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: 1fr 1fr;
           gap: 6px;
           background: rgba(15, 23, 42, 0.6);
           padding: 4px;
           border-radius: var(--radius-lg);
           border: 1px solid var(--border-subtle);
           margin-bottom: 20px;
+          transition: all 0.25s ease;
+        }
+        .role-tabs.has-admin {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+        .admin-role-tab {
+          position: relative;
+        }
+        .admin-status-dot {
+          color: #F59E0B;
+          font-size: 0.65rem;
+          margin-left: 2px;
+        }
+        .admin-unlock-banner {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: var(--radius-sm);
+          font-size: 0.78rem;
+          background: rgba(245, 158, 11, 0.15);
+          border: 1px solid rgba(245, 158, 11, 0.4);
+          color: #FCD34D;
+          margin-bottom: 12px;
+          animation: fadeIn 0.25s ease-out;
+        }
+        .admin-visible-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 2px 6px;
+          margin-top: -12px;
+          margin-bottom: 14px;
+        }
+        .hide-admin-link {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          font-size: 0.72rem;
+          cursor: pointer;
+          text-decoration: underline;
+          padding: 2px 4px;
+        }
+        .hide-admin-link:hover {
+          color: #f87171;
+        }
+        .footer-shield-icon {
+          cursor: pointer;
+          transition: color 0.15s ease;
+        }
+        .footer-shield-icon:hover {
+          color: #F59E0B;
         }
         .role-tab-btn {
           display: flex;
