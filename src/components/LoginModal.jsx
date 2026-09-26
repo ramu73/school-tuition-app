@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession, getLockoutStatus } from '../lib/auth';
+import { logger } from '../lib/logger';
 
 export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [activeRole, setActiveRole] = useState(USER_ROLES.ADMIN);
@@ -24,6 +25,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [parentIdentifier, setParentIdentifier] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
 
@@ -55,6 +57,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const handleRoleTabChange = (role) => {
     setActiveRole(role);
     setErrorMsg('');
+    setFieldErrors({});
     setUsername('');
     setPassword('');
     setParentIdentifier('');
@@ -63,6 +66,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg('');
+    const fErrors = {};
 
     if (isLocked) {
       setErrorMsg(`Account temporarily locked. Please retry in ${lockoutSeconds}s.`);
@@ -70,12 +74,34 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
     }
 
     if (activeRole === USER_ROLES.PARENT) {
+      const clean = (parentIdentifier || '').trim();
+      if (!clean || clean.length < 3) {
+        fErrors.parentIdentifier = 'Please enter a valid 10-digit mobile number or admission number.';
+      }
+    } else {
+      if (!username || username.trim().length < 2) {
+        fErrors.username = 'Please enter your username (min 2 characters).';
+      }
+      if (!password || password.length < 3) {
+        fErrors.password = 'Please enter your password (min 3 characters).';
+      }
+    }
+
+    if (Object.keys(fErrors).length > 0) {
+      setFieldErrors(fErrors);
+      logger.warn(logger.CATEGORIES.VALIDATION, `Login form validation failed for ${activeRole}`, fErrors);
+      return;
+    }
+
+    if (activeRole === USER_ROLES.PARENT) {
       const res = authenticateParent(parentIdentifier, students);
       if (res.success) {
         const session = setAuthSession(res.user, rememberMe);
+        logger.action(res.user, 'PARENT_LOGIN', `Parent authenticated successfully for student ${res.user.studentName}`);
         onLoginSuccess(session);
       } else {
         setErrorMsg(res.message);
+        logger.warn(logger.CATEGORIES.AUTH, `Parent login failed: ${res.message}`, { identifier: parentIdentifier });
         if (res.isLocked) {
           setIsLocked(true);
           setLockoutSeconds(res.remainingSeconds || 120);
@@ -85,9 +111,11 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
       const res = authenticateStaff(username, password, activeRole);
       if (res.success) {
         const session = setAuthSession(res.user, rememberMe);
+        logger.action(res.user, 'STAFF_LOGIN', `Staff user "${res.user.name}" (${res.user.role}) authenticated successfully`);
         onLoginSuccess(session);
       } else {
         setErrorMsg(res.message);
+        logger.warn(logger.CATEGORIES.AUTH, `Staff login failed for @${username} as ${activeRole}: ${res.message}`);
         if (res.isLocked) {
           setIsLocked(true);
           setLockoutSeconds(res.remainingSeconds || 120);
@@ -149,55 +177,71 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         <form onSubmit={handleSubmit} className="login-form">
           {activeRole === USER_ROLES.PARENT ? (
             <div className="form-group">
-              <label className="form-label">Registered Mobile or Admission No.</label>
+              <label className="form-label">Registered Mobile or Admission No. *</label>
               <div className="input-with-icon">
                 <Phone size={16} className="input-icon" />
                 <input
                   type="text"
-                  required
                   autoFocus
                   placeholder="Enter 10-digit mobile number"
                   value={parentIdentifier}
-                  onChange={(e) => setParentIdentifier(e.target.value)}
+                  onChange={(e) => {
+                    setParentIdentifier(e.target.value);
+                    if (fieldErrors.parentIdentifier) setFieldErrors(prev => ({ ...prev, parentIdentifier: null }));
+                  }}
                   disabled={isLocked}
-                  className="form-input with-left-icon"
+                  className={`form-input with-left-icon ${fieldErrors.parentIdentifier ? 'input-error' : ''}`}
                 />
               </div>
+              {fieldErrors.parentIdentifier && (
+                <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                  {fieldErrors.parentIdentifier}
+                </span>
+              )}
               <p className="field-hint">E.g. 9876543210 or ADM-1001</p>
             </div>
           ) : (
             <>
               <div className="form-group">
                 <label className="form-label">
-                  {activeRole === USER_ROLES.ADMIN ? 'Admin Username / Email' : 'Teacher Username / Email'}
+                  {activeRole === USER_ROLES.ADMIN ? 'Admin Username / Email *' : 'Teacher Username / Email *'}
                 </label>
                 <div className="input-with-icon">
                   <User size={16} className="input-icon" />
                   <input
                     type="text"
-                    required
                     autoFocus
                     placeholder={activeRole === USER_ROLES.ADMIN ? "Enter admin username" : "Enter teacher username"}
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      if (fieldErrors.username) setFieldErrors(prev => ({ ...prev, username: null }));
+                    }}
                     disabled={isLocked}
-                    className="form-input with-left-icon"
+                    className={`form-input with-left-icon ${fieldErrors.username ? 'input-error' : ''}`}
                   />
                 </div>
+                {fieldErrors.username && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {fieldErrors.username}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">
-                <label className="form-label">Password / Security PIN</label>
+                <label className="form-label">Password / Security PIN *</label>
                 <div className="input-with-icon">
                   <Lock size={16} className="input-icon" />
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    required
                     placeholder="Enter password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) setFieldErrors(prev => ({ ...prev, password: null }));
+                    }}
                     disabled={isLocked}
-                    className="form-input with-left-icon with-right-icon"
+                    className={`form-input with-left-icon with-right-icon ${fieldErrors.password ? 'input-error' : ''}`}
                   />
                   <button
                     type="button"
@@ -209,6 +253,11 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {fieldErrors.password}
+                  </span>
+                )}
               </div>
             </>
           )}

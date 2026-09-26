@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Award, Plus, FileText, CheckCircle2, User, X, Check, BookOpen } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
+import { logger } from '../lib/logger';
 
 
 export default function Exams({ data, currentUser, onSaveData }) {
@@ -40,6 +41,7 @@ export default function Exams({ data, currentUser, onSaveData }) {
   const [selectedExamId, setSelectedExamId] = useState(exams[0]?.id || '');
   const [newExamModalOpen, setNewExamModalOpen] = useState(false);
   const [reportCardStudent, setReportCardStudent] = useState(null);
+  const [examErrors, setExamErrors] = useState({});
 
   // New Exam Form
   const [newExamData, setNewExamData] = useState({
@@ -62,19 +64,40 @@ export default function Exams({ data, currentUser, onSaveData }) {
 
   const handleCreateExam = (e) => {
     e.preventDefault();
-    if (!newExamData.title) {
-      alert('Please enter Test / Exam Title.');
+    const errors = {};
+
+    if (!newExamData.title || newExamData.title.trim().length < 3) {
+      errors.title = 'Test title must be at least 3 characters.';
+    }
+    if (!newExamData.subject || newExamData.subject.trim().length < 2) {
+      errors.subject = 'Subject name must be at least 2 characters.';
+    }
+    const tot = Number(newExamData.totalMarks);
+    if (isNaN(tot) || tot <= 0 || tot > 500) {
+      errors.totalMarks = 'Total marks must be a positive number between 1 and 500.';
+    }
+    const pass = Number(newExamData.passingMarks);
+    if (isNaN(pass) || pass < 0 || pass > tot) {
+      errors.passingMarks = `Passing marks must be between 0 and total marks (${tot || 50}).`;
+    }
+    if (!newExamData.date) {
+      errors.date = 'Please select a valid exam date.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setExamErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Exam creation validation failed', { errors, examTitle: newExamData.title });
       return;
     }
 
     const createdId = generateNextId(exams);
     const createdExam = {
       id: createdId,
-      title: newExamData.title,
+      title: newExamData.title.trim(),
       classCode: newExamData.classCode,
-      subject: newExamData.subject,
-      totalMarks: Number(newExamData.totalMarks) || 50,
-      passingMarks: Number(newExamData.passingMarks) || 18,
+      subject: newExamData.subject.trim(),
+      totalMarks: tot || 50,
+      passingMarks: pass || 18,
       date: newExamData.date
     };
 
@@ -83,9 +106,16 @@ export default function Exams({ data, currentUser, onSaveData }) {
       exams: [createdExam, ...exams]
     });
 
+    logger.action(currentUser, 'CREATE_EXAM', `Scheduled test "${createdExam.title}" for ${createdExam.classCode} (${createdExam.totalMarks} marks)`, {
+      examId: createdId,
+      subject: createdExam.subject,
+      classCode: createdExam.classCode
+    });
+
     setSelectedClass(newExamData.classCode);
     setSelectedExamId(createdId);
     setNewExamModalOpen(false);
+    setExamErrors({});
     setNewExamData({
       title: '',
       classCode: 'CLASS_10',
@@ -332,16 +362,40 @@ export default function Exams({ data, currentUser, onSaveData }) {
             </div>
 
             <form onSubmit={handleCreateExam} className="admission-form">
+              {Object.keys(examErrors).length > 0 && (
+                <div className="form-error-banner" style={{
+                  padding: '10px 14px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '8px',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  ⚠️ Please fix the highlighted fields to create this test.
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Test Title *</label>
                 <input 
                   type="text"
-                  className="form-input"
-                  required
+                  className={`form-input ${examErrors.title ? 'input-error' : ''}`}
                   placeholder="e.g. Unit Test 2 - Quadratic Equations"
                   value={newExamData.title}
-                  onChange={(e) => setNewExamData({ ...newExamData, title: e.target.value })}
+                  onChange={(e) => {
+                    setNewExamData({ ...newExamData, title: e.target.value });
+                    if (examErrors.title) setExamErrors(prev => ({ ...prev, title: null }));
+                  }}
                 />
+                {examErrors.title && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {examErrors.title}
+                  </span>
+                )}
               </div>
 
               <div className="form-grid-2">
@@ -362,12 +416,19 @@ export default function Exams({ data, currentUser, onSaveData }) {
                   <label className="form-label">Subject *</label>
                   <input 
                     type="text"
-                    className="form-input"
-                    required
+                    className={`form-input ${examErrors.subject ? 'input-error' : ''}`}
                     placeholder="e.g. Mathematics / Science / English"
                     value={newExamData.subject}
-                    onChange={(e) => setNewExamData({ ...newExamData, subject: e.target.value })}
+                    onChange={(e) => {
+                      setNewExamData({ ...newExamData, subject: e.target.value });
+                      if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+                    }}
                   />
+                  {examErrors.subject && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {examErrors.subject}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -376,35 +437,59 @@ export default function Exams({ data, currentUser, onSaveData }) {
                   <label className="form-label">Total Maximum Marks</label>
                   <input 
                     type="number"
-                    className="form-input"
+                    className={`form-input ${examErrors.totalMarks ? 'input-error' : ''}`}
                     value={newExamData.totalMarks}
-                    onChange={(e) => setNewExamData({ ...newExamData, totalMarks: e.target.value })}
+                    onChange={(e) => {
+                      setNewExamData({ ...newExamData, totalMarks: e.target.value });
+                      if (examErrors.totalMarks) setExamErrors(prev => ({ ...prev, totalMarks: null }));
+                    }}
                   />
+                  {examErrors.totalMarks && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {examErrors.totalMarks}
+                    </span>
+                  )}
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Passing Marks</label>
                   <input 
                     type="number"
-                    className="form-input"
+                    className={`form-input ${examErrors.passingMarks ? 'input-error' : ''}`}
                     value={newExamData.passingMarks}
-                    onChange={(e) => setNewExamData({ ...newExamData, passingMarks: e.target.value })}
+                    onChange={(e) => {
+                      setNewExamData({ ...newExamData, passingMarks: e.target.value });
+                      if (examErrors.passingMarks) setExamErrors(prev => ({ ...prev, passingMarks: null }));
+                    }}
                   />
+                  {examErrors.passingMarks && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {examErrors.passingMarks}
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Exam Date</label>
+                <label className="form-label">Exam Date *</label>
                 <input 
                   type="date"
-                  className="form-input"
+                  className={`form-input ${examErrors.date ? 'input-error' : ''}`}
                   value={newExamData.date}
-                  onChange={(e) => setNewExamData({ ...newExamData, date: e.target.value })}
+                  onChange={(e) => {
+                    setNewExamData({ ...newExamData, date: e.target.value });
+                    if (examErrors.date) setExamErrors(prev => ({ ...prev, date: null }));
+                  }}
                 />
+                {examErrors.date && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {examErrors.date}
+                  </span>
+                )}
               </div>
 
               <div className="modal-actions-flex">
-                <button type="button" className="btn btn-secondary" onClick={() => setNewExamModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setNewExamModalOpen(false); setExamErrors({}); }}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">

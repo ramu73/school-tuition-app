@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
+import { logger } from '../lib/logger';
 
 export default function Batches({ data, currentUser, onSaveData, setActiveTab, setSelectedClassFilter, onSelectBatchForAttendance }) {
   const { batches = [], students = [], classes = [] } = data;
@@ -44,6 +45,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
   const [batchStudentClassFilter, setBatchStudentClassFilter] = useState('ALL');
   const [selectedStudentIdsForBatch, setSelectedStudentIdsForBatch] = useState([]);
   const [batchSaveFeedback, setBatchSaveFeedback] = useState(null);
+  const [batchErrors, setBatchErrors] = useState({});
 
   const [newBatch, setNewBatch] = useState({
     name: '',
@@ -56,28 +58,47 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
 
   const handleCreateBatch = (e) => {
     e.preventDefault();
-    if (!newBatch.name || !newBatch.tutor) {
-      alert('Please enter Batch Name and Tutor Name.');
+    const errors = {};
+
+    if (!newBatch.name || newBatch.name.trim().length < 3) {
+      errors.name = 'Batch Name must be at least 3 characters.';
+    }
+    if (!newBatch.tutor || newBatch.tutor.trim().length < 2) {
+      errors.tutor = 'Please enter a valid tutor or teacher name (min 2 characters).';
+    }
+    if (!newBatch.timing || newBatch.timing.trim().length < 3) {
+      errors.timing = 'Please specify batch schedule timing.';
+    }
+    const cap = Number(newBatch.capacity);
+    if (isNaN(cap) || cap < 1 || cap > 300) {
+      errors.capacity = 'Capacity must be a positive number between 1 and 300.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setBatchErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Batch creation validation failed', { errors, attemptedBatch: newBatch.name });
       return;
     }
 
     const created = {
       id: generateNextId(batches),
-      name: newBatch.name,
+      name: newBatch.name.trim(),
       classCode: newBatch.classCode,
-      timing: newBatch.timing,
-      tutor: newBatch.tutor,
-      room: newBatch.room,
+      timing: newBatch.timing.trim(),
+      tutor: newBatch.tutor.trim(),
+      room: (newBatch.room || 'Main Hall').trim(),
       capacity: Number(newBatch.capacity) || 25
     };
-
 
     onSaveData({
       ...data,
       batches: [...batches, created]
     });
 
+    logger.action(currentUser, 'CREATE_BATCH', `Created batch slot "${created.name}"`, { batchId: created.id, tutor: created.tutor });
+
     setBatchModalOpen(false);
+    setBatchErrors({});
     setNewBatch({
       name: '',
       classCode: 'ALL',
@@ -332,16 +353,40 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
             </div>
 
             <form onSubmit={handleCreateBatch} className="admission-form">
+              {Object.keys(batchErrors).length > 0 && (
+                <div className="form-error-banner" style={{
+                  padding: '10px 14px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '8px',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  ⚠️ Please fix the highlighted fields to save this batch slot.
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Batch Name *</label>
                 <input 
                   type="text"
-                  className="form-input"
-                  required
+                  className={`form-input ${batchErrors.name ? 'input-error' : ''}`}
                   placeholder="e.g. Class 10 - Evening Batch A"
                   value={newBatch.name}
-                  onChange={(e) => setNewBatch({ ...newBatch, name: e.target.value })}
+                  onChange={(e) => {
+                    setNewBatch({ ...newBatch, name: e.target.value });
+                    if (batchErrors.name) setBatchErrors(prev => ({ ...prev, name: null }));
+                  }}
                 />
+                {batchErrors.name && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {batchErrors.name}
+                  </span>
+                )}
               </div>
 
               <div className="form-grid-2">
@@ -366,12 +411,19 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                   <label className="form-label">Batch Timing *</label>
                   <input 
                     type="text"
-                    className="form-input"
-                    required
+                    className={`form-input ${batchErrors.timing ? 'input-error' : ''}`}
                     placeholder="e.g. 05:30 PM - 07:00 PM"
                     value={newBatch.timing}
-                    onChange={(e) => setNewBatch({ ...newBatch, timing: e.target.value })}
+                    onChange={(e) => {
+                      setNewBatch({ ...newBatch, timing: e.target.value });
+                      if (batchErrors.timing) setBatchErrors(prev => ({ ...prev, timing: null }));
+                    }}
                   />
+                  {batchErrors.timing && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {batchErrors.timing}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -380,12 +432,19 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                   <label className="form-label">Tutor / Teacher Name *</label>
                   <input 
                     type="text"
-                    className="form-input"
-                    required
+                    className={`form-input ${batchErrors.tutor ? 'input-error' : ''}`}
                     placeholder="e.g. Mr. K. Sharma (Maths)"
                     value={newBatch.tutor}
-                    onChange={(e) => setNewBatch({ ...newBatch, tutor: e.target.value })}
+                    onChange={(e) => {
+                      setNewBatch({ ...newBatch, tutor: e.target.value });
+                      if (batchErrors.tutor) setBatchErrors(prev => ({ ...prev, tutor: null }));
+                    }}
                   />
+                  {batchErrors.tutor && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {batchErrors.tutor}
+                    </span>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -404,14 +463,22 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                 <label className="form-label">Seat Capacity</label>
                 <input 
                   type="number"
-                  className="form-input"
+                  className={`form-input ${batchErrors.capacity ? 'input-error' : ''}`}
                   value={newBatch.capacity}
-                  onChange={(e) => setNewBatch({ ...newBatch, capacity: e.target.value })}
+                  onChange={(e) => {
+                    setNewBatch({ ...newBatch, capacity: e.target.value });
+                    if (batchErrors.capacity) setBatchErrors(prev => ({ ...prev, capacity: null }));
+                  }}
                 />
+                {batchErrors.capacity && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {batchErrors.capacity}
+                  </span>
+                )}
               </div>
 
               <div className="modal-actions-flex">
-                <button type="button" className="btn btn-secondary" onClick={() => setBatchModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setBatchModalOpen(false); setBatchErrors({}); }}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">

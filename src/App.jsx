@@ -11,10 +11,12 @@ import SettingsModal from './components/SettingsModal';
 import LoginModal from './components/LoginModal';
 import ParentPortal from './components/ParentPortal';
 import SessionExpiryModal from './components/SessionExpiryModal';
+import LogsViewerModal from './components/LogsViewerModal';
 import { useSessionManager } from './hooks/useSessionManager';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
 import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES, canAccessTab, hasPermission, PERMISSIONS } from './lib/auth';
+import { logger } from './lib/logger';
 
 class TabErrorBoundary extends React.Component {
   constructor(props) {
@@ -28,6 +30,11 @@ class TabErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("Caught error in TabErrorBoundary:", error, errorInfo);
+    logger.exception(error, { 
+      tabName: this.props.tabName, 
+      tabKey: this.props.tabKey, 
+      componentStack: errorInfo?.componentStack 
+    });
   }
 
   componentDidUpdate(prevProps) {
@@ -86,6 +93,7 @@ export default function App() {
   const [admitModalOpen, setAdmitModalOpen] = useState(false);
   const [feeCollectModalOpen, setFeeCollectModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [logsModalOpen, setLogsModalOpen] = useState(false);
 
   // Supabase connection state
   const [isSupabaseLive, setIsSupabaseLive] = useState(getSupabaseConfig().isConnected);
@@ -94,6 +102,7 @@ export default function App() {
   const handleLogout = useCallback(() => {
     clearAuthSession();
     setCurrentUser(null);
+    setData(getStoredData());
     setActiveTab('dashboard');
   }, []);
 
@@ -313,6 +322,7 @@ export default function App() {
       <LoginModal 
         students={data.students}
         onLoginSuccess={(user) => {
+          setData(getStoredData());
           setCurrentUser(user);
           if (user.role === USER_ROLES.PARENT) {
             setActiveTab('parent-portal');
@@ -331,6 +341,7 @@ export default function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onOpenSettings={() => hasPermission(currentUser, PERMISSIONS.MANAGE_SETTINGS) && setSettingsModalOpen(true)}
+        onOpenLogs={() => setLogsModalOpen(true)}
         isSupabaseLive={isSupabaseLive}
         isSyncing={isSyncing}
         currentUser={currentUser}
@@ -402,6 +413,7 @@ export default function App() {
             {activeTab === 'fees' && canAccessTab(currentUser, 'fees') && (
               <Fees 
                 data={data}
+                currentUser={currentUser}
                 onSaveData={handleSaveData}
                 feeCollectModalOpen={feeCollectModalOpen}
                 setFeeCollectModalOpen={setFeeCollectModalOpen}
@@ -438,8 +450,15 @@ export default function App() {
           batches={data.batches || []}
           students={data.students || []}
           onSaveData={handleSaveData}
+          onOpenLogs={() => setLogsModalOpen(true)}
         />
       )}
+
+      {/* Runtime & Exception Logs Viewer Modal */}
+      <LogsViewerModal 
+        isOpen={logsModalOpen}
+        onClose={() => setLogsModalOpen(false)}
+      />
 
       {/* Inactivity & Session Expiry Countdown Warning Modal */}
       <SessionExpiryModal 

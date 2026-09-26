@@ -19,7 +19,8 @@ import {
   Megaphone,
   ChevronDown,
   Shield,
-  Info
+  Info,
+  Terminal
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -29,6 +30,7 @@ export default function Navbar({
   activeTab, 
   setActiveTab, 
   onOpenSettings, 
+  onOpenLogs,
   isSupabaseLive, 
   isSyncing,
   currentUser,
@@ -112,6 +114,19 @@ export default function Navbar({
             <Radio size={12} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
             <span className="live-pill-text">{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Live') : 'Local'}</span>
           </div>
+
+          {/* Runtime & Exception Logs (Admin & Staff) */}
+          {currentUser && currentUser.role !== USER_ROLES.PARENT && (
+            <button 
+              onClick={onOpenLogs}
+              className="btn btn-secondary btn-sm logs-nav-btn"
+              title="Application Runtime Logs & Exception Console"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Terminal size={14} className="text-emerald" />
+              <span className="btn-label-text">Logs</span>
+            </button>
+          )}
 
           {/* System Settings & Database (Admin Only) */}
           {currentUser?.role === USER_ROLES.ADMIN && (
@@ -203,6 +218,20 @@ export default function Navbar({
 
                   {/* Actions */}
                   <div className="profile-menu-footer">
+                    {currentUser.role !== USER_ROLES.PARENT && (
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary btn-sm w-full mb-2"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '8px' }}
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          if (typeof onOpenLogs === 'function') onOpenLogs();
+                        }}
+                      >
+                        <Terminal size={14} className="text-emerald" />
+                        <span>System Diagnostics & Logs</span>
+                      </button>
+                    )}
                     <button 
                       type="button" 
                       className="btn btn-secondary btn-sm w-full profile-logout-btn"

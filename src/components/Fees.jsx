@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl, generateFeeReminderMessage } from '../lib/feeCycle';
 import { generateNextId } from '../lib/storage';
+import { logger } from '../lib/logger';
 import HayagrivaLogo from './HayagrivaLogo';
 
 
@@ -29,7 +30,8 @@ export default function Fees({
   data, 
   onSaveData, 
   feeCollectModalOpen, 
-  setFeeCollectModalOpen 
+  setFeeCollectModalOpen,
+  currentUser
 }) {
   const { fees = [], students = [], classes = [], receipts = [] } = data;
 
@@ -49,6 +51,7 @@ export default function Fees({
   const [paymentMode, setPaymentMode] = useState('UPI');
   const [transactionRef, setTransactionRef] = useState('');
   const [feeNotes, setFeeNotes] = useState('');
+  const [feeErrors, setFeeErrors] = useState({});
 
   // Financial Stats
   const totalBilled = fees.reduce((sum, f) => sum + Number(f.amountDue), 0);
@@ -92,8 +95,21 @@ export default function Fees({
   // Submit Payment Collection
   const handleProcessPayment = (e) => {
     e.preventDefault();
-    if (!selectedStudentId || !paymentAmount || Number(paymentAmount) <= 0) {
-      alert('Please select a student and enter a valid payment amount.');
+    const errors = {};
+
+    if (!selectedStudentId) {
+      errors.selectedStudentId = 'Please select a student from the dropdown list.';
+    }
+    const amtNum = Number(paymentAmount);
+    if (!paymentAmount || isNaN(amtNum) || amtNum <= 0) {
+      errors.paymentAmount = 'Please enter a valid payment amount greater than ₹0.';
+    } else if (amtNum > 100000) {
+      errors.paymentAmount = 'Amount exceeds maximum single transaction limit (₹100,000).';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFeeErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Fee payment validation failed', { errors, studentId: selectedStudentId });
       return;
     }
 
@@ -160,11 +176,19 @@ export default function Fees({
       receipts: [newReceipt, ...receipts]
     });
 
+    logger.action(currentUser, 'RECORD_FEE_PAYMENT', `Collected ₹${amountNum} fee for student "${newReceipt.studentName}" via ${paymentMode}`, {
+      studentId: sId,
+      receiptNo: receiptNumber,
+      amount: amountNum,
+      mode: paymentMode
+    });
+
     setFeeCollectModalOpen(false);
     setSelectedStudentId('');
     setPaymentAmount('');
     setTransactionRef('');
     setFeeNotes('');
+    setFeeErrors({});
     setActiveReceipt(newReceipt);
   };
 
@@ -669,13 +693,32 @@ export default function Fees({
             </div>
 
             <form onSubmit={handleProcessPayment} className="admission-form">
+              {Object.keys(feeErrors).length > 0 && (
+                <div className="form-error-banner" style={{
+                  padding: '10px 14px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '8px',
+                  color: '#f87171',
+                  fontSize: '0.85rem',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  ⚠️ Please fix the highlighted fields to record fee payment.
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label">Select Student (Class 1 to 10) *</label>
                 <select 
-                  className="form-select"
-                  required
+                  className={`form-select ${feeErrors.selectedStudentId ? 'input-error' : ''}`}
                   value={selectedStudentId}
-                  onChange={(e) => handleStudentSelect(e.target.value)}
+                  onChange={(e) => {
+                    handleStudentSelect(e.target.value);
+                    if (feeErrors.selectedStudentId) setFeeErrors(prev => ({ ...prev, selectedStudentId: null }));
+                  }}
                 >
                   <option value="">Choose student...</option>
                   {students.filter(s => s.status === 'ACTIVE').map(s => {
@@ -688,6 +731,11 @@ export default function Fees({
                     );
                   })}
                 </select>
+                {feeErrors.selectedStudentId && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {feeErrors.selectedStudentId}
+                  </span>
+                )}
               </div>
 
               <div className="form-grid-2">
@@ -695,12 +743,19 @@ export default function Fees({
                   <label className="form-label">Payment Amount (₹) *</label>
                   <input 
                     type="number"
-                    className="form-input"
-                    required
+                    className={`form-input ${feeErrors.paymentAmount ? 'input-error' : ''}`}
                     placeholder="e.g. 1250"
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    onChange={(e) => {
+                      setPaymentAmount(e.target.value);
+                      if (feeErrors.paymentAmount) setFeeErrors(prev => ({ ...prev, paymentAmount: null }));
+                    }}
                   />
+                  {feeErrors.paymentAmount && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {feeErrors.paymentAmount}
+                    </span>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -730,7 +785,7 @@ export default function Fees({
               </div>
 
               <div className="modal-actions-flex">
-                <button type="button" className="btn btn-secondary" onClick={() => setFeeCollectModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => { setFeeCollectModalOpen(false); setFeeErrors({}); }}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-success">

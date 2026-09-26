@@ -22,8 +22,11 @@ import {
   Search,
   UserCheck,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Terminal,
+  Activity
 } from 'lucide-react';
+import { logger, LOG_LEVELS, LOG_CATEGORIES } from '../lib/logger';
 import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase, syncStaffAccountsToSupabase } from '../lib/supabase';
 import { 
   getSupabaseConfig, 
@@ -50,7 +53,7 @@ import {
   assignStudentsToTeacher
 } from '../lib/auth';
 
-export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [], onSaveData }) {
+export default function SettingsModal({ isOpen, onClose, onDataReset, batches = [], students = [], onSaveData, onOpenLogs }) {
   if (!isOpen) return null;
 
   const [activeSettingsTab, setActiveSettingsTab] = useState('database');
@@ -63,6 +66,9 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
   const [pushing, setPushing] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [dbErrors, setDbErrors] = useState({});
+  const [adminErrors, setAdminErrors] = useState({});
+  const [teacherErrors, setTeacherErrors] = useState({});
 
   // Staff Credentials State
   const initialAccounts = getStaffAccounts();
@@ -142,19 +148,38 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
 
   const handleTestAndSave = async (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!url || !url.trim().startsWith('http')) {
+      errors.url = 'Please enter a valid Supabase project URL starting with https://';
+    }
+    if (!anonKey || anonKey.trim().length < 20) {
+      errors.anonKey = 'Please enter a valid Supabase anon public API key.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setDbErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Supabase config validation failed', errors);
+      return;
+    }
+
     setTesting(true);
     setTestResult(null);
+    setDbErrors({});
 
-    const res = await testSupabaseConnection(url, anonKey);
+    logger.info(logger.CATEGORIES.SYNC, `Testing connection to Supabase project at ${url.trim()}`);
+    const res = await testSupabaseConnection(url.trim(), anonKey.trim());
     setTesting(false);
     setTestResult(res);
 
     if (res.success) {
       saveSupabaseConfig({
-        url,
-        anonKey,
+        url: url.trim(),
+        anonKey: anonKey.trim(),
         isConnected: true
       });
+      logger.action(null, 'CONNECT_SUPABASE', `Connected and saved Supabase project credentials`, { url: url.trim() });
+    } else {
+      logger.error(logger.CATEGORIES.SYNC, `Supabase connection test failed: ${res.message}`);
     }
   };
 
@@ -167,6 +192,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     setUrl('');
     setAnonKey('');
     setTestResult({ success: false, message: 'Disconnected. Switched back to local storage.' });
+    logger.action(null, 'DISCONNECT_SUPABASE', 'Disconnected from Supabase and switched to offline local storage');
   };
 
   const handlePushToSupabase = async () => {
@@ -175,12 +201,15 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
       const currentData = getStoredData();
       const res = await syncTuitionDataToSupabase(currentData);
       if (res.success) {
-        alert('All local tuition data successfully uploaded & synced to your Supabase PostgreSQL database!');
+        setTestResult({ success: true, message: 'All local tuition data successfully uploaded & synced to your Supabase PostgreSQL database!' });
+        logger.action(null, 'PUSH_DATA_SUPABASE', 'Synced local tuition data to Supabase');
       } else {
-        alert('Failed to upload data to Supabase: ' + (res.error || 'Check connection settings'));
+        setTestResult({ success: false, message: 'Failed to upload data to Supabase: ' + (res.error || 'Check connection settings') });
+        logger.error(logger.CATEGORIES.SYNC, 'Failed to upload data to Supabase', { error: res.error });
       }
     } catch (err) {
-      alert('Error during cloud sync: ' + err.message);
+      setTestResult({ success: false, message: 'Error during cloud sync: ' + err.message });
+      logger.exception(err, { source: 'handlePushToSupabase' });
     } finally {
       setPushing(false);
     }
@@ -188,6 +217,20 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
 
   const handleSaveAdminCreds = (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!adminUser || adminUser.trim().length < 3) {
+      errors.adminUser = 'Username must be at least 3 characters.';
+    }
+    if (!adminPass || adminPass.trim().length < 6) {
+      errors.adminPass = 'Password must be at least 6 characters.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAdminErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Admin credentials validation failed', errors);
+      return;
+    }
+
     const currentAccs = getStaffAccounts();
     const updated = {
       ...currentAccs,
@@ -201,17 +244,36 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     if (getSupabaseConfig().isConnected) {
       syncStaffAccountsToSupabase(updated).catch(() => {});
     }
+    setAdminErrors({});
+    logger.action(null, 'UPDATE_ADMIN_CREDENTIALS', `Updated administrator credentials for @${adminUser.trim()}`);
     setStaffMsg({ type: 'success', text: 'Admin login credentials updated successfully!' });
     setTimeout(() => setStaffMsg(null), 3500);
   };
 
   const handleAddNewTeacher = (e) => {
     e.preventDefault();
+    const errors = {};
+    if (!newTeacherName || newTeacherName.trim().length < 2) {
+      errors.newTeacherName = 'Please enter a valid teacher name (min 2 characters).';
+    }
+    if (!newTeacherUsername || newTeacherUsername.trim().length < 3) {
+      errors.newTeacherUsername = 'Teacher username must be at least 3 characters.';
+    }
+    if (!newTeacherPassword || newTeacherPassword.trim().length < 6) {
+      errors.newTeacherPassword = 'Password must be at least 6 characters.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setTeacherErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Teacher creation validation failed', errors);
+      return;
+    }
+
     const res = addTeacherAccount({
-      name: newTeacherName,
-      subject: newTeacherSubject,
-      username: newTeacherUsername,
-      password: newTeacherPassword,
+      name: newTeacherName.trim(),
+      subject: newTeacherSubject.trim(),
+      username: newTeacherUsername.trim(),
+      password: newTeacherPassword.trim(),
       assignedBatchIds: newTeacherBatches,
       assignedStudentIds: newTeacherStudents
     });
@@ -219,6 +281,8 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     if (res.success) {
       setTeachers(getTeacherAccounts());
       setShowAddTeacher(false);
+      setTeacherErrors({});
+      logger.action(null, 'CREATE_TEACHER', `Created faculty account for ${newTeacherName.trim()} (@${newTeacherUsername.trim()})`);
 
       // If batches were assigned, update their tutor in data.batches so Batches and Timetable display the new teacher!
       if (newTeacherBatches.length > 0) {
@@ -297,7 +361,8 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
         setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted and batch assignments updated.` });
         setTimeout(() => setStaffMsg(null), 3000);
       } else {
-        alert(res.message);
+        setStaffMsg({ type: 'error', text: res.message || 'Failed to delete teacher' });
+        setTimeout(() => setStaffMsg(null), 3500);
       }
     }
   };
@@ -316,7 +381,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
       if (config.isConnected) {
         await clearSupabaseDatabase();
       }
-      alert('Cleared! Your tuition database is now clean with 0 students, ready for real student admissions.');
+      logger.action(null, 'DATABASE_PURGE', 'Cleared all student and fee records for fresh start');
       onClose();
     }
   };
@@ -331,6 +396,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    logger.action(null, 'EXPORT_JSON_BACKUP', 'Exported JSON backup file');
   };
 
   const handleResetData = () => {
@@ -352,7 +418,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
       if (config.isConnected) {
         syncTuitionDataToSupabase(defaultData);
       }
-      alert('Data reset to demo data successfully!');
+      logger.action(null, 'DATABASE_RESET_DEMO', 'Reset tuition database to default demo dataset');
       onClose();
     }
   };
@@ -478,6 +544,14 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
             <FolderArchive size={15} />
             <span>Data & Backup</span>
           </button>
+          <button 
+            type="button"
+            className={`settings-nav-btn ${activeSettingsTab === 'logs' ? 'active' : ''}`}
+            onClick={() => setActiveSettingsTab('logs')}
+          >
+            <Terminal size={15} />
+            <span>System Logs</span>
+          </button>
         </div>
 
         {/* TAB 1: DATABASE & SUPABASE */}
@@ -489,25 +563,41 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
               </div>
 
               <div className="form-group">
-                <label className="form-label">Supabase Project URL</label>
+                <label className="form-label">Supabase Project URL *</label>
                 <input 
                   type="url"
-                  className="form-input"
+                  className={`form-input ${dbErrors.url ? 'input-error' : ''}`}
                   placeholder="https://your-project.supabase.co"
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
+                  onChange={(e) => {
+                    setUrl(e.target.value);
+                    if (dbErrors.url) setDbErrors(prev => ({ ...prev, url: null }));
+                  }}
                 />
+                {dbErrors.url && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {dbErrors.url}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">
-                <label className="form-label">Supabase Anon Public API Key</label>
+                <label className="form-label">Supabase Anon Public API Key *</label>
                 <input 
                   type="password"
-                  className="form-input"
+                  className={`form-input ${dbErrors.anonKey ? 'input-error' : ''}`}
                   placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                   value={anonKey}
-                  onChange={(e) => setAnonKey(e.target.value)}
+                  onChange={(e) => {
+                    setAnonKey(e.target.value);
+                    if (dbErrors.anonKey) setDbErrors(prev => ({ ...prev, anonKey: null }));
+                  }}
                 />
+                {dbErrors.anonKey && (
+                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                    {dbErrors.anonKey}
+                  </span>
+                )}
               </div>
 
               {testResult && (
@@ -575,24 +665,33 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
               <form onSubmit={handleSaveAdminCreds}>
                 <div className="form-grid-2">
                   <div className="form-group mb-2">
-                    <label className="form-label">Admin Username</label>
+                    <label className="form-label">Admin Username *</label>
                     <input 
                       type="text" 
-                      required 
-                      className="form-input" 
+                      className={`form-input ${adminErrors.adminUser ? 'input-error' : ''}`}
                       value={adminUser} 
-                      onChange={(e) => setAdminUser(e.target.value)} 
+                      onChange={(e) => {
+                        setAdminUser(e.target.value);
+                        if (adminErrors.adminUser) setAdminErrors(prev => ({ ...prev, adminUser: null }));
+                      }} 
                     />
+                    {adminErrors.adminUser && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {adminErrors.adminUser}
+                      </span>
+                    )}
                   </div>
                   <div className="form-group mb-2">
-                    <label className="form-label">Admin Password</label>
+                    <label className="form-label">Admin Password *</label>
                     <div className="input-with-icon-right">
                       <input 
                         type={showAdminPass ? 'text' : 'password'} 
-                        required 
-                        className="form-input" 
+                        className={`form-input ${adminErrors.adminPass ? 'input-error' : ''}`}
                         value={adminPass} 
-                        onChange={(e) => setAdminPass(e.target.value)} 
+                        onChange={(e) => {
+                          setAdminPass(e.target.value);
+                          if (adminErrors.adminPass) setAdminErrors(prev => ({ ...prev, adminPass: null }));
+                        }} 
                       />
                       <button 
                         type="button" 
@@ -603,6 +702,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                         {showAdminPass ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
+                    {adminErrors.adminPass && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {adminErrors.adminPass}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex justify-end mt-2">
@@ -656,12 +760,19 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                         <label className="form-label">Teacher Name *</label>
                         <input 
                           type="text" 
-                          required 
                           placeholder="e.g. Mrs. S. Lakshmi"
-                          className="form-input"
+                          className={`form-input ${teacherErrors.newTeacherName ? 'input-error' : ''}`}
                           value={newTeacherName}
-                          onChange={(e) => setNewTeacherName(e.target.value)}
+                          onChange={(e) => {
+                            setNewTeacherName(e.target.value);
+                            if (teacherErrors.newTeacherName) setTeacherErrors(prev => ({ ...prev, newTeacherName: null }));
+                          }}
                         />
+                        {teacherErrors.newTeacherName && (
+                          <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                            {teacherErrors.newTeacherName}
+                          </span>
+                        )}
                       </div>
                       <div className="form-group mb-2">
                         <label className="form-label">Subject / Faculty Specialization</label>
@@ -677,23 +788,37 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                         <label className="form-label">Teacher Username *</label>
                         <input 
                           type="text" 
-                          required 
                           placeholder="e.g. lakshmi"
-                          className="form-input font-mono"
+                          className={`form-input font-mono ${teacherErrors.newTeacherUsername ? 'input-error' : ''}`}
                           value={newTeacherUsername}
-                          onChange={(e) => setNewTeacherUsername(e.target.value)}
+                          onChange={(e) => {
+                            setNewTeacherUsername(e.target.value);
+                            if (teacherErrors.newTeacherUsername) setTeacherErrors(prev => ({ ...prev, newTeacherUsername: null }));
+                          }}
                         />
+                        {teacherErrors.newTeacherUsername && (
+                          <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                            {teacherErrors.newTeacherUsername}
+                          </span>
+                        )}
                       </div>
                       <div className="form-group mb-2">
                         <label className="form-label">Login Password *</label>
                         <input 
                           type="text" 
-                          required 
                           placeholder="e.g. teach123"
-                          className="form-input font-mono"
+                          className={`form-input font-mono ${teacherErrors.newTeacherPassword ? 'input-error' : ''}`}
                           value={newTeacherPassword}
-                          onChange={(e) => setNewTeacherPassword(e.target.value)}
+                          onChange={(e) => {
+                            setNewTeacherPassword(e.target.value);
+                            if (teacherErrors.newTeacherPassword) setTeacherErrors(prev => ({ ...prev, newTeacherPassword: null }));
+                          }}
                         />
+                        {teacherErrors.newTeacherPassword && (
+                          <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                            {teacherErrors.newTeacherPassword}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1116,6 +1241,142 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
             </div>
           </div>
         )}
+
+        {/* TAB 4: SYSTEM LOGS & EXCEPTION VIEWER */}
+        {activeSettingsTab === 'logs' && (
+          <div className="settings-tab-content">
+            <div className="settings-notice mb-3 flex items-center justify-between" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <strong>Telemetry & Exception Logs:</strong>
+                <div className="text-xs text-muted mt-0.5">
+                  Track form validations, user logins, and runtime exceptions.
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  if (typeof onOpenLogs === 'function') onOpenLogs();
+                }}
+              >
+                <Terminal size={14} />
+                <span>Open Logs Console</span>
+              </button>
+            </div>
+
+            {/* Log Stats Highlights */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '14px' }}>
+              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="text-xs text-muted">Total Events</div>
+                <div className="text-xl font-bold font-mono text-white mt-1">{logger.getLogs().length}</div>
+              </div>
+              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(239,68,68,0.06)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <div className="text-xs" style={{ color: '#f87171' }}>Exceptions</div>
+                <div className="text-xl font-bold font-mono mt-1" style={{ color: '#f87171' }}>
+                  {logger.getLogs().filter(l => l.level === LOG_LEVELS.ERROR || l.level === LOG_LEVELS.EXCEPTION).length}
+                </div>
+              </div>
+              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(245,158,11,0.06)', borderRadius: '8px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <div className="text-xs" style={{ color: '#fbbf24' }}>Warnings</div>
+                <div className="text-xl font-bold font-mono mt-1" style={{ color: '#fbbf24' }}>
+                  {logger.getLogs().filter(l => l.level === LOG_LEVELS.WARN).length}
+                </div>
+              </div>
+              <div className="stat-card p-3 glass-card" style={{ textAlign: 'center', padding: '10px', background: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                <div className="text-xs" style={{ color: '#34d399' }}>User Actions</div>
+                <div className="text-xl font-bold font-mono mt-1" style={{ color: '#34d399' }}>
+                  {logger.getLogs().filter(l => l.level === LOG_LEVELS.ACTION).length}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions Toolbar */}
+            <div className="flex items-center gap-2 mb-3" style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  const txt = logger.exportLogsText();
+                  const blob = new Blob([txt], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `hayagriva_logs_${new Date().toISOString().split('T')[0]}.txt`;
+                  a.click();
+                }}
+              >
+                <Download size={13} />
+                <span>Export TXT</span>
+              </button>
+
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  const json = logger.exportLogsJson();
+                  const blob = new Blob([json], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `hayagriva_logs_${new Date().toISOString().split('T')[0]}.json`;
+                  a.click();
+                }}
+              >
+                <Download size={13} />
+                <span>Export JSON</span>
+              </button>
+
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  try {
+                    throw new Error('Diagnostic: JavaScript runtime exception verification');
+                  } catch (err) {
+                    logger.exception(err, { source: 'Settings Diagnostics Tab' });
+                  }
+                }}
+                title="Simulate a real JavaScript exception to verify logging"
+              >
+                <span>Test Exception</span>
+              </button>
+
+              <button 
+                type="button" 
+                className="btn btn-danger btn-sm"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => {
+                  if (window.confirm('Clear all recorded logs?')) {
+                    logger.clearLogs();
+                  }
+                }}
+              >
+                <Trash2 size={13} />
+                <span>Clear Logs</span>
+              </button>
+            </div>
+
+            {/* Live Log Stream Preview */}
+            <div className="recent-logs-preview" style={{ maxHeight: '250px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.725rem', background: 'rgba(0,0,0,0.4)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {logger.getLogs().slice(0, 20).map(log => (
+                <div key={log.id} style={{ display: 'flex', gap: '8px', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ color: '#94a3b8' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  <span style={{ 
+                    fontWeight: 700, 
+                    color: log.level === 'EXCEPTION' || log.level === 'ERROR' ? '#f87171' : log.level === 'WARN' ? '#fbbf24' : log.level === 'ACTION' ? '#34d399' : '#38bdf8' 
+                  }}>
+                    [{log.level}]
+                  </span>
+                  <span style={{ color: '#c084fc' }}>[{log.category}]</span>
+                  <span style={{ color: '#f1f5f9', flex: 1 }}>{log.message}</span>
+                </div>
+              ))}
+              {logger.getLogs().length === 0 && (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: '20px' }}>No runtime events recorded yet.</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
 
@@ -1204,7 +1465,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
         }
         .settings-nav-tabs {
           display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-columns: repeat(4, 1fr);
           gap: 6px;
           background: rgba(15, 23, 42, 0.6);
           padding: 4px;

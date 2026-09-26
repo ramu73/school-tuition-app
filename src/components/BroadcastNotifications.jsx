@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
+import { logger } from '../lib/logger';
 
 export default function BroadcastNotifications({ data = {}, currentUser, onSaveData }) {
   const safeData = data || {};
@@ -95,6 +96,8 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
   const [copiedNumbers, setCopiedNumbers] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [broadcastErrors, setBroadcastErrors] = useState({});
+  const [dispatchStatusMsg, setDispatchStatusMsg] = useState(null);
 
   // Quick Preset Templates
   const TEMPLATES = [
@@ -235,8 +238,21 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
 
   // Save / Publish to In-App Parent Portal
   const handleSaveAndPublish = () => {
-    if (!title.trim() || !message.trim()) {
-      alert('Please enter both title and announcement message.');
+    const errors = {};
+
+    if (!title.trim() || title.trim().length < 3) {
+      errors.title = 'Notice title must be at least 3 characters.';
+    }
+    if (!message.trim() || message.trim().length < 10) {
+      errors.message = 'Notice body must be at least 10 characters.';
+    }
+    if (!targetRecipients || targetRecipients.length === 0) {
+      errors.recipients = 'No student recipients selected for this target audience.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setBroadcastErrors(errors);
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Notice publication validation failed', { errors, attemptedTitle: title });
       return;
     }
 
@@ -260,6 +276,12 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
       });
     }
 
+    logger.action(currentUser, 'PUBLISH_NOTICE', `Published notice "${newAnnouncement.title}" to ${newAnnouncement.targetName} (${targetRecipients.length} recipients)`, {
+      id: newAnnouncement.id,
+      targetType
+    });
+
+    setBroadcastErrors({});
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -272,6 +294,7 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
       if (typeof onSaveData === 'function') {
         onSaveData({ ...safeData, announcements: filtered });
       }
+      logger.action(currentUser, 'DELETE_NOTICE', `Deleted announcement #${id}`);
     }
   };
 
@@ -281,7 +304,8 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
     if (unsent) {
       handleOpenWhatsApp(unsent);
     } else {
-      alert('All target parents have already been messaged! ✓');
+      setDispatchStatusMsg('All target parents in this list have already been messaged! ✓');
+      setTimeout(() => setDispatchStatusMsg(null), 3500);
     }
   };
 
@@ -565,28 +589,61 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
               <span className="text-xs text-muted font-mono">{message.length} chars</span>
             </div>
 
+            {Object.keys(broadcastErrors).length > 0 && (
+              <div className="form-error-banner" style={{
+                padding: '10px 14px',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '8px',
+                color: '#f87171',
+                fontSize: '0.85rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                ⚠️ {broadcastErrors.recipients || 'Please fix the highlighted fields to publish notice.'}
+              </div>
+            )}
+
             <div className="form-group mb-3">
-              <label className="form-label text-xs">Notice Heading / Title</label>
+              <label className="form-label text-xs">Notice Heading / Title *</label>
               <input 
                 type="text" 
-                className="form-input font-medium"
+                className={`form-input font-medium ${broadcastErrors.title ? 'input-error' : ''}`}
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (broadcastErrors.title) setBroadcastErrors(prev => ({ ...prev, title: null }));
+                }}
                 placeholder="e.g. Special Sunday Tuition Class"
               />
+              {broadcastErrors.title && (
+                <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                  {broadcastErrors.title}
+                </span>
+              )}
             </div>
 
             <div className="form-group mb-2">
               <div className="flex items-center justify-between mb-1">
-                <label className="form-label text-xs mb-0">Message Body (Supports WhatsApp Bold *text* and Emojis)</label>
+                <label className="form-label text-xs mb-0">Message Body (Supports WhatsApp Bold *text* and Emojis) *</label>
               </div>
               <textarea 
                 rows={9}
-                className="form-textarea font-sans text-sm leading-relaxed"
+                className={`form-textarea font-sans text-sm leading-relaxed ${broadcastErrors.message ? 'input-error' : ''}`}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => {
+                  setMessage(e.target.value);
+                  if (broadcastErrors.message) setBroadcastErrors(prev => ({ ...prev, message: null }));
+                }}
                 placeholder="Type your message here..."
               />
+              {broadcastErrors.message && (
+                <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                  {broadcastErrors.message}
+                </span>
+              )}
             </div>
 
             {/* Variable Tags Help */}
@@ -697,6 +754,24 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
                 </button>
               </div>
             </div>
+
+            {dispatchStatusMsg && (
+              <div style={{
+                padding: '8px 12px',
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '6px',
+                color: '#34d399',
+                fontSize: '0.8rem',
+                margin: '0 12px 10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <CheckCircle2 size={14} />
+                <span>{dispatchStatusMsg}</span>
+              </div>
+            )}
 
             {/* Recipient Rows */}
             <div className="recipients-list-wrap">

@@ -13,10 +13,11 @@ import {
   Filter,
   X,
   IndianRupee,
-  Award
+  Award,
+  AlertCircle
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
-
+import { logger, LOG_CATEGORIES } from '../lib/logger';
 
 export default function Students({ 
   data, 
@@ -31,6 +32,8 @@ export default function Students({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
+
+  const [formErrors, setFormErrors] = useState({});
 
   // New Student Form State
   const [formData, setFormData] = useState({
@@ -47,10 +50,21 @@ export default function Students({
     address: ''
   });
 
+  const clearFieldError = (field) => {
+    if (formErrors[field]) {
+      setFormErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
   // Handle Class change in Admission Form (auto-populate default fee)
   const handleFormClassChange = (e) => {
     const classCode = e.target.value;
     const matchedClass = classes.find(c => c.code === classCode);
+    clearFieldError('classCode');
     setFormData(prev => ({
       ...prev,
       classCode,
@@ -58,13 +72,50 @@ export default function Students({
     }));
   };
 
+  // Validate form fields
+  const validateStudentForm = () => {
+    const errors = {};
+    if (!formData.name || !formData.name.trim() || formData.name.trim().length < 2) {
+      errors.name = 'Full name is required (minimum 2 characters).';
+    }
+    if (!formData.admissionNo || !formData.admissionNo.trim()) {
+      errors.admissionNo = 'Admission / Roll number is required.';
+    } else {
+      const trimmedAdm = formData.admissionNo.trim().toLowerCase();
+      const duplicate = students.some(s => 
+        (!editingStudent || s.id !== editingStudent.id) && 
+        (s.admissionNo || '').toLowerCase() === trimmedAdm
+      );
+      if (duplicate) {
+        errors.admissionNo = `Admission No "${formData.admissionNo.trim()}" is already assigned to another student.`;
+      }
+    }
+    if (!formData.parentName || !formData.parentName.trim() || formData.parentName.trim().length < 2) {
+      errors.parentName = 'Parent / Guardian name is required.';
+    }
+    const cleanPhone = (formData.parentPhone || '').replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      errors.parentPhone = 'Please enter a valid 10-digit mobile number (e.g. 9876543210).';
+    }
+    if (formData.monthlyFee === '' || isNaN(Number(formData.monthlyFee)) || Number(formData.monthlyFee) < 0) {
+      errors.monthlyFee = 'Please enter a valid tuition fee (₹0 or greater).';
+    }
+    if (!formData.admissionDate) {
+      errors.admissionDate = 'Admission date is required.';
+    }
+    return errors;
+  };
+
   // Submit Admission
   const handleSaveStudent = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.parentPhone) {
-      alert('Please fill in Student Name and Parent Phone number.');
+    const errors = validateStudentForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      logger.warn(LOG_CATEGORIES.VALIDATION, 'Student admission validation failed', { errors, formData });
       return;
     }
+    setFormErrors({});
 
     if (editingStudent) {
       // Update
@@ -74,20 +125,21 @@ export default function Students({
           : s
       );
       onSaveData({ ...data, students: updatedStudents });
+      logger.action(LOG_CATEGORIES.DATABASE, `Updated student details: ${formData.name}`, { id: editingStudent.id, admissionNo: formData.admissionNo });
       setEditingStudent(null);
     } else {
       // Create new
       const newId = generateNextId(students);
       const newStudent = {
         id: newId,
-        admissionNo: formData.admissionNo || `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
-        name: formData.name,
+        admissionNo: formData.admissionNo.trim(),
+        name: formData.name.trim(),
         gender: formData.gender,
         classCode: formData.classCode,
         batchId: formData.batchId ? Number(formData.batchId) : null,
-        school: formData.school,
-        parentName: formData.parentName,
-        parentPhone: formData.parentPhone,
+        school: formData.school ? formData.school.trim() : '',
+        parentName: formData.parentName.trim(),
+        parentPhone: formData.parentPhone.trim(),
         monthlyFee: Number(formData.monthlyFee) || 1000,
         status: 'ACTIVE',
         admissionDate: formData.admissionDate || new Date().toISOString().split('T')[0]
@@ -106,12 +158,12 @@ export default function Students({
         lastPaymentDate: null
       };
 
-
       onSaveData({
         ...data,
         students: [newStudent, ...students],
         fees: [...fees, newFeeRecord]
       });
+      logger.action(LOG_CATEGORIES.DATABASE, `Admitted new student: ${newStudent.name} (${newStudent.admissionNo})`, { studentId: newId });
     }
 
     // Reset
@@ -128,6 +180,7 @@ export default function Students({
       admissionDate: new Date().toISOString().split('T')[0],
       address: ''
     });
+    setFormErrors({});
     setAdmitModalOpen(false);
   };
 
@@ -414,26 +467,55 @@ export default function Students({
             </div>
 
             <form onSubmit={handleSaveStudent} className="admission-form">
+              {Object.keys(formErrors).length > 0 && (
+                <div className="form-error-banner">
+                  <AlertCircle size={16} className="text-rose flex-shrink-0" />
+                  <div className="banner-text">
+                    <strong>Please correct the following errors:</strong>
+                    <ul className="banner-errors-list">
+                      {Object.values(formErrors).map((msg, idx) => (
+                        <li key={idx}>{msg}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Full Name *</label>
                   <input 
                     type="text" 
-                    className="form-input" 
-                    required 
+                    className={`form-input ${formErrors.name ? 'input-error' : ''}`}
                     placeholder="e.g. Aarav Sharma"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('name');
+                      setFormData({ ...formData, name: e.target.value });
+                    }}
                   />
+                  {formErrors.name && (
+                    <span className="field-error-text">
+                      <AlertCircle size={12} /> {formErrors.name}
+                    </span>
+                  )}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Admission / Roll No</label>
+                  <label className="form-label">Admission / Roll No *</label>
                   <input 
                     type="text" 
-                    className="form-input" 
+                    className={`form-input ${formErrors.admissionNo ? 'input-error' : ''}`}
                     value={formData.admissionNo}
-                    onChange={(e) => setFormData({ ...formData, admissionNo: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('admissionNo');
+                      setFormData({ ...formData, admissionNo: e.target.value });
+                    }}
                   />
+                  {formErrors.admissionNo && (
+                    <span className="field-error-text">
+                      <AlertCircle size={12} /> {formErrors.admissionNo}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -456,7 +538,10 @@ export default function Students({
                   <select 
                     className="form-select" 
                     value={formData.batchId}
-                    onChange={(e) => setFormData({ ...formData, batchId: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('batchId');
+                      setFormData({ ...formData, batchId: e.target.value });
+                    }}
                   >
                     <option value="">Select a batch...</option>
                     {batches.map(b => (
@@ -497,23 +582,37 @@ export default function Students({
                   <label className="form-label">Parent / Guardian Name *</label>
                   <input 
                     type="text" 
-                    className="form-input" 
-                    required 
+                    className={`form-input ${formErrors.parentName ? 'input-error' : ''}`}
                     placeholder="Father / Mother name"
                     value={formData.parentName}
-                    onChange={(e) => setFormData({ ...formData, parentName: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('parentName');
+                      setFormData({ ...formData, parentName: e.target.value });
+                    }}
                   />
+                  {formErrors.parentName && (
+                    <span className="field-error-text">
+                      <AlertCircle size={12} /> {formErrors.parentName}
+                    </span>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">Parent Phone (WhatsApp) *</label>
                   <input 
                     type="tel" 
-                    className="form-input" 
-                    required 
-                    placeholder="10-digit mobile number"
+                    className={`form-input ${formErrors.parentPhone ? 'input-error' : ''}`}
+                    placeholder="10-digit mobile number (e.g. 9876543210)"
                     value={formData.parentPhone}
-                    onChange={(e) => setFormData({ ...formData, parentPhone: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('parentPhone');
+                      setFormData({ ...formData, parentPhone: e.target.value });
+                    }}
                   />
+                  {formErrors.parentPhone && (
+                    <span className="field-error-text">
+                      <AlertCircle size={12} /> {formErrors.parentPhone}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -522,22 +621,36 @@ export default function Students({
                   <label className="form-label">Monthly Tuition Fee (₹) *</label>
                   <input 
                     type="number" 
-                    className="form-input" 
-                    required 
+                    className={`form-input ${formErrors.monthlyFee ? 'input-error' : ''}`}
                     value={formData.monthlyFee}
-                    onChange={(e) => setFormData({ ...formData, monthlyFee: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('monthlyFee');
+                      setFormData({ ...formData, monthlyFee: e.target.value });
+                    }}
                   />
+                  {formErrors.monthlyFee && (
+                    <span className="field-error-text">
+                      <AlertCircle size={12} /> {formErrors.monthlyFee}
+                    </span>
+                  )}
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Admission / Joining Date *</label>
                   <input 
                     type="date" 
-                    className="form-input" 
-                    required 
+                    className={`form-input ${formErrors.admissionDate ? 'input-error' : ''}`}
                     value={formData.admissionDate}
-                    onChange={(e) => setFormData({ ...formData, admissionDate: e.target.value })}
+                    onChange={(e) => {
+                      clearFieldError('admissionDate');
+                      setFormData({ ...formData, admissionDate: e.target.value });
+                    }}
                   />
+                  {formErrors.admissionDate && (
+                    <span className="field-error-text">
+                      <AlertCircle size={12} /> {formErrors.admissionDate}
+                    </span>
+                  )}
                   <span className="text-xs text-secondary mt-1">
                     🗓️ <strong>Fee Cycle:</strong> Due on {formData.admissionDate ? new Date(formData.admissionDate).getDate() : 1}th of every month
                   </span>
@@ -545,7 +658,10 @@ export default function Students({
               </div>
 
               <div className="modal-actions-flex">
-                <button type="button" className="btn btn-secondary" onClick={() => setAdmitModalOpen(false)}>
+                <button type="button" className="btn btn-secondary" onClick={() => {
+                  setFormErrors({});
+                  setAdmitModalOpen(false);
+                }}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
@@ -961,6 +1077,50 @@ export default function Students({
           .profile-details-grid {
             grid-template-columns: 1fr;
           }
+        }
+
+        /* Form Validation Error Styles */
+        .form-error-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          background: rgba(244, 63, 94, 0.12);
+          border: 1px solid rgba(244, 63, 94, 0.4);
+          border-radius: var(--radius-md, 8px);
+          padding: 12px 14px;
+          margin-bottom: 16px;
+          color: #FDA4AF;
+          font-size: 0.8125rem;
+          animation: shake 0.25s ease-in-out;
+        }
+        .banner-text strong {
+          color: #FB7185;
+          display: block;
+          margin-bottom: 4px;
+        }
+        .banner-errors-list {
+          margin: 0;
+          padding-left: 18px;
+          line-height: 1.5;
+        }
+        .input-error {
+          border-color: #F43F5E !important;
+          box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.35) !important;
+          background: rgba(244, 63, 94, 0.04) !important;
+        }
+        .field-error-text {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: #FB7185;
+          font-size: 0.725rem;
+          margin-top: 4px;
+          font-weight: 500;
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
         }
       `}</style>
     </div>
