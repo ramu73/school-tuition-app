@@ -402,50 +402,6 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           </button>
         </form>
 
-        {/* Quick Demo Fill Helper */}
-        <div className="login-demo-helper">
-          <span className="demo-helper-title">Demo Account:</span>
-          {activeRole === USER_ROLES.ADMIN && (
-            <button
-              type="button"
-              className="demo-fill-btn"
-              onClick={() => {
-                setUsername('admin');
-                setPassword('admin123');
-                setErrorMsg('');
-              }}
-            >
-              Fill Admin (<code>admin / admin123</code>)
-            </button>
-          )}
-          {activeRole === USER_ROLES.TEACHER && (
-            <button
-              type="button"
-              className="demo-fill-btn"
-              onClick={() => {
-                setUsername('teacher');
-                setPassword('teacher123');
-                setErrorMsg('');
-              }}
-            >
-              Fill Teacher (<code>teacher / teacher123</code>)
-            </button>
-          )}
-          {activeRole === USER_ROLES.PARENT && (
-            <button
-              type="button"
-              className="demo-fill-btn"
-              onClick={() => {
-                const sampleStudent = (students && students.length > 0) ? students[0] : null;
-                const samplePhone = sampleStudent?.parentPhone || sampleStudent?.admissionNo || '9876543210';
-                setParentIdentifier(samplePhone);
-                setErrorMsg('');
-              }}
-            >
-              Fill Parent ({students && students[0]?.parentName ? `${students[0].parentName}: ` : ''}<code>{students && students[0]?.parentPhone ? students[0].parentPhone : '9876543210'}</code>)
-            </button>
-          )}
-        </div>
 
         <div className="login-security-footer">
           <ShieldCheck 
@@ -713,46 +669,6 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         }
         .password-toggle-btn:hover {
           color: white;
-        }
-        .login-demo-helper {
-          margin-top: 14px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-        }
-        .demo-helper-title {
-          font-size: 0.7rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 600;
-        }
-        .demo-fill-btn {
-          background: rgba(99, 102, 241, 0.1);
-          border: 1px dashed rgba(99, 102, 241, 0.35);
-          color: #A5B4FC;
-          font-size: 0.75rem;
-          padding: 5px 12px;
-          border-radius: var(--radius-full);
-          cursor: pointer;
-          transition: all 0.2s ease;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-        }
-        .demo-fill-btn:hover {
-          background: rgba(99, 102, 241, 0.2);
-          border-color: rgba(99, 102, 241, 0.6);
-          color: white;
-          transform: translateY(-1px);
-        }
-        .demo-fill-btn code {
-          background: rgba(0, 0, 0, 0.25);
-          padding: 1px 4px;
-          border-radius: 4px;
-          color: #FBBF24;
-          font-family: var(--font-mono);
         }
         .login-security-footer {
           margin-top: 20px;
