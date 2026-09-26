@@ -16,6 +16,10 @@ import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData }
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
 import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES, canAccessTab, hasPermission, PERMISSIONS } from './lib/auth';
 import { logger } from './lib/logger';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { SplashScreen } from '@capacitor/splash-screen';
 
 class TabErrorBoundary extends React.Component {
   constructor(props) {
@@ -110,6 +114,33 @@ export default function App() {
     currentUser,
     onLogout: handleLogout
   });
+
+  // Native mobile features & hardware back-button handler (Android / Capacitor)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#0B0F19' }).catch(() => {});
+      SplashScreen.hide().catch(() => {});
+
+      const backListener = CapApp.addListener('backButton', () => {
+        if (admitModalOpen) {
+          setAdmitModalOpen(false);
+        } else if (feeCollectModalOpen) {
+          setFeeCollectModalOpen(false);
+        } else if (settingsModalOpen) {
+          setSettingsModalOpen(false);
+        } else if (activeTab !== 'dashboard' && currentUser?.role !== USER_ROLES.PARENT) {
+          setActiveTab('dashboard');
+        } else {
+          CapApp.exitApp();
+        }
+      });
+
+      return () => {
+        backListener.then(handle => handle.remove()).catch(() => {});
+      };
+    }
+  }, [admitModalOpen, feeCollectModalOpen, settingsModalOpen, activeTab, currentUser]);
 
   // Role-Based Authorization Guard: Redirect if attempting to access unauthorized tab
   useEffect(() => {

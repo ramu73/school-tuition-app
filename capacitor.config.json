@@ -1,0 +1,22 @@
+{
+  "appId": "com.hayagrivatutorials.app",
+  "appName": "Hayagriva Tutorials",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1800,
+      "launchAutoHide": true,
+      "backgroundColor": "#0B0F19",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0B0F19"
+    }
+  }
+}
