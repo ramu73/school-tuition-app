@@ -9,7 +9,8 @@ import {
   BookOpen, 
   Award, 
   Sparkles,
-  Megaphone
+  Megaphone,
+  LogOut
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 
@@ -84,12 +85,23 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     <div className="parent-portal-container">
       {/* Top Banner with Child Selector */}
       <div className="portal-header-card glass-card">
-        <div className="portal-header-content">
+        <div className="portal-header-content" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div className="parent-greeting">Parent & Guardian Portal</div>
             <h1 className="parent-title">Welcome, {currentUser?.name || currentStudent?.parentName || 'Parent'}</h1>
             <p className="parent-sub">Monitoring academic performance, tests & attendance at Hayagriva Tutorials</p>
           </div>
+          {typeof onLogout === 'function' && (
+            <button
+              onClick={onLogout}
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              title="Sign out of Parent Portal"
+            >
+              <LogOut size={14} />
+              <span>Sign Out</span>
+            </button>
+          )}
         </div>
 
         {/* If parent has multiple children enrolled */}

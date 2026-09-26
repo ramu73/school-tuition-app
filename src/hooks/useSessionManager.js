@@ -67,7 +67,10 @@ export function useSessionManager({ currentUser, onLogout }) {
     const handleAuthSync = () => {
       const session = getAuthSession();
       if (!session || !isSessionValid(session)) {
-        handleSessionTimeoutLogout();
+        setShowWarningModal(false);
+        if (currentUser && onLogout) {
+          onLogout();
+        }
       } else {
         const now = Date.now();
         const timeRemainingMs = session.expiresAt - now;
@@ -94,7 +97,7 @@ export function useSessionManager({ currentUser, onLogout }) {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('hayagriva-auth-changed', handleAuthSync);
     };
-  }, [handleSessionTimeoutLogout]);
+  }, [currentUser, onLogout]);
 
   // Periodic session checker: runs every 1s when in warning mode, 5s otherwise
   useEffect(() => {

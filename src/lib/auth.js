@@ -678,10 +678,12 @@ export function extendSession(additionalMinutes = 60) {
 
 // Clear session / Logout
 export function clearAuthSession() {
+  let wasPresent = false;
   if (typeof localStorage !== 'undefined') {
+    wasPresent = !!localStorage.getItem(AUTH_SESSION_KEY);
     localStorage.removeItem(AUTH_SESSION_KEY);
   }
-  if (typeof window !== 'undefined') {
+  if (wasPresent && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
   }
 }

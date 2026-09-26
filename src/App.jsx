@@ -100,11 +100,12 @@ export default function App() {
 
   // Centralized Logout Handler
   const handleLogout = useCallback(() => {
+    logger.action(currentUser, 'LOGOUT', `User "${currentUser?.name || 'User'}" logged out`);
     clearAuthSession();
     setCurrentUser(null);
     setData(getStoredData());
     setActiveTab('dashboard');
-  }, []);
+  }, [currentUser]);
 
   // Automatic Session Management & Inactivity Monitoring
   const { showWarningModal, warningSecondsLeft, extendSession } = useSessionManager({
@@ -132,12 +133,16 @@ export default function App() {
     };
 
     const handleAuthChange = (e) => {
-      setCurrentUser(e.detail || getAuthSession());
+      setCurrentUser(e.detail !== undefined ? e.detail : getAuthSession());
     };
 
     const handleStaffChange = () => {
       const session = getAuthSession();
-      if (session && session.role === USER_ROLES.TEACHER) {
+      if (!session) {
+        setCurrentUser(null);
+        return;
+      }
+      if (session.role === USER_ROLES.TEACHER) {
         const accounts = getStaffAccounts();
         const freshTeacher = (accounts.teachers || []).find(
           t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
@@ -161,7 +166,7 @@ export default function App() {
           clearAuthSession();
           setCurrentUser(null);
         }
-      } else if (session && session.role === USER_ROLES.ADMIN) {
+      } else if (session.role === USER_ROLES.ADMIN) {
         const accounts = getStaffAccounts();
         if (accounts.admin) {
           const updatedAdmin = {
@@ -173,7 +178,7 @@ export default function App() {
           setCurrentUser(updatedAdmin);
         }
       } else {
-        setCurrentUser(getAuthSession());
+        setCurrentUser(session);
       }
     };
 
@@ -182,7 +187,9 @@ export default function App() {
       if (e.key === 'hayagriva_staff_accounts_v1' || e.key === 'hayagriva_auth_session_v1') {
         const latestSession = getAuthSession();
         setCurrentUser(latestSession);
-        handleStaffChange();
+        if (latestSession) {
+          handleStaffChange();
+        }
       }
       if (e.key === 'vidyatrack_tuition_data_v1') {
         setData(getStoredData());
