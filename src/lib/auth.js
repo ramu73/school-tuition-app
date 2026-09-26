@@ -122,6 +122,15 @@ export function canAccessTab(user, tabId) {
   return hasPermission(user, requiredPerm);
 }
 
+// Check if a session object is currently valid (non-null, active role, not expired, not idle-timed-out)
+export function isSessionValid(session) {
+  if (!session || !session.role) return false;
+  const now = Date.now();
+  if (session.expiresAt && now > session.expiresAt) return false;
+  if (session.lastActiveAt && (now - session.lastActiveAt) > SESSION_DURATIONS.IDLE_TIMEOUT_MS) return false;
+  return true;
+}
+
 // Brute-force & failed login tracking
 export function getLockoutStatus(identifier) {
   if (!identifier) return { isLocked: false, remainingSeconds: 0, attemptsLeft: MAX_FAILED_ATTEMPTS };

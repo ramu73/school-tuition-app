@@ -4,16 +4,18 @@ import {
   clearAuthSession, 
   refreshSessionActivity, 
   extendSession, 
+  isSessionValid,
   SESSION_DURATIONS 
 } from '../lib/auth';
 
 /**
  * useSessionManager Hook
  * Automatically handles:
- * 1. User idle activity tracking
- * 2. Session expiration countdown
- * 3. Inactivity warnings (e.g. 2 minutes before expiry)
+ * 1. User idle activity tracking (throttled across mouse/touch/keyboard)
+ * 2. Real-time session expiration countdown
+ * 3. Inactivity warnings (2-minute countdown warning modal)
  * 4. Automatic logout upon session expiration
+ * 5. Instantaneous cross-tab session & logout synchronization
  */
 export function useSessionManager({ currentUser, onLogout }) {
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -60,17 +62,51 @@ export function useSessionManager({ currentUser, onLogout }) {
     };
   }, [currentUser, handleUserActivity]);
 
-  // Periodic session checker (every 5 seconds)
+  // Cross-tab synchronization & custom auth change listener
+  useEffect(() => {
+    const handleAuthSync = () => {
+      const session = getAuthSession();
+      if (!session || !isSessionValid(session)) {
+        handleSessionTimeoutLogout();
+      } else {
+        const now = Date.now();
+        const timeRemainingMs = session.expiresAt - now;
+        const idleTimeMs = session.lastActiveAt ? (now - session.lastActiveAt) : 0;
+        const idleRemainingMs = SESSION_DURATIONS.IDLE_TIMEOUT_MS - idleTimeMs;
+        const effectiveRemainingMs = Math.min(timeRemainingMs, idleRemainingMs);
+
+        if (effectiveRemainingMs > SESSION_DURATIONS.WARNING_BEFORE_EXPIRY_MS) {
+          setShowWarningModal(false);
+        }
+      }
+    };
+
+    const handleStorage = (e) => {
+      if (e.key === 'hayagriva_auth_session_v1') {
+        handleAuthSync();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('hayagriva-auth-changed', handleAuthSync);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('hayagriva-auth-changed', handleAuthSync);
+    };
+  }, [handleSessionTimeoutLogout]);
+
+  // Periodic session checker: runs every 1s when in warning mode, 5s otherwise
   useEffect(() => {
     if (!currentUser) {
       setShowWarningModal(false);
       return;
     }
 
-    const interval = setInterval(() => {
+    const checkSessionState = () => {
       const session = getAuthSession();
-      if (!session || !session.expiresAt) {
-        // Session invalid or cleared
+      if (!session || !isSessionValid(session)) {
+        console.warn('Session invalid, expired or idle timeout reached.');
         handleSessionTimeoutLogout();
         return;
       }
@@ -79,27 +115,33 @@ export function useSessionManager({ currentUser, onLogout }) {
       const timeRemainingMs = session.expiresAt - now;
       const idleTimeMs = session.lastActiveAt ? (now - session.lastActiveAt) : 0;
       const idleRemainingMs = SESSION_DURATIONS.IDLE_TIMEOUT_MS - idleTimeMs;
-
       const effectiveRemainingMs = Math.min(timeRemainingMs, idleRemainingMs);
 
-      // 1. Session completely expired
+      // 1. Session expired or idle timeout reached
       if (effectiveRemainingMs <= 0) {
         console.warn('Session expired or idle timeout reached.');
         handleSessionTimeoutLogout();
         return;
       }
 
-      // 2. Approaching expiration warning threshold (2 minutes before expiry)
+      // 2. Approaching expiration warning threshold (<= 2 minutes remaining)
       if (effectiveRemainingMs <= SESSION_DURATIONS.WARNING_BEFORE_EXPIRY_MS) {
         setShowWarningModal(true);
         setWarningSecondsLeft(Math.max(1, Math.ceil(effectiveRemainingMs / 1000)));
       } else {
         setShowWarningModal(false);
       }
-    }, 5000);
+    };
+
+    // Check immediately on mount/state change
+    checkSessionState();
+
+    // Dynamically adjust frequency: 1000ms if warning modal is active for smooth countdown, 5000ms otherwise
+    const checkIntervalMs = showWarningModal ? 1000 : 5000;
+    const interval = setInterval(checkSessionState, checkIntervalMs);
 
     return () => clearInterval(interval);
-  }, [currentUser, handleSessionTimeoutLogout]);
+  }, [currentUser, showWarningModal, handleSessionTimeoutLogout]);
 
   return {
     showWarningModal,

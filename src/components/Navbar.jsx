@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -16,7 +16,10 @@ import {
   LogOut,
   ShieldCheck,
   Settings,
-  Megaphone
+  Megaphone,
+  ChevronDown,
+  Shield,
+  Info
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -31,6 +34,24 @@ export default function Navbar({
   currentUser,
   onLogout 
 }) {
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef(null);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    if (profileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [profileMenuOpen]);
+
   const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
     { id: 'students', label: 'Students', icon: Users, roles: [USER_ROLES.ADMIN] },
@@ -104,17 +125,98 @@ export default function Navbar({
             </button>
           )}
 
-          {/* Current User Badge with Session Metadata */}
+          {/* Current User Badge with Session Metadata & Dropdown Menu */}
           {currentUser && (
-            <div 
-              className="current-user-badge"
-              title={`Active Session: ${currentUser.name} (${currentUser.role})\nSession Type: ${currentUser.rememberMe ? 'Persistent (7 Days)' : 'Standard (2 Hours)'}\nAuto-Lock: 45m Inactivity Protection Active`}
-            >
-              {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={13} className="text-primary" />}
-              {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={13} className="text-emerald" />}
-              {currentUser.role === USER_ROLES.PARENT && <Users size={13} className="text-amber" />}
-              <span className="user-badge-name">{currentUser.name}</span>
-              <span className={`user-role-tag role-${currentUser.role?.toLowerCase()}`}>{currentUser.role}</span>
+            <div className="profile-badge-wrapper" ref={profileMenuRef}>
+              <div 
+                className={`current-user-badge ${profileMenuOpen ? 'active' : ''}`}
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                role="button"
+                tabIndex={0}
+                title="Click to view User Profile & Session details"
+              >
+                {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={13} className="text-primary" />}
+                {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={13} className="text-emerald" />}
+                {currentUser.role === USER_ROLES.PARENT && <Users size={13} className="text-amber" />}
+                <span className="user-badge-name">{currentUser.name}</span>
+                <span className={`user-role-tag role-${currentUser.role?.toLowerCase()}`}>{currentUser.role}</span>
+                <ChevronDown size={12} className={`profile-chevron ${profileMenuOpen ? 'rotate' : ''}`} />
+              </div>
+
+              {profileMenuOpen && (
+                <div className="profile-dropdown-menu">
+                  {/* Header */}
+                  <div className="profile-menu-header">
+                    <div className="profile-avatar">
+                      {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={20} className="text-primary" />}
+                      {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={20} className="text-emerald" />}
+                      {currentUser.role === USER_ROLES.PARENT && <Users size={20} className="text-amber" />}
+                    </div>
+                    <div className="profile-meta">
+                      <div className="profile-name">{currentUser.name}</div>
+                      <div className="profile-title">{currentUser.title || currentUser.role}</div>
+                      {currentUser.email && <div className="profile-email">{currentUser.email}</div>}
+                      {currentUser.parentPhone && <div className="profile-email">Phone: {currentUser.parentPhone}</div>}
+                    </div>
+                  </div>
+
+                  {/* Session Status Section */}
+                  <div className="profile-menu-section">
+                    <div className="section-subtitle">
+                      <Clock size={12} />
+                      <span>Active Session</span>
+                    </div>
+                    <div className="profile-info-row">
+                      <span className="info-label">Session Mode:</span>
+                      <span className="info-value font-mono">
+                        {currentUser.rememberMe ? 'Persistent (7 Days)' : 'Standard (2 Hours)'}
+                      </span>
+                    </div>
+                    <div className="profile-info-row">
+                      <span className="info-label">Inactivity Lock:</span>
+                      <span className="info-value font-mono">45 mins auto-lock</span>
+                    </div>
+                  </div>
+
+                  {/* RBAC Scope Section */}
+                  <div className="profile-menu-section">
+                    <div className="section-subtitle">
+                      <Shield size={12} />
+                      <span>Role & Permissions</span>
+                    </div>
+                    <div className="rbac-desc">
+                      {currentUser.role === USER_ROLES.ADMIN && (
+                        <span>Full Administrative Control (Students, Fees, Batches, Exams, Staff, Settings)</span>
+                      )}
+                      {currentUser.role === USER_ROLES.TEACHER && (
+                        <span>
+                          Teacher Access • Assigned to{' '}
+                          <strong>{currentUser.assignedBatchIds?.length || 0} batches</strong>
+                          {currentUser.subject ? ` (${currentUser.subject})` : ''}
+                        </span>
+                      )}
+                      {currentUser.role === USER_ROLES.PARENT && (
+                        <span>Parent Portal • {currentUser.studentName ? `Student: ${currentUser.studentName}` : 'Child Records (Read-Only)'}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="profile-menu-footer">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary btn-sm w-full profile-logout-btn"
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        onLogout();
+                      }}
+                    >
+                      <LogOut size={14} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -280,6 +382,9 @@ export default function Navbar({
           font-size: 0.775rem;
           white-space: nowrap;
         }
+        .profile-badge-wrapper {
+          position: relative;
+        }
         .current-user-badge {
           display: flex;
           align-items: center;
@@ -289,6 +394,21 @@ export default function Navbar({
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-full);
           font-size: 0.775rem;
+          cursor: pointer;
+          user-select: none;
+          transition: all 0.2s ease;
+        }
+        .current-user-badge:hover, .current-user-badge.active {
+          background: rgba(30, 41, 59, 0.85);
+          border-color: rgba(99, 102, 241, 0.45);
+          box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+        }
+        .profile-chevron {
+          color: var(--text-muted);
+          transition: transform 0.2s ease;
+        }
+        .profile-chevron.rotate {
+          transform: rotate(180deg);
         }
         .user-badge-name {
           font-weight: 600;
@@ -320,6 +440,135 @@ export default function Navbar({
           background: rgba(245, 158, 11, 0.2);
           color: #FCD34D;
           border: 1px solid rgba(245, 158, 11, 0.4);
+        }
+
+        /* Profile Dropdown Menu */
+        .profile-dropdown-menu {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 8px);
+          width: 290px;
+          background: rgba(17, 24, 39, 0.97);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          border-radius: var(--radius-lg, 12px);
+          box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 25px rgba(99, 102, 241, 0.12);
+          z-index: 1000;
+          padding: 16px;
+          animation: dropDownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes dropDownIn {
+          from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .profile-menu-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid var(--border-subtle);
+          margin-bottom: 12px;
+        }
+        .profile-avatar {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .profile-meta {
+          min-width: 0;
+          flex: 1;
+        }
+        .profile-name {
+          font-family: var(--font-heading);
+          font-weight: 700;
+          font-size: 0.95rem;
+          color: white;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .profile-title {
+          font-size: 0.75rem;
+          color: #A5B4FC;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .profile-email {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-top: 2px;
+        }
+        .profile-menu-section {
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md, 8px);
+          padding: 10px 12px;
+          margin-bottom: 10px;
+        }
+        .section-subtitle {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+          margin-bottom: 8px;
+        }
+        .profile-info-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.75rem;
+          margin-bottom: 4px;
+        }
+        .profile-info-row:last-child {
+          margin-bottom: 0;
+        }
+        .info-label {
+          color: var(--text-secondary);
+        }
+        .info-value {
+          color: white;
+          font-weight: 600;
+        }
+        .rbac-desc {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          line-height: 1.4;
+        }
+        .rbac-desc strong {
+          color: #34D399;
+        }
+        .profile-menu-footer {
+          margin-top: 12px;
+          padding-top: 10px;
+          border-top: 1px solid var(--border-subtle);
+        }
+        .profile-logout-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          color: #FB7185;
+          border-color: rgba(244, 63, 94, 0.35);
+        }
+        .profile-logout-btn:hover {
+          background: rgba(244, 63, 94, 0.15);
+          border-color: rgba(244, 63, 94, 0.6);
+          color: #FDA4AF;
         }
         .logout-nav-btn {
           display: flex;
