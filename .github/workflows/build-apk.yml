@@ -12,6 +12,8 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      VITE_SUPABASE_URL: https://zqavoaqgbmcdgpseaern.supabase.co
+      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxYXZvYXFnYm1jZGdwc2VhZXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MTAwNzEsImV4cCI6MjEwNDI4NjA3MX0.aEux3R59N_3fjCndysdrQa7CaG4Cn996bPX92JJJhb4
 
     steps:
       - name: Checkout Code

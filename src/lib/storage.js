@@ -175,8 +175,8 @@ export function getSupabaseConfig() {
       // fallback to env variables
     }
   }
-  const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const envUrl = import.meta.env.VITE_SUPABASE_URL || 'https://zqavoaqgbmcdgpseaern.supabase.co';
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxYXZvYXFnYm1jZGdwc2VhZXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MTAwNzEsImV4cCI6MjEwNDI4NjA3MX0.aEux3R59N_3fjCndysdrQa7CaG4Cn996bPX92JJJhb4';
   if (envUrl && envKey) {
     return { url: envUrl, anonKey: envKey, isConnected: true };
   }
