@@ -288,8 +288,18 @@ export function getStaffAccounts() {
       }));
     }
 
+    let admin = { ...INITIAL_STAFF_ACCOUNTS.admin, ...(parsed.admin || {}) };
+    // If local storage has the old deprecated placeholder 'admin' / 'admin123', immediately discard it
+    if (admin.username === 'admin' && admin.password === 'admin123') {
+      admin = { ...INITIAL_STAFF_ACCOUNTS.admin };
+      if (typeof localStorage !== 'undefined') {
+        parsed.admin = admin;
+        localStorage.setItem(STAFF_ACCOUNTS_KEY, JSON.stringify(parsed));
+      }
+    }
+
     return {
-      admin: { ...INITIAL_STAFF_ACCOUNTS.admin, ...(parsed.admin || {}) },
+      admin,
       teacher: teachers[0] || INITIAL_STAFF_ACCOUNTS.teacher,
       teachers
     };

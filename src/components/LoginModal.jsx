@@ -150,7 +150,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
     setParentIdentifier('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     const fErrors = {};
@@ -183,7 +183,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
     if (activeRole === USER_ROLES.PARENT) {
       const res = authenticateParent(parentIdentifier, students);
       if (res.success) {
-        const session = setAuthSession(res.user, rememberMe);
+        const session = setAuthSession(res.user);
         logger.action(res.user, 'PARENT_LOGIN', `Parent authenticated successfully for student ${res.user.studentName}`);
         onLoginSuccess(session);
       } else {
@@ -195,9 +195,16 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         }
       }
     } else {
+      // Sync latest credentials from live Supabase database before validating
+      try {
+        await fetchStaffAccountsFromSupabase();
+      } catch (syncErr) {
+        // Fall back to local credentials if offline
+      }
+
       const res = authenticateStaff(username, password, activeRole);
       if (res.success) {
-        const session = setAuthSession(res.user, rememberMe);
+        const session = setAuthSession(res.user);
         logger.action(res.user, 'STAFF_LOGIN', `Staff user "${res.user.name}" (${res.user.role}) authenticated successfully`);
         onLoginSuccess(session);
       } else {
