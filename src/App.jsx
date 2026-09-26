@@ -368,8 +368,18 @@ export default function App() {
                 setActiveTab={setActiveTab}
                 setSelectedClassFilter={setSelectedClassFilter}
                 setAttendanceViewMode={setAttendanceViewMode}
-                onOpenAdmitModal={() => hasPermission(currentUser, PERMISSIONS.MANAGE_STUDENTS) && setAdmitModalOpen(true)}
-                onOpenFeeCollectModal={() => hasPermission(currentUser, PERMISSIONS.COLLECT_FEES) && setFeeCollectModalOpen(true)}
+                onOpenAdmitModal={() => {
+                  if (hasPermission(currentUser, PERMISSIONS.MANAGE_STUDENTS)) {
+                    setActiveTab('students');
+                    setAdmitModalOpen(true);
+                  }
+                }}
+                onOpenFeeCollectModal={() => {
+                  if (hasPermission(currentUser, PERMISSIONS.COLLECT_FEES)) {
+                    setActiveTab('fees');
+                    setFeeCollectModalOpen(true);
+                  }
+                }}
               />
             )}
 

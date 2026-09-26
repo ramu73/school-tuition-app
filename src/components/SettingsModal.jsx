@@ -24,7 +24,8 @@ import {
   ChevronDown,
   ChevronUp,
   Terminal,
-  Activity
+  Activity,
+  CheckCircle
 } from 'lucide-react';
 import { logger, LOG_LEVELS, LOG_CATEGORIES } from '../lib/logger';
 import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase, syncStaffAccountsToSupabase } from '../lib/supabase';
@@ -79,6 +80,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
   // Teacher Accounts State
   const allBatches = batches.length > 0 ? batches : (getStoredData().batches || INITIAL_BATCHES);
   const allStudents = students.length > 0 ? students : (getStoredData().students || INITIAL_STUDENTS);
+  const availableClasses = ['ALL', ...Array.from(new Set(allStudents.map(s => s.classCode).filter(Boolean))).sort()];
   const [teachers, setTeachers] = useState(initialAccounts.teachers || []);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
   const [newTeacherName, setNewTeacherName] = useState('');
@@ -93,6 +95,29 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
 
   const [expandedTeacherStudentPicker, setExpandedTeacherStudentPicker] = useState({});
   const [teacherStudentSearchQuery, setTeacherStudentSearchQuery] = useState('');
+  // Per-teacher localized feedback for immediate, in-place button & card confirmation
+  const [scopeFeedback, setScopeFeedback] = useState({});
+  // Per-teacher class filter in student picker (e.g. 'ALL', 'CLASS_10', 'CLASS_9')
+  const [teacherStudentClassFilter, setTeacherStudentClassFilter] = useState({});
+
+  const showScopeFeedback = (teacherId, text, isSaved = true) => {
+    setScopeFeedback(prev => ({
+      ...prev,
+      [teacherId]: {
+        saved: isSaved,
+        text,
+        timestamp: Date.now()
+      }
+    }));
+    setTimeout(() => {
+      setScopeFeedback(prev => {
+        if (!prev[teacherId]) return prev;
+        const next = { ...prev };
+        delete next[teacherId];
+        return next;
+      });
+    }, 4000);
+  };
 
   const handleToggleTeacherBatch = (teacherId, batchId) => {
     const teacher = teachers.find(t => t.id === teacherId);
@@ -105,22 +130,36 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
 
     assignBatchesToTeacher(teacherId, updated);
     setTeachers(getTeacherAccounts());
-    setStaffMsg({ type: 'success', text: `Assigned batches updated for ${teacher.name}!` });
+
+    const bObj = allBatches.find(b => String(b.id) === String(batchId));
+    const batchName = bObj ? bObj.name : `Batch #${batchId}`;
+    const msg = exists 
+      ? `Removed batch "${batchName}" from ${teacher.name}. (${updated.length} batches total)`
+      : `✓ Assigned batch "${batchName}" to ${teacher.name}. (${updated.length} batches total)`;
+
+    showScopeFeedback(teacherId, msg, true);
+    setStaffMsg({ type: 'success', text: msg });
     setTimeout(() => setStaffMsg(null), 2500);
   };
 
   const handleAssignAllBatches = (teacherId) => {
+    const teacher = teachers.find(t => t.id === teacherId);
     const allIds = allBatches.map(b => b.id);
     assignBatchesToTeacher(teacherId, allIds);
     setTeachers(getTeacherAccounts());
-    setStaffMsg({ type: 'success', text: `Assigned all batches to teacher!` });
+    const msg = `✓ Assigned all ${allIds.length} batches to ${teacher?.name || 'faculty'}!`;
+    showScopeFeedback(teacherId, msg, true);
+    setStaffMsg({ type: 'success', text: msg });
     setTimeout(() => setStaffMsg(null), 2500);
   };
 
   const handleClearBatches = (teacherId) => {
+    const teacher = teachers.find(t => t.id === teacherId);
     assignBatchesToTeacher(teacherId, []);
     setTeachers(getTeacherAccounts());
-    setStaffMsg({ type: 'success', text: `Cleared batch assignments for teacher!` });
+    const msg = `Cleared batch assignments for ${teacher?.name || 'faculty'}.`;
+    showScopeFeedback(teacherId, msg, true);
+    setStaffMsg({ type: 'success', text: msg });
     setTimeout(() => setStaffMsg(null), 2500);
   };
 
@@ -135,15 +174,70 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
 
     assignStudentsToTeacher(teacherId, updated);
     setTeachers(getTeacherAccounts());
-    setStaffMsg({ type: 'success', text: `Student assignments updated for ${teacher.name}!` });
-    setTimeout(() => setStaffMsg(null), 2500);
+
+    const stObj = allStudents.find(s => String(s.id) === String(studentId));
+    const studentName = stObj ? stObj.name : `Student #${studentId}`;
+    const msg = exists
+      ? `Removed ${studentName} (${updated.length} selected)`
+      : `✓ Added ${studentName} (${updated.length} selected)`;
+
+    showScopeFeedback(teacherId, msg, false);
   };
 
   const handleClearTeacherStudents = (teacherId) => {
+    const teacher = teachers.find(t => t.id === teacherId);
     assignStudentsToTeacher(teacherId, []);
     setTeachers(getTeacherAccounts());
-    setStaffMsg({ type: 'success', text: `Cleared direct student assignments for teacher!` });
+    const msg = `Cleared all direct student assignments for ${teacher?.name || 'faculty'}.`;
+    showScopeFeedback(teacherId, msg, true);
+    setStaffMsg({ type: 'success', text: msg });
     setTimeout(() => setStaffMsg(null), 2500);
+  };
+
+  const handleSelectFilteredStudents = (teacherId, filteredIds) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return;
+    const current = Array.isArray(teacher.assignedStudentIds) ? teacher.assignedStudentIds : [];
+    const combined = [...new Set([...current.map(String), ...filteredIds.map(String)])];
+    assignStudentsToTeacher(teacherId, combined);
+    setTeachers(getTeacherAccounts());
+    const msg = `✓ Added ${filteredIds.length} filtered students to ${teacher.name}! Total: ${combined.length}`;
+    showScopeFeedback(teacherId, msg, true);
+    setStaffMsg({ type: 'success', text: msg });
+    setTimeout(() => setStaffMsg(null), 2500);
+  };
+
+  const handleSaveTeacherStudentScope = (teacherId) => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return;
+    const studentIds = teacher.assignedStudentIds || [];
+
+    // 1. Explicitly persist to staff accounts storage
+    assignStudentsToTeacher(teacherId, studentIds);
+    setTeachers(getTeacherAccounts());
+
+    // 2. Log action to audit logger
+    logger.action(
+      null,
+      'SAVE_TEACHER_STUDENT_SCOPE',
+      `Saved student scope for faculty ${teacher.name} (${studentIds.length} students)`,
+      { teacherId, teacherName: teacher.name, studentCount: studentIds.length }
+    );
+
+    // 3. Dispatch system events so active session / tabs pick up immediately
+    window.dispatchEvent(new CustomEvent('tuition-auth-updated', { detail: { teacherId } }));
+    window.dispatchEvent(new Event('storage'));
+
+    // 4. Localized tactile & visual confirmation right on the teacher card
+    const confirmMsg = `✓ Scope saved successfully! ${teacher.name} will now see ${studentIds.length} assigned student${studentIds.length === 1 ? '' : 's'}.`;
+    showScopeFeedback(teacherId, confirmMsg, true);
+
+    // 5. Also update top global banner
+    setStaffMsg({
+      type: 'success',
+      text: confirmMsg
+    });
+    setTimeout(() => setStaffMsg(null), 4000);
   };
 
   const handleTestAndSave = async (e) => {
@@ -983,7 +1077,18 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                         </div>
                       </div>
 
-                      {/* Scoped Batch Assignment Row */}
+                      {/* Local In-Place Feedback Banner for Teacher Scope */}
+                      {scopeFeedback[teacher.id] && (
+                        <div className={`scope-inline-feedback-banner ${scopeFeedback[teacher.id].saved ? 'success' : 'info'} mt-2 mb-2`}>
+                          {scopeFeedback[teacher.id].saved ? (
+                            <CheckCircle size={15} className="text-emerald-400 flex-shrink-0 animate-bounce" />
+                          ) : (
+                            <Check size={14} className="text-indigo-400 flex-shrink-0" />
+                          )}
+                          <span className="font-semibold">{scopeFeedback[teacher.id].text}</span>
+                        </div>
+                      )}
+
                       {/* Scoped Batch Assignment Row */}
                       <div className="teacher-batches-selector-row">
                         <div className="teacher-batches-header">
@@ -1071,108 +1176,138 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                             </div>
                           </div>
 
-                          {(expandedTeacherStudentPicker[teacher.id] ?? ((teacher.assignedStudentIds || []).length > 0)) && (
-                            <div className="teacher-student-picker-box mt-2">
-                              <div className="search-input-box mb-2">
-                                <Search size={14} className="search-icon" />
-                                <input
-                                  type="text"
-                                  className="form-input text-xs"
-                                  placeholder="Filter student names..."
-                                  value={teacherStudentSearchQuery}
-                                  onChange={(e) => setTeacherStudentSearchQuery(e.target.value)}
-                                />
-                              </div>
+                          {(expandedTeacherStudentPicker[teacher.id] ?? ((teacher.assignedStudentIds || []).length > 0)) && (() => {
+                            const curClassFilter = teacherStudentClassFilter[teacher.id] || 'ALL';
+                            const filteredStudents = allStudents
+                              .filter(s => {
+                                if (!s) return false;
+                                const st = String(s.status || '').toUpperCase();
+                                return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED';
+                              })
+                              .filter(s => {
+                                if (curClassFilter !== 'ALL' && s.classCode !== curClassFilter) return false;
+                                if (!teacherStudentSearchQuery.trim()) return true;
+                                const q = teacherStudentSearchQuery.toLowerCase().trim();
+                                return (s.name && s.name.toLowerCase().includes(q)) || 
+                                       (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
+                              });
 
-                              <div className="teacher-student-chips-list">
-                                {allStudents
-                                  .filter(s => {
-                                    if (!s) return false;
-                                    const st = String(s.status || '').toUpperCase();
-                                    return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED';
-                                  })
-                                  .filter(s => {
-                                    if (!teacherStudentSearchQuery.trim()) return true;
-                                    const q = teacherStudentSearchQuery.toLowerCase().trim();
-                                    return (s.name && s.name.toLowerCase().includes(q)) || 
-                                           (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
-                                  })
-                                  .map(student => {
-                                    const isAssigned = (teacher.assignedStudentIds || []).some(id => String(id) === String(student.id));
-                                    const sBatch = allBatches.find(b => String(b.id) === String(student.batchId));
+                            const isSavedRecently = scopeFeedback[teacher.id]?.saved;
+
+                            return (
+                              <div className="teacher-student-picker-box mt-2">
+                                <div className="search-input-box mb-1.5">
+                                  <Search size={14} className="search-icon" />
+                                  <input
+                                    type="text"
+                                    className="form-input text-xs"
+                                    placeholder="Filter student names or roll numbers..."
+                                    value={teacherStudentSearchQuery}
+                                    onChange={(e) => setTeacherStudentSearchQuery(e.target.value)}
+                                  />
+                                  {teacherStudentSearchQuery && (
+                                    <button
+                                      type="button"
+                                      className="clear-search-btn-inline"
+                                      onClick={() => setTeacherStudentSearchQuery('')}
+                                      title="Clear search"
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Quick Class Standard Filter Chips */}
+                                <div className="scope-class-filter-chips mb-2 flex items-center gap-1 flex-wrap">
+                                  <span className="text-xs text-muted font-medium mr-1">Standard:</span>
+                                  {availableClasses.map(clsCode => {
+                                    const isCurrent = curClassFilter === clsCode;
+                                    const label = clsCode === 'ALL' ? 'All Classes' : clsCode.replace('CLASS_', 'Class ');
                                     return (
                                       <button
-                                        key={student.id}
+                                        key={clsCode}
                                         type="button"
-                                        className={`student-select-pill ${isAssigned ? 'assigned' : ''}`}
-                                        onClick={() => handleToggleTeacherStudent(teacher.id, student.id)}
-                                        title={`Class: ${student.classCode} • Current Batch: ${sBatch?.name || 'Unassigned'}`}
+                                        className={`scope-filter-chip ${isCurrent ? 'active' : ''}`}
+                                        onClick={() => setTeacherStudentClassFilter(prev => ({
+                                          ...prev,
+                                          [teacher.id]: clsCode
+                                        }))}
                                       >
-                                        <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
-                                        <span>{student.name}</span>
-                                        <span className="pill-class-badge font-mono">({(student.classCode || '').replace('CLASS_', '')})</span>
+                                        {label}
                                       </button>
                                     );
                                   })}
-                              </div>
-
-                              {/* Save & Confirm Footer Bar */}
-                              <div className="picker-footer-bar mt-2 pt-2 border-top-subtle flex items-center justify-between flex-wrap gap-2">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary btn-xs text-primary"
-                                    onClick={() => {
-                                      const filteredIds = allStudents
-                                        .filter(s => {
-                                          if (!s) return false;
-                                          const st = String(s.status || '').toUpperCase();
-                                          return st !== 'INACTIVE' && st !== 'DISABLED' && st !== 'DELETED';
-                                        })
-                                        .filter(s => {
-                                          if (!teacherStudentSearchQuery.trim()) return true;
-                                          const q = teacherStudentSearchQuery.toLowerCase().trim();
-                                          return (s.name && s.name.toLowerCase().includes(q)) || 
-                                                 (s.admissionNo && s.admissionNo.toLowerCase().includes(q));
-                                        })
-                                        .map(s => s.id);
-
-                                      const current = Array.isArray(teacher.assignedStudentIds) ? teacher.assignedStudentIds : [];
-                                      const combined = [...new Set([...current.map(String), ...filteredIds.map(String)])];
-                                      assignStudentsToTeacher(teacher.id, combined);
-                                      setTeachers(getTeacherAccounts());
-                                      setStaffMsg({ type: 'success', text: `✓ Added all filtered students to ${teacher.name}!` });
-                                      setTimeout(() => setStaffMsg(null), 2500);
-                                    }}
-                                  >
-                                    Select Filtered
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-secondary btn-xs text-rose-400"
-                                    onClick={() => handleClearTeacherStudents(teacher.id)}
-                                  >
-                                    Clear All
-                                  </button>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-xs flex items-center gap-1.5"
-                                  onClick={() => {
-                                    setStaffMsg({ 
-                                      type: 'success', 
-                                      text: `✓ Saved! ${teacher.name} will now only see these ${(teacher.assignedStudentIds || []).length} assigned students.` 
-                                    });
-                                    setTimeout(() => setStaffMsg(null), 3500);
-                                  }}
-                                >
-                                  <Check size={13} />
-                                  <span>Save Student Scope ({(teacher.assignedStudentIds || []).length} Selected)</span>
-                                </button>
+                                <div className="teacher-student-chips-list">
+                                  {filteredStudents.length === 0 ? (
+                                    <div className="text-xs text-muted p-2 text-center w-full">
+                                      No students match the current search / filter.
+                                    </div>
+                                  ) : (
+                                    filteredStudents.map(student => {
+                                      const isAssigned = (teacher.assignedStudentIds || []).some(id => String(id) === String(student.id));
+                                      const sBatch = allBatches.find(b => String(b.id) === String(student.batchId));
+                                      return (
+                                        <button
+                                          key={student.id}
+                                          type="button"
+                                          className={`student-select-pill ${isAssigned ? 'assigned' : ''}`}
+                                          onClick={() => handleToggleTeacherStudent(teacher.id, student.id)}
+                                          title={`Class: ${student.classCode} • Current Batch: ${sBatch?.name || 'Unassigned'}`}
+                                        >
+                                          <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
+                                          <span>{student.name}</span>
+                                          <span className="pill-class-badge font-mono">({(student.classCode || '').replace('CLASS_', '')})</span>
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+
+                                {/* Save & Confirm Footer Bar */}
+                                <div className="picker-footer-bar mt-2 pt-2 border-top-subtle flex items-center justify-between flex-wrap gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-xs text-primary font-medium"
+                                      onClick={() => handleSelectFilteredStudents(teacher.id, filteredStudents.map(s => s.id))}
+                                      title={`Select all ${filteredStudents.length} displayed students`}
+                                    >
+                                      Select Filtered ({filteredStudents.length})
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-xs text-rose-400 font-medium"
+                                      onClick={() => handleClearTeacherStudents(teacher.id)}
+                                    >
+                                      Clear All
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className={`btn ${isSavedRecently ? 'btn-success' : 'btn-primary'} btn-xs flex items-center gap-1.5 transition-all`}
+                                    style={isSavedRecently ? { boxShadow: '0 0 12px rgba(16, 185, 129, 0.4)' } : {}}
+                                    onClick={() => handleSaveTeacherStudentScope(teacher.id)}
+                                    title="Save and lock this student scope to teacher account"
+                                  >
+                                    {isSavedRecently ? (
+                                      <>
+                                        <CheckCircle size={14} className="text-white animate-pulse" />
+                                        <span className="font-bold">✓ Scope Saved! ({(teacher.assignedStudentIds || []).length} Students)</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Check size={13} />
+                                        <span>Save Student Scope ({(teacher.assignedStudentIds || []).length} Selected)</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1774,6 +1909,64 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
         .pill-class-badge {
           font-size: 0.65rem;
           color: var(--text-muted);
+        }
+        .scope-inline-feedback-banner {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 12px;
+          border-radius: var(--radius-sm);
+          font-size: 0.78rem;
+          transition: all 0.2s ease;
+        }
+        .scope-inline-feedback-banner.success {
+          background: rgba(16, 185, 129, 0.15);
+          border: 1px solid rgba(16, 185, 129, 0.35);
+          color: #A7F3D0;
+        }
+        .scope-inline-feedback-banner.info {
+          background: rgba(99, 102, 241, 0.12);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          color: #C7D2FE;
+        }
+        .scope-class-filter-chips {
+          margin-top: 4px;
+        }
+        .scope-filter-chip {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: var(--text-secondary);
+          padding: 2px 8px;
+          border-radius: var(--radius-full);
+          font-size: 0.7rem;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .scope-filter-chip:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+        }
+        .scope-filter-chip.active {
+          background: rgba(16, 185, 129, 0.2);
+          border-color: rgba(16, 185, 129, 0.45);
+          color: #A7F3D0;
+          font-weight: 600;
+        }
+        .clear-search-btn-inline {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          padding: 2px;
+        }
+        .clear-search-btn-inline:hover {
+          color: white;
         }
 
         .flex { display: flex; }
