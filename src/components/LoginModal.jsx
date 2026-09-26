@@ -382,17 +382,12 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
             </>
           )}
 
-          {/* Remember Me & Session Duration Options */}
+          {/* Session Security Policy Indicator */}
           <div className="login-options-row">
-            <label className="remember-me-label">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="remember-checkbox"
-              />
-              <span>Remember me (7 days)</span>
-            </label>
+            <span className="flex items-center gap-1.5 text-xs text-muted" title="Sessions end immediately when you exit or kill the app for security">
+              <Lock size={12} className="text-amber-400" />
+              <span>Secure Session (Login required on restart)</span>
+            </span>
             <span className="session-policy-hint" title="Sessions auto-lock after 45 minutes of inactivity for security.">
               45m auto-lock
             </span>

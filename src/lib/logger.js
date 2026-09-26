@@ -84,12 +84,11 @@ export function addLog(level, category, message, details = null) {
   // Get active user if available
   let activeUser = 'Anonymous';
   try {
-    if (typeof localStorage !== 'undefined') {
-      const session = localStorage.getItem('hayagriva_auth_session_v1');
-      if (session) {
-        const u = JSON.parse(session);
-        if (u && u.name) activeUser = `${u.name} (${u.role || 'USER'})`;
-      }
+    const raw = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('hayagriva_auth_session_v1')) ||
+                (typeof localStorage !== 'undefined' && localStorage.getItem('hayagriva_auth_session_v1'));
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u && u.name) activeUser = `${u.name} (${u.role || 'USER'})`;
     }
   } catch {
     // ignore

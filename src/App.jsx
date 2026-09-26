@@ -132,6 +132,7 @@ export default function App() {
         } else if (activeTab !== 'dashboard' && currentUser?.role !== USER_ROLES.PARENT) {
           setActiveTab('dashboard');
         } else {
+          clearAuthSession();
           CapApp.exitApp();
         }
       });

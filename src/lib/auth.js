@@ -535,8 +535,15 @@ export function updateStaffAccount(role, updates) {
 // Get active session from storage with real-time validation against registered staff accounts & expiry
 export function getAuthSession() {
   try {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    if (typeof window === 'undefined') return null;
+
+    // Purge any legacy persistent localStorage session to guarantee app kill asks for credentials
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(AUTH_SESSION_KEY)) {
+      localStorage.removeItem(AUTH_SESSION_KEY);
+    }
+
+    if (typeof sessionStorage === 'undefined') return null;
+    const raw = sessionStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw);
     if (!session || !session.role) return null;
@@ -545,7 +552,7 @@ export function getAuthSession() {
     // Validate session expiration timestamp
     if (session.expiresAt && now > session.expiresAt) {
       console.warn('Session expired. Auto-logging out.');
-      localStorage.removeItem(AUTH_SESSION_KEY);
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
       }
@@ -555,7 +562,7 @@ export function getAuthSession() {
     // Validate idle inactivity timeout
     if (session.lastActiveAt && (now - session.lastActiveAt) > SESSION_DURATIONS.IDLE_TIMEOUT_MS) {
       console.warn('Session idle timeout reached. Auto-logging out.');
-      localStorage.removeItem(AUTH_SESSION_KEY);
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
       }
@@ -569,7 +576,7 @@ export function getAuthSession() {
         t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
       );
       if (!currentTeacher) {
-        localStorage.removeItem(AUTH_SESSION_KEY);
+        sessionStorage.removeItem(AUTH_SESSION_KEY);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
         }
@@ -610,31 +617,35 @@ export function getAuthSession() {
 }
 
 // Generate session payload with security metadata
-export function createSessionData(user, rememberMe = true) {
+export function createSessionData(user, rememberMe = false) {
   const now = Date.now();
-  const duration = rememberMe ? SESSION_DURATIONS.REMEMBER_ME_MS : SESSION_DURATIONS.SHORT_SESSION_MS;
+  const duration = SESSION_DURATIONS.SHORT_SESSION_MS;
   return {
     ...user,
     sessionId: user.sessionId || `sess_${now}_${Math.random().toString(36).substring(2, 9)}`,
     createdAt: user.createdAt || now,
     lastActiveAt: now,
     expiresAt: user.expiresAt || (now + duration),
-    rememberMe: Boolean(rememberMe)
+    rememberMe: false
   };
 }
 
-// Save active session with optional rememberMe parameter
-export function setAuthSession(session, rememberMe = true) {
+// Save active session into sessionStorage (destroyed automatically on mobile app kill)
+export function setAuthSession(session, rememberMe = false) {
   let sessionToSave = session;
   if (session && !session.sessionId) {
-    sessionToSave = createSessionData(session, rememberMe);
+    sessionToSave = createSessionData(session, false);
   }
-  if (typeof localStorage !== 'undefined') {
+  if (typeof sessionStorage !== 'undefined') {
     if (!sessionToSave) {
-      localStorage.removeItem(AUTH_SESSION_KEY);
+      sessionStorage.removeItem(AUTH_SESSION_KEY);
     } else {
-      localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionToSave));
+      sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionToSave));
     }
+  }
+  // Clear any persistent localStorage copy so app restart always asks for credentials
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(AUTH_SESSION_KEY);
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: sessionToSave }));
@@ -655,8 +666,8 @@ export function refreshSessionActivity() {
     ...session,
     lastActiveAt: now
   };
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(updated));
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(updated));
   }
   return updated;
 }
@@ -672,15 +683,19 @@ export function extendSession(additionalMinutes = 60) {
     lastActiveAt: now,
     expiresAt: Math.max(session.expiresAt || now, now) + extensionMs
   };
-  setAuthSession(updated, session.rememberMe);
+  setAuthSession(updated, false);
   return updated;
 }
 
 // Clear session / Logout
 export function clearAuthSession() {
   let wasPresent = false;
+  if (typeof sessionStorage !== 'undefined') {
+    wasPresent = wasPresent || !!sessionStorage.getItem(AUTH_SESSION_KEY);
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+  }
   if (typeof localStorage !== 'undefined') {
-    wasPresent = !!localStorage.getItem(AUTH_SESSION_KEY);
+    wasPresent = wasPresent || !!localStorage.getItem(AUTH_SESSION_KEY);
     localStorage.removeItem(AUTH_SESSION_KEY);
   }
   if (wasPresent && typeof window !== 'undefined') {
