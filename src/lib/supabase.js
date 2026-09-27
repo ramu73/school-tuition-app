@@ -300,6 +300,24 @@ export async function syncTuitionDataToSupabase(data) {
   if (!supabase) return { success: false, message: 'Supabase client not connected.' };
 
   try {
+    // 0. Class Levels (Fee Rates & Display Names)
+    if (data.classes && data.classes.length > 0) {
+      for (const cls of data.classes) {
+        if (cls.code && cls.defaultFee !== undefined) {
+          const updatePayload = {
+            default_monthly_fee: Number(cls.defaultFee) || 0
+          };
+          if (cls.name) {
+            updatePayload.display_name = cls.name.replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
+          }
+          await supabase
+            .from('class_levels')
+            .update(updatePayload)
+            .eq('code', cls.code);
+        }
+      }
+    }
+
     // 1. Batches
     if (data.batches && data.batches.length > 0) {
       const validClassCodes = new Set(['CLASS_1', 'CLASS_2', 'CLASS_3', 'CLASS_4', 'CLASS_5', 'CLASS_6', 'CLASS_7', 'CLASS_8', 'CLASS_9', 'CLASS_10', 'ALL']);
