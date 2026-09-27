@@ -8,6 +8,7 @@ import {
   X, 
   BookOpen, 
   Trash2, 
+  Edit,
   UserPlus, 
   Search, 
   Check, 
@@ -40,6 +41,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
     : batches;
 
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [editingBatch, setEditingBatch] = useState(null); // null = create mode, object = edit mode
   const [selectedBatchForRoster, setSelectedBatchForRoster] = useState(null);
   const [manageStudentsBatch, setManageStudentsBatch] = useState(null);
   const [batchStudentSearchQuery, setBatchStudentSearchQuery] = useState('');
@@ -49,7 +51,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
   const [batchErrors, setBatchErrors] = useState({});
   const [feedbackStudent, setFeedbackStudent] = useState(null);
 
-  // Integrated Student Assignment during Batch Creation
+  // Integrated Student Assignment during Batch Creation & Edit
   const [createBatchSelectedStudentIds, setCreateBatchSelectedStudentIds] = useState([]);
   const [createBatchStudentSearch, setCreateBatchStudentSearch] = useState('');
   const [createBatchClassFilter, setCreateBatchClassFilter] = useState('ALL');
@@ -86,7 +88,46 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
     capacity: 25
   });
 
-  const handleCreateBatch = (e) => {
+  const handleOpenCreateBatch = () => {
+    setEditingBatch(null);
+    setBatchErrors({});
+    setCreateBatchSelectedStudentIds([]);
+    setCreateBatchStudentSearch('');
+    setCreateBatchClassFilter('ALL');
+    setCreateBatchUnassignedOnly(false);
+    setNewBatch({
+      name: '',
+      classCode: 'ALL',
+      timing: '05:00 PM - 06:30 PM',
+      tutor: '',
+      room: 'Hall A',
+      capacity: 25
+    });
+    setBatchModalOpen(true);
+  };
+
+  const handleOpenEditBatch = (batch) => {
+    setEditingBatch(batch);
+    setBatchErrors({});
+    const currentlyEnrolled = students
+      .filter(s => String(s.batchId) === String(batch.id))
+      .map(s => s.id);
+    setCreateBatchSelectedStudentIds(currentlyEnrolled);
+    setCreateBatchStudentSearch('');
+    setCreateBatchClassFilter(batch.classCode || 'ALL');
+    setCreateBatchUnassignedOnly(false);
+    setNewBatch({
+      name: batch.name || '',
+      classCode: batch.classCode || 'ALL',
+      timing: batch.timing || '05:00 PM - 06:30 PM',
+      tutor: batch.tutor || '',
+      room: batch.room || 'Hall A',
+      capacity: batch.capacity || 25
+    });
+    setBatchModalOpen(true);
+  };
+
+  const handleSaveBatch = (e) => {
     e.preventDefault();
     const errors = {};
 
@@ -106,58 +147,107 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
 
     if (Object.keys(errors).length > 0) {
       setBatchErrors(errors);
-      logger.warn(logger.CATEGORIES.VALIDATION, 'Batch creation validation failed', { errors, attemptedBatch: newBatch.name });
+      logger.warn(logger.CATEGORIES.VALIDATION, 'Batch validation failed', { errors, attemptedBatch: newBatch.name });
       return;
     }
 
-    const createdId = generateNextId(batches);
-    const created = {
-      id: createdId,
-      name: newBatch.name.trim(),
-      classCode: newBatch.classCode,
-      timing: newBatch.timing.trim(),
-      tutor: newBatch.tutor.trim(),
-      room: (newBatch.room || 'Main Hall').trim(),
-      capacity: Number(newBatch.capacity) || 25
-    };
+    if (editingBatch) {
+      // EDIT MODE
+      const targetBatchId = Number(editingBatch.id);
+      const updatedBatchObj = {
+        ...editingBatch,
+        name: newBatch.name.trim(),
+        classCode: newBatch.classCode,
+        timing: newBatch.timing.trim(),
+        tutor: newBatch.tutor.trim(),
+        room: (newBatch.room || 'Main Hall').trim(),
+        capacity: Number(newBatch.capacity) || 25
+      };
 
-    // If students were assigned during creation, assign them to the new batch
-    let updatedStudents = [...students];
-    if (createBatchSelectedStudentIds.length > 0) {
-      updatedStudents = updatedStudents.map(s => {
-        if (createBatchSelectedStudentIds.some(id => String(id) === String(s.id))) {
-          return { ...s, batchId: createdId };
+      const updatedBatches = batches.map(b => Number(b.id) === targetBatchId ? updatedBatchObj : b);
+
+      // Synchronize student assignments for this batch
+      const updatedStudents = students.map(s => {
+        const isSelected = createBatchSelectedStudentIds.some(id => String(id) === String(s.id));
+        const wasInBatch = Number(s.batchId) === targetBatchId;
+
+        if (isSelected && !wasInBatch) {
+          return { ...s, batchId: targetBatchId };
+        }
+        if (!isSelected && wasInBatch) {
+          return { ...s, batchId: null };
         }
         return s;
       });
+
+      onSaveData({
+        ...data,
+        batches: updatedBatches,
+        students: updatedStudents
+      });
+
+      logger.action(currentUser, 'UPDATE_BATCH', `Updated batch slot "${updatedBatchObj.name}" with ${createBatchSelectedStudentIds.length} assigned students`, {
+        batchId: updatedBatchObj.id,
+        timing: updatedBatchObj.timing,
+        tutor: updatedBatchObj.tutor,
+        assignedCount: createBatchSelectedStudentIds.length
+      });
+
+      setBatchModalOpen(false);
+      setEditingBatch(null);
+      setBatchErrors({});
+      setCreateBatchSelectedStudentIds([]);
+    } else {
+      // CREATE MODE
+      const createdId = generateNextId(batches);
+      const created = {
+        id: createdId,
+        name: newBatch.name.trim(),
+        classCode: newBatch.classCode,
+        timing: newBatch.timing.trim(),
+        tutor: newBatch.tutor.trim(),
+        room: (newBatch.room || 'Main Hall').trim(),
+        capacity: Number(newBatch.capacity) || 25
+      };
+
+      // If students were assigned during creation, assign them to the new batch
+      let updatedStudents = [...students];
+      if (createBatchSelectedStudentIds.length > 0) {
+        updatedStudents = updatedStudents.map(s => {
+          if (createBatchSelectedStudentIds.some(id => String(id) === String(s.id))) {
+            return { ...s, batchId: createdId };
+          }
+          return s;
+        });
+      }
+
+      onSaveData({
+        ...data,
+        batches: [...batches, created],
+        students: updatedStudents
+      });
+
+      logger.action(currentUser, 'CREATE_BATCH', `Created batch slot "${created.name}" with ${createBatchSelectedStudentIds.length} assigned students`, {
+        batchId: created.id,
+        tutor: created.tutor,
+        assignedCount: createBatchSelectedStudentIds.length
+      });
+
+      setBatchModalOpen(false);
+      setBatchErrors({});
+      setCreateBatchSelectedStudentIds([]);
+      setCreateBatchStudentSearch('');
+      setCreateBatchClassFilter('ALL');
+      setCreateBatchUnassignedOnly(false);
+      setNewBatch({
+        name: '',
+        classCode: 'ALL',
+        timing: '05:00 PM - 06:30 PM',
+        tutor: '',
+        room: 'Hall A',
+        capacity: 25
+      });
     }
-
-    onSaveData({
-      ...data,
-      batches: [...batches, created],
-      students: updatedStudents
-    });
-
-    logger.action(currentUser, 'CREATE_BATCH', `Created batch slot "${created.name}" with ${createBatchSelectedStudentIds.length} assigned students`, {
-      batchId: created.id,
-      tutor: created.tutor,
-      assignedCount: createBatchSelectedStudentIds.length
-    });
-
-    setBatchModalOpen(false);
-    setBatchErrors({});
-    setCreateBatchSelectedStudentIds([]);
-    setCreateBatchStudentSearch('');
-    setCreateBatchClassFilter('ALL');
-    setCreateBatchUnassignedOnly(false);
-    setNewBatch({
-      name: '',
-      classCode: 'ALL',
-      timing: '05:00 PM - 06:30 PM',
-      tutor: '',
-      room: 'Hall A',
-      capacity: 25
-    });
   };
 
   const handleDeleteBatch = (batchId) => {
@@ -287,7 +377,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
           </p>
         </div>
         {!isTeacher && (
-          <button className="btn btn-primary" onClick={() => setBatchModalOpen(true)}>
+          <button className="btn btn-primary" onClick={handleOpenCreateBatch}>
             <Plus size={16} />
             <span>Add New Batch</span>
           </button>
@@ -359,13 +449,22 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                   <span className="badge badge-class">All Standards (Multi-Class)</span>
                 )}
                 {!isTeacher && (
-                  <button 
-                    className="btn-delete-mini"
-                    title="Delete Batch"
-                    onClick={() => handleDeleteBatch(batch.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      className="btn-edit-mini"
+                      title="Edit Batch Slot"
+                      onClick={() => handleOpenEditBatch(batch)}
+                    >
+                      <Edit size={14} />
+                    </button>
+                    <button 
+                      className="btn-delete-mini"
+                      title="Delete Batch"
+                      onClick={() => handleDeleteBatch(batch.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -412,12 +511,22 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                 </button>
                 {!isTeacher && (
                   <button 
+                    className="btn btn-secondary btn-sm flex-1 text-primary"
+                    onClick={() => handleOpenEditBatch(batch)}
+                    title="Edit Batch Details & Timetable"
+                  >
+                    <Edit size={14} />
+                    <span>Edit</span>
+                  </button>
+                )}
+                {!isTeacher && (
+                  <button 
                     className="btn btn-secondary btn-sm flex-1 text-emerald"
                     onClick={() => handleOpenManageStudents(batch)}
                     title="Assign or change students in this batch by name"
                   >
                     <UserPlus size={14} />
-                    <span>Assign Students</span>
+                    <span>Assign</span>
                   </button>
                 )}
                 <button 
@@ -442,17 +551,29 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
             <div className="modal-header">
               <div>
                 <h2 className="modal-title flex items-center gap-2">
-                  <Plus size={20} className="text-primary" />
-                  <span>Create Class Batch & Assign Students</span>
+                  {editingBatch ? (
+                    <>
+                      <Edit size={20} className="text-primary" />
+                      <span>Edit Batch: {editingBatch.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={20} className="text-primary" />
+                      <span>Create Class Batch & Assign Students</span>
+                    </>
+                  )}
                 </h2>
                 <div className="text-xs text-muted mt-0.5">
-                  Set batch timetable slot and optionally enroll students immediately
+                  {editingBatch 
+                    ? 'Update batch schedule, teacher, classroom, seat limit, or enrolled student roster'
+                    : 'Set batch timetable slot and optionally enroll students immediately'}
                 </div>
               </div>
               <button 
                 className="close-btn" 
                 onClick={() => { 
                   setBatchModalOpen(false); 
+                  setEditingBatch(null);
                   setBatchErrors({});
                   setCreateBatchSelectedStudentIds([]);
                 }}
@@ -461,7 +582,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
               </button>
             </div>
 
-            <form onSubmit={handleCreateBatch} className="admission-form">
+            <form onSubmit={handleSaveBatch} className="admission-form">
               {Object.keys(batchErrors).length > 0 && (
                 <div className="form-error-banner" style={{
                   padding: '10px 14px',
@@ -779,6 +900,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                   className="btn btn-secondary" 
                   onClick={() => { 
                     setBatchModalOpen(false); 
+                    setEditingBatch(null);
                     setBatchErrors({}); 
                     setCreateBatchSelectedStudentIds([]);
                   }}
@@ -788,9 +910,11 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                 <button type="submit" className="btn btn-primary">
                   <Check size={16} />
                   <span>
-                    {createBatchSelectedStudentIds.length > 0 
-                      ? `Create Batch & Assign ${createBatchSelectedStudentIds.length} Students`
-                      : 'Create Batch Slot'}
+                    {editingBatch 
+                      ? 'Save Batch Changes' 
+                      : (createBatchSelectedStudentIds.length > 0 
+                          ? `Create Batch & Assign ${createBatchSelectedStudentIds.length} Students`
+                          : 'Create Batch Slot')}
                   </span>
                 </button>
               </div>
@@ -1113,9 +1237,32 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
           border: none;
           color: var(--text-muted);
           cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px;
+          border-radius: var(--radius-sm);
+          transition: all 0.15s ease;
         }
         .btn-delete-mini:hover {
           color: var(--rose-500);
+          background: rgba(244, 63, 94, 0.12);
+        }
+        .btn-edit-mini {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 3px;
+          border-radius: var(--radius-sm);
+          transition: all 0.15s ease;
+        }
+        .btn-edit-mini:hover {
+          color: var(--primary-400);
+          background: rgba(99, 102, 241, 0.12);
         }
         .batch-title {
           font-size: 1.15rem;
