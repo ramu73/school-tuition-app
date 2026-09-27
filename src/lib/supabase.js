@@ -718,19 +718,21 @@ export async function syncStaffAccountsToSupabase(accounts) {
         return { success: false, error: upsertErr.message };
       }
 
-      // Delete any teacher accounts from Supabase that were deleted locally
+      // Safely delete only those teacher accounts in Supabase that were removed locally
       const validTeacherIds = teachersList.map(t => t.id).filter(Boolean);
-      if (validTeacherIds.length > 0) {
-        await supabase
-          .from('staff_accounts')
-          .delete()
-          .eq('role', 'TEACHER')
-          .not('id', 'in', `(${validTeacherIds.map(id => `'${id}'`).join(',')})`);
-      } else {
-        await supabase
-          .from('staff_accounts')
-          .delete()
-          .eq('role', 'TEACHER');
+      const { data: existingDbTeachers } = await supabase
+        .from('staff_accounts')
+        .select('id')
+        .eq('role', 'TEACHER');
+
+      if (Array.isArray(existingDbTeachers) && existingDbTeachers.length > 0) {
+        const idsToDelete = existingDbTeachers
+          .map(row => row.id)
+          .filter(id => !validTeacherIds.includes(id));
+
+        for (const staleId of idsToDelete) {
+          await supabase.from('staff_accounts').delete().eq('id', staleId);
+        }
       }
     }
 
@@ -740,3 +742,15 @@ export async function syncStaffAccountsToSupabase(accounts) {
     return { success: false, error: err.message };
   }
 }
+
+// Global browser event listener: auto-sync staff accounts whenever local changes occur
+if (typeof window !== 'undefined') {
+  window.addEventListener('hayagriva-staff-sync-to-db', (e) => {
+    if (e && e.detail) {
+      syncStaffAccountsToSupabase(e.detail).catch(err => {
+        console.warn('Background auto-sync of staff accounts to Supabase failed:', err);
+      });
+    }
+  });
+}
+

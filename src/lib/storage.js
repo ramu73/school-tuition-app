@@ -208,19 +208,27 @@ export function saveStoredData(data) {
 
 // Supabase Connection Credentials Storage
 export function getSupabaseConfig() {
-  const stored = localStorage.getItem(SUPABASE_CONFIG_KEY);
+  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || 'https://zqavoaqgbmcdgpseaern.supabase.co';
+  const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxYXZvYXFnYm1jZGdwc2VhZXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MTAwNzEsImV4cCI6MjEwNDI4NjA3MX0.aEux3R59N_3fjCndysdrQa7CaG4Cn996bPX92JJJhb4';
+
+  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(SUPABASE_CONFIG_KEY) : null;
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
+      // User explicitly disconnected
+      if (parsed.url === '' && parsed.anonKey === '') {
+        return { url: '', anonKey: '', isConnected: false };
+      }
       if (parsed.url && parsed.anonKey) {
-        return parsed;
+        return {
+          ...parsed,
+          isConnected: parsed.isConnected !== false
+        };
       }
     } catch (e) {
       // fallback to env variables
     }
   }
-  const envUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) || 'https://zqavoaqgbmcdgpseaern.supabase.co';
-  const envKey = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxYXZvYXFnYm1jZGdwc2VhZXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MTAwNzEsImV4cCI6MjEwNDI4NjA3MX0.aEux3R59N_3fjCndysdrQa7CaG4Cn996bPX92JJJhb4';
   if (envUrl && envKey) {
     return { url: envUrl, anonKey: envKey, isConnected: true };
   }

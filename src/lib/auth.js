@@ -302,6 +302,10 @@ export function saveStaffAccounts(accounts) {
       }
     }
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hayagriva-staff-sync-to-db', { detail: accounts }));
+    }
+
     return { success: true };
   } catch (err) {
     console.error('Failed to save staff accounts:', err);

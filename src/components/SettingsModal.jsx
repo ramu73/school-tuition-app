@@ -113,6 +113,32 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
   const [scopeFeedback, setScopeFeedback] = useState({});
   // Per-teacher class filter in student picker (e.g. 'ALL', 'CLASS_10', 'CLASS_9')
   const [teacherStudentClassFilter, setTeacherStudentClassFilter] = useState({});
+  const [isSyncingFaculty, setIsSyncingFaculty] = useState(false);
+
+  const handleSyncTeachersToDb = async () => {
+    setIsSyncingFaculty(true);
+    try {
+      const accounts = getStaffAccounts();
+      const res = await syncStaffAccountsToSupabase(accounts);
+      if (res && res.success) {
+        setStaffMsg({
+          type: 'success',
+          text: `✓ Successfully synced ${(accounts.teachers || []).length} faculty accounts directly to Supabase Database (staff_accounts table)!`
+        });
+      } else {
+        const err = res?.error || res?.message || 'Check database connection';
+        setStaffMsg({
+          type: 'error',
+          text: `Database sync failed: ${err}`
+        });
+      }
+    } catch (err) {
+      setStaffMsg({ type: 'error', text: 'Sync error: ' + err.message });
+    } finally {
+      setIsSyncingFaculty(false);
+      setTimeout(() => setStaffMsg(null), 5000);
+    }
+  };
 
   const showScopeFeedback = (teacherId, text, isSaved = true) => {
     setScopeFeedback(prev => ({
@@ -410,12 +436,9 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
         }
       }
 
-      // Sync to Supabase PostgreSQL so other devices / logins immediately have the new teacher in Database
-      let dbSynced = false;
-      if (getSupabaseConfig().isConnected) {
-        const syncRes = await syncStaffAccountsToSupabase(getStaffAccounts());
-        dbSynced = syncRes && syncRes.success;
-      }
+      // Always sync to Supabase PostgreSQL so other devices / logins immediately have the new teacher in Database
+      const syncRes = await syncStaffAccountsToSupabase(getStaffAccounts());
+      const dbSynced = syncRes && syncRes.success;
 
       setNewTeacherName('');
       setNewTeacherSubject('');
@@ -426,11 +449,20 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
       setNewTeacherBatches([]);
       setNewTeacherStudents([]);
       setNewTeacherStudentQuery('');
-      setStaffMsg({ 
-        type: 'success', 
-        text: `✓ Teacher "${newTeacherName}" account created! Username: "${newTeacherUsername}"${dbSynced ? ' (Saved to Database)' : ''}` 
-      });
-      setTimeout(() => setStaffMsg(null), 4000);
+
+      if (dbSynced) {
+        setStaffMsg({ 
+          type: 'success', 
+          text: `✓ Teacher "${newTeacherName.trim()}" account created & saved to Supabase Database (staff_accounts)!` 
+        });
+      } else {
+        const errDetail = syncRes?.error || syncRes?.message || 'Database sync issue';
+        setStaffMsg({ 
+          type: 'warning', 
+          text: `Teacher "${newTeacherName.trim()}" saved locally, but database sync returned: ${errDetail}` 
+        });
+      }
+      setTimeout(() => setStaffMsg(null), 5000);
     } else {
       setStaffMsg({ type: 'error', text: res.message || 'Failed to create teacher' });
       setTimeout(() => setStaffMsg(null), 4000);
@@ -510,21 +542,25 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
         saveStoredData({ ...stored, batches: updatedBatches });
       }
 
-      // Sync to Supabase PostgreSQL Database immediately!
-      let dbSynced = false;
-      const config = getSupabaseConfig();
-      if (config.isConnected) {
-        const syncRes = await syncStaffAccountsToSupabase(getStaffAccounts());
-        dbSynced = syncRes && syncRes.success;
-      }
+      // Always sync to Supabase PostgreSQL Database immediately!
+      const syncRes = await syncStaffAccountsToSupabase(getStaffAccounts());
+      const dbSynced = syncRes && syncRes.success;
 
       setTeachers(getTeacherAccounts());
       setEditingTeacherId(null);
-      setStaffMsg({
-        type: 'success',
-        text: `✓ Teacher "${editTeacherName}" credentials updated successfully!${dbSynced ? ' (Synced to Supabase DB)' : ''}`
-      });
-      setTimeout(() => setStaffMsg(null), 4000);
+      if (dbSynced) {
+        setStaffMsg({
+          type: 'success',
+          text: `✓ Teacher "${editTeacherName.trim()}" credentials updated & saved to Supabase Database (staff_accounts)!`
+        });
+      } else {
+        const errDetail = syncRes?.error || syncRes?.message || 'Database sync issue';
+        setStaffMsg({
+          type: 'warning',
+          text: `Credentials updated locally, but database sync returned: ${errDetail}`
+        });
+      }
+      setTimeout(() => setStaffMsg(null), 5000);
     } catch (err) {
       setStaffMsg({ type: 'error', text: 'Error updating teacher: ' + err.message });
     } finally {
@@ -565,13 +601,11 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
           saveStoredData({ ...stored, batches: updatedBatches });
         }
 
-        // Sync deletion to Supabase PostgreSQL cloud so all other devices and logins purge the deleted teacher
-        if (getSupabaseConfig().isConnected) {
-          await syncStaffAccountsToSupabase(getStaffAccounts());
-        }
+        // Always sync deletion to Supabase PostgreSQL cloud so all other devices and logins purge the deleted teacher
+        await syncStaffAccountsToSupabase(getStaffAccounts());
 
-        setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted from Database & Local Storage.` });
-        setTimeout(() => setStaffMsg(null), 3000);
+        setStaffMsg({ type: 'success', text: `✓ Teacher "${teacherName}" deleted from Database & Local Storage.` });
+        setTimeout(() => setStaffMsg(null), 4000);
       } else {
         setStaffMsg({ type: 'error', text: res.message || 'Failed to delete teacher' });
         setTimeout(() => setStaffMsg(null), 3500);
@@ -908,16 +942,39 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                     <span className="badge badge-class ml-2">{teachers.length} Active</span>
                   </div>
                 </div>
-                {!showAddTeacher && (
+                <div className="flex items-center gap-2">
                   <button 
                     type="button" 
-                    className="btn btn-success btn-sm"
-                    onClick={() => setShowAddTeacher(true)}
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleSyncTeachersToDb}
+                    disabled={isSyncingFaculty}
+                    title="Directly save/sync all faculty accounts to Supabase PostgreSQL Database"
                   >
-                    <Plus size={14} />
-                    <span>Add New Teacher</span>
+                    <RefreshCw size={13} className={isSyncingFaculty ? 'animate-spin' : ''} />
+                    <span>{isSyncingFaculty ? 'Syncing...' : 'Sync to Database'}</span>
                   </button>
-                )}
+                  {!showAddTeacher && (
+                    <button 
+                      type="button" 
+                      className="btn btn-success btn-sm"
+                      onClick={() => setShowAddTeacher(true)}
+                    >
+                      <Plus size={14} />
+                      <span>Add New Teacher</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Database Status Info Banner */}
+              <div className="flex items-center justify-between p-2 mb-3 rounded text-xs" style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                <span className="text-slate-300 flex items-center gap-1.5">
+                  <Database size={13} className="text-indigo-400" />
+                  Database Table: <strong className="text-white">staff_accounts</strong> (Supabase PostgreSQL)
+                </span>
+                <span className="text-xs text-indigo-300 font-medium">
+                  {teachers.length} Teacher{teachers.length === 1 ? '' : 's'} Configured
+                </span>
               </div>
 
               {/* Add New Teacher Form */}
