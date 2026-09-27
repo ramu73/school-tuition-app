@@ -109,7 +109,7 @@ export async function fetchTuitionDataFromSupabase() {
     const batches = (batchesRes.data || []).map(b => ({
       id: b.id,
       name: b.batch_name,
-      classCode: b.class_code,
+      classCode: b.class_code || 'ALL',
       timing: b.timing,
       tutor: b.tutor_name,
       room: b.room_number || '',
@@ -244,16 +244,24 @@ export async function syncTuitionDataToSupabase(data) {
   try {
     // 1. Batches
     if (data.batches && data.batches.length > 0) {
+      const validClassCodes = new Set(['CLASS_1', 'CLASS_2', 'CLASS_3', 'CLASS_4', 'CLASS_5', 'CLASS_6', 'CLASS_7', 'CLASS_8', 'CLASS_9', 'CLASS_10', 'ALL']);
+      if (Array.isArray(data.classes)) {
+        data.classes.forEach(c => c?.code && validClassCodes.add(c.code));
+      }
+
       const batchRows = data.batches.map(b => ({
         id: b.id,
         batch_name: b.name,
-        class_code: b.classCode,
+        class_code: b.classCode && validClassCodes.has(b.classCode) ? b.classCode : (b.classCode === 'ALL' ? 'ALL' : null),
         timing: b.timing,
         tutor_name: b.tutor,
         room_number: b.room || '',
         max_capacity: b.capacity || 25
       }));
-      await supabase.from('batches').upsert(batchRows, { onConflict: 'id' });
+      const { error: batchErr } = await supabase.from('batches').upsert(batchRows, { onConflict: 'id' });
+      if (batchErr) {
+        console.error('Failed to sync batches to Supabase:', batchErr);
+      }
 
       // Clean deleted batches
       const batchIds = data.batches.map(b => b.id);
