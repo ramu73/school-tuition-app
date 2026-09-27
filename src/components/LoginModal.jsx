@@ -20,15 +20,12 @@ import { fetchStaffAccountsFromSupabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 
 export default function LoginModal({ onLoginSuccess, students = [] }) {
-  // Detect if Admin access was explicitly requested via URL parameter or preserved in localStorage
+  // Detect if Admin access was explicitly requested via URL parameter or hash
   const detectInitialAdminAccess = () => {
     try {
       const params = new URLSearchParams(window.location.search);
       const hash = window.location.hash || '';
       if (params.get('admin') === 'true' || params.get('admin') === '1' || params.get('role') === 'admin' || hash.toLowerCase().includes('admin')) {
-        return true;
-      }
-      if (localStorage.getItem('hayagriva_admin_unlocked') === 'true') {
         return true;
       }
     } catch (e) {
@@ -39,6 +36,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
 
   const initialAdminVisible = detectInitialAdminAccess();
   const [isAdminVisible, setIsAdminVisible] = useState(initialAdminVisible);
+  // Default to PARENT login on startup/logout unless URL explicitly specifies admin
   const [activeRole, setActiveRole] = useState(initialAdminVisible ? USER_ROLES.ADMIN : USER_ROLES.PARENT);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -55,8 +53,12 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const [lastLogoClickTime, setLastLogoClickTime] = useState(0);
   const [adminUnlockToast, setAdminUnlockToast] = useState(false);
 
-  // Fetch latest staff & admin credentials from Supabase on mount
+  // Purge any stale admin unlock flags from previous sessions and fetch staff credentials
   useEffect(() => {
+    try {
+      localStorage.removeItem('hayagriva_admin_unlocked');
+      sessionStorage.removeItem('hayagriva_admin_unlocked');
+    } catch (e) {}
     fetchStaffAccountsFromSupabase().catch(() => {});
   }, []);
 
@@ -70,11 +72,9 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
           if (next) {
             setActiveRole(USER_ROLES.ADMIN);
             setAdminUnlockToast(true);
-            localStorage.setItem('hayagriva_admin_unlocked', 'true');
             logger.info(logger.CATEGORIES.AUTH, 'Admin login tab revealed via keyboard shortcut (Ctrl+Shift+A)');
             setTimeout(() => setAdminUnlockToast(false), 3500);
           } else {
-            localStorage.removeItem('hayagriva_admin_unlocked');
             setActiveRole(USER_ROLES.PARENT);
             logger.info(logger.CATEGORIES.AUTH, 'Admin login tab hidden via keyboard shortcut');
           }
@@ -101,7 +101,6 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
         setIsAdminVisible(true);
         setActiveRole(USER_ROLES.ADMIN);
         setAdminUnlockToast(true);
-        localStorage.setItem('hayagriva_admin_unlocked', 'true');
         logger.info(logger.CATEGORIES.AUTH, 'Admin login tab unlocked via Logo triple-click gesture');
         setTimeout(() => setAdminUnlockToast(false), 3500);
         setLogoClickCount(0);
@@ -112,7 +111,6 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
   const handleLockAdmin = () => {
     setIsAdminVisible(false);
     setActiveRole(USER_ROLES.PARENT);
-    localStorage.removeItem('hayagriva_admin_unlocked');
     logger.info(logger.CATEGORIES.AUTH, 'Admin login tab hidden / re-locked');
   };
 

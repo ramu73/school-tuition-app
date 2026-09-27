@@ -660,10 +660,12 @@ export function clearAuthSession() {
   if (typeof sessionStorage !== 'undefined') {
     wasPresent = wasPresent || !!sessionStorage.getItem(AUTH_SESSION_KEY);
     sessionStorage.removeItem(AUTH_SESSION_KEY);
+    sessionStorage.removeItem('hayagriva_admin_unlocked');
   }
   if (typeof localStorage !== 'undefined') {
     wasPresent = wasPresent || !!localStorage.getItem(AUTH_SESSION_KEY);
     localStorage.removeItem(AUTH_SESSION_KEY);
+    localStorage.removeItem('hayagriva_admin_unlocked');
   }
   if (wasPresent && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('hayagriva-auth-changed', { detail: null }));
