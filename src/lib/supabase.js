@@ -76,6 +76,10 @@ export async function fetchTuitionDataFromSupabase() {
       return null;
     }
 
+    if (batchesRes.error) {
+      console.warn('Could not query batches table from Supabase:', batchesRes.error);
+    }
+
     const classes = (classesRes.data && classesRes.data.length > 0)
       ? classesRes.data.map(c => {
           let cleanName = (c.display_name || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
@@ -266,7 +270,7 @@ export async function syncTuitionDataToSupabase(data) {
       // Clean deleted batches
       const batchIds = data.batches.map(b => b.id);
       await supabase.from('batches').delete().not('id', 'in', `(${batchIds.join(',')})`);
-    } else {
+    } else if (Array.isArray(data.batches)) {
       await supabase.from('batches').delete().neq('id', 0);
     }
 
@@ -295,7 +299,7 @@ export async function syncTuitionDataToSupabase(data) {
       // Clean deleted students
       const studentIds = data.students.map(s => s.id);
       await supabase.from('students').delete().not('id', 'in', `(${studentIds.join(',')})`);
-    } else {
+    } else if (Array.isArray(data.students)) {
       await supabase.from('students').delete().neq('id', 0);
     }
 

@@ -152,6 +152,80 @@ export default function App() {
     }
   }, [currentUser, activeTab]);
 
+  const handleStaffChange = useCallback(() => {
+    const session = getAuthSession();
+    if (!session) {
+      setCurrentUser(null);
+      return;
+    }
+    if (session.role === USER_ROLES.TEACHER) {
+      const accounts = getStaffAccounts();
+      const freshTeacher = (accounts.teachers || []).find(
+        t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
+      );
+      if (freshTeacher) {
+        const updatedUser = {
+          ...session,
+          id: freshTeacher.id,
+          name: freshTeacher.name,
+          title: freshTeacher.title || session.title,
+          subject: freshTeacher.subject || session.subject,
+          email: freshTeacher.email || session.email,
+          phone: freshTeacher.phone || session.phone,
+          assignedBatchIds: freshTeacher.assignedBatchIds || [],
+          assignedStudentIds: freshTeacher.assignedStudentIds || []
+        };
+        setCurrentUser(updatedUser);
+        setAuthSession(updatedUser);
+      } else {
+        // The teacher account was deleted by Admin! Invalidate immediately
+        clearAuthSession();
+        setCurrentUser(null);
+      }
+    } else if (session.role === USER_ROLES.ADMIN) {
+      const accounts = getStaffAccounts();
+      if (accounts.admin) {
+        const updatedAdmin = {
+          ...session,
+          name: accounts.admin.name || session.name,
+          title: accounts.admin.title || session.title,
+          email: accounts.admin.email || session.email
+        };
+        setCurrentUser(updatedAdmin);
+      }
+    } else {
+      setCurrentUser(session);
+    }
+  }, []);
+
+  const loadFromSupabase = useCallback(async () => {
+    const config = getSupabaseConfig();
+    if (!config.isConnected) return;
+
+    setIsSyncing(true);
+    try {
+      const [remote, remoteStaff] = await Promise.all([
+        fetchTuitionDataFromSupabase(),
+        fetchStaffAccountsFromSupabase()
+      ]);
+      if (remoteStaff) {
+        handleStaffChange();
+      }
+      if (remote) {
+        if (remote.hasData) {
+          setData(remote);
+          saveStoredData(remote);
+        } else {
+          console.log('Connected to Supabase PostgreSQL. Tables are ready.');
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase initial fetch warning:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [handleStaffChange]);
+
   // Sync data whenever changed locally or by custom event
   useEffect(() => {
     const handleDbUpdate = (e) => {
@@ -164,52 +238,6 @@ export default function App() {
 
     const handleAuthChange = (e) => {
       setCurrentUser(e.detail !== undefined ? e.detail : getAuthSession());
-    };
-
-    const handleStaffChange = () => {
-      const session = getAuthSession();
-      if (!session) {
-        setCurrentUser(null);
-        return;
-      }
-      if (session.role === USER_ROLES.TEACHER) {
-        const accounts = getStaffAccounts();
-        const freshTeacher = (accounts.teachers || []).find(
-          t => t.id === session.id || t.username?.toLowerCase() === session.username?.toLowerCase()
-        );
-        if (freshTeacher) {
-          const updatedUser = {
-            ...session,
-            id: freshTeacher.id,
-            name: freshTeacher.name,
-            title: freshTeacher.title || session.title,
-            subject: freshTeacher.subject || session.subject,
-            email: freshTeacher.email || session.email,
-            phone: freshTeacher.phone || session.phone,
-            assignedBatchIds: freshTeacher.assignedBatchIds || [],
-            assignedStudentIds: freshTeacher.assignedStudentIds || []
-          };
-          setCurrentUser(updatedUser);
-          setAuthSession(updatedUser);
-        } else {
-          // The teacher account was deleted by Admin! Invalidate immediately
-          clearAuthSession();
-          setCurrentUser(null);
-        }
-      } else if (session.role === USER_ROLES.ADMIN) {
-        const accounts = getStaffAccounts();
-        if (accounts.admin) {
-          const updatedAdmin = {
-            ...session,
-            name: accounts.admin.name || session.name,
-            title: accounts.admin.title || session.title,
-            email: accounts.admin.email || session.email
-          };
-          setCurrentUser(updatedAdmin);
-        }
-      } else {
-        setCurrentUser(session);
-      }
     };
 
     // Cross-tab synchronization listener (fires in all OTHER tabs when localStorage updates)
@@ -239,48 +267,12 @@ export default function App() {
       window.removeEventListener('hayagriva-staff-accounts-changed', handleStaffChange);
       window.removeEventListener('storage', handleStorageEvent);
     };
-  }, []);
+  }, [handleStaffChange]);
 
   // Fetch remote database records from Supabase on mount / connection change
   useEffect(() => {
-    let isMounted = true;
-
-    const loadFromSupabase = async () => {
-      const config = getSupabaseConfig();
-      if (!config.isConnected) return;
-
-      setIsSyncing(true);
-      try {
-        const [remote, remoteStaff] = await Promise.all([
-          fetchTuitionDataFromSupabase(),
-          fetchStaffAccountsFromSupabase()
-        ]);
-        if (isMounted) {
-          if (remoteStaff) {
-            handleStaffChange();
-          }
-          if (remote) {
-            if (remote.hasData) {
-              setData(remote);
-              saveStoredData(remote);
-            } else {
-              console.log('Connected to Supabase PostgreSQL. Tables are ready.');
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Supabase initial fetch warning:', err);
-      } finally {
-        if (isMounted) setIsSyncing(false);
-      }
-    };
-
     loadFromSupabase();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isSupabaseLive]);
+  }, [isSupabaseLive, loadFromSupabase]);
 
   // Supabase Real-Time Subscriptions Listener (cross-tab & multi-device sync)
   useEffect(() => {
@@ -361,6 +353,7 @@ export default function App() {
         onLoginSuccess={(user) => {
           setData(getStoredData());
           setCurrentUser(user);
+          loadFromSupabase();
           if (user.role === USER_ROLES.PARENT) {
             setActiveTab('parent-portal');
           } else {
