@@ -623,7 +623,22 @@ export async function fetchStaffAccountsFromSupabase() {
       createdAt: t.created_at
     }));
 
-    if (teachers.length === 0 && !admin) return null;
+    const localAccounts = getStaffAccounts();
+    const localTeachers = Array.isArray(localAccounts?.teachers) ? localAccounts.teachers : [];
+
+    let finalTeachers = teachers;
+    // If Supabase has no teachers yet, but local storage already has valid teachers created by the admin,
+    // preserve the local teachers and automatically sync them to Supabase PostgreSQL!
+    if (teachers.length === 0 && localTeachers.length > 0) {
+      finalTeachers = localTeachers;
+      syncStaffAccountsToSupabase({
+        admin: admin || localAccounts.admin,
+        teacher: localTeachers[0],
+        teachers: localTeachers
+      }).catch(err => console.warn('Could not sync local teachers to Supabase:', err));
+    }
+
+    if (finalTeachers.length === 0 && !admin) return null;
 
     const staffAccounts = {
       admin: admin || {
@@ -635,8 +650,8 @@ export async function fetchStaffAccountsFromSupabase() {
         title: 'Administrator',
         email: 'admin@hayagriva.edu'
       },
-      teacher: teachers[0] || null,
-      teachers: teachers.length > 0 ? teachers : []
+      teacher: finalTeachers[0] || null,
+      teachers: finalTeachers.length > 0 ? finalTeachers : []
     };
 
     if (typeof localStorage !== 'undefined') {
@@ -711,6 +726,11 @@ export async function syncStaffAccountsToSupabase(accounts) {
           .delete()
           .eq('role', 'TEACHER')
           .not('id', 'in', `(${validTeacherIds.map(id => `'${id}'`).join(',')})`);
+      } else {
+        await supabase
+          .from('staff_accounts')
+          .delete()
+          .eq('role', 'TEACHER');
       }
     }
 

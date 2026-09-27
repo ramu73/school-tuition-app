@@ -25,7 +25,10 @@ import {
   ChevronUp,
   Terminal,
   Activity,
-  CheckCircle
+  CheckCircle,
+  Edit3,
+  Phone,
+  Mail
 } from 'lucide-react';
 import { logger, LOG_LEVELS, LOG_CATEGORIES } from '../lib/logger';
 import { testSupabaseConnection, syncTuitionDataToSupabase, clearSupabaseDatabase, syncStaffAccountsToSupabase } from '../lib/supabase';
@@ -42,6 +45,7 @@ import {
   saveStaffAccounts, 
   getTeacherAccounts, 
   addTeacherAccount, 
+  updateTeacherAccount,
   deleteTeacherAccount,
   assignBatchesToTeacher,
   assignStudentsToTeacher
@@ -80,11 +84,28 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
   const [newTeacherSubject, setNewTeacherSubject] = useState('');
   const [newTeacherUsername, setNewTeacherUsername] = useState('');
   const [newTeacherPassword, setNewTeacherPassword] = useState('');
+  const [newTeacherPhone, setNewTeacherPhone] = useState('');
+  const [newTeacherEmail, setNewTeacherEmail] = useState('');
   const [newTeacherBatches, setNewTeacherBatches] = useState([]);
   const [newTeacherStudents, setNewTeacherStudents] = useState([]);
   const [newTeacherStudentQuery, setNewTeacherStudentQuery] = useState('');
   const [teacherPassVisible, setTeacherPassVisible] = useState({});
   const [staffMsg, setStaffMsg] = useState(null);
+
+  // Edit Teacher State
+  const [editingTeacherId, setEditingTeacherId] = useState(null);
+  const [editTeacherName, setEditTeacherName] = useState('');
+  const [editTeacherSubject, setEditTeacherSubject] = useState('');
+  const [editTeacherUsername, setEditTeacherUsername] = useState('');
+  const [editTeacherPassword, setEditTeacherPassword] = useState('');
+  const [editTeacherPhone, setEditTeacherPhone] = useState('');
+  const [editTeacherEmail, setEditTeacherEmail] = useState('');
+  const [editTeacherBatches, setEditTeacherBatches] = useState([]);
+  const [editTeacherStudents, setEditTeacherStudents] = useState([]);
+  const [editTeacherStudentQuery, setEditTeacherStudentQuery] = useState('');
+  const [editTeacherErrors, setEditTeacherErrors] = useState({});
+  const [editTeacherPassVisible, setEditTeacherPassVisible] = useState(false);
+  const [isSavingTeacher, setIsSavingTeacher] = useState(false);
 
   const [expandedTeacherStudentPicker, setExpandedTeacherStudentPicker] = useState({});
   const [teacherStudentSearchQuery, setTeacherStudentSearchQuery] = useState('');
@@ -337,7 +358,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     setTimeout(() => setStaffMsg(null), 3500);
   };
 
-  const handleAddNewTeacher = (e) => {
+  const handleAddNewTeacher = async (e) => {
     e.preventDefault();
     const errors = {};
     if (!newTeacherName || newTeacherName.trim().length < 2) {
@@ -361,6 +382,8 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
       subject: newTeacherSubject.trim(),
       username: newTeacherUsername.trim(),
       password: newTeacherPassword.trim(),
+      phone: newTeacherPhone ? newTeacherPhone.trim() : '',
+      email: newTeacherEmail ? newTeacherEmail.trim() : '',
       assignedBatchIds: newTeacherBatches,
       assignedStudentIds: newTeacherStudents
     });
@@ -387,19 +410,26 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
         }
       }
 
-      // Sync to Supabase PostgreSQL so other devices / logins immediately have the new teacher
+      // Sync to Supabase PostgreSQL so other devices / logins immediately have the new teacher in Database
+      let dbSynced = false;
       if (getSupabaseConfig().isConnected) {
-        syncStaffAccountsToSupabase(getStaffAccounts()).catch(() => {});
+        const syncRes = await syncStaffAccountsToSupabase(getStaffAccounts());
+        dbSynced = syncRes && syncRes.success;
       }
 
       setNewTeacherName('');
       setNewTeacherSubject('');
       setNewTeacherUsername('');
       setNewTeacherPassword('');
+      setNewTeacherPhone('');
+      setNewTeacherEmail('');
       setNewTeacherBatches([]);
       setNewTeacherStudents([]);
       setNewTeacherStudentQuery('');
-      setStaffMsg({ type: 'success', text: `Teacher "${newTeacherName}" account created! They can now log in using username "${newTeacherUsername}".` });
+      setStaffMsg({ 
+        type: 'success', 
+        text: `✓ Teacher "${newTeacherName}" account created! Username: "${newTeacherUsername}"${dbSynced ? ' (Saved to Database)' : ''}` 
+      });
       setTimeout(() => setStaffMsg(null), 4000);
     } else {
       setStaffMsg({ type: 'error', text: res.message || 'Failed to create teacher' });
@@ -407,7 +437,102 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     }
   };
 
-  const handleDeleteTeacher = (teacherId, teacherName) => {
+  const handleStartEditTeacher = (teacher) => {
+    setEditingTeacherId(teacher.id);
+    setEditTeacherName(teacher.name || '');
+    setEditTeacherSubject(teacher.subject || '');
+    setEditTeacherUsername(teacher.username || '');
+    setEditTeacherPassword(teacher.password || '');
+    setEditTeacherPhone(teacher.phone || '');
+    setEditTeacherEmail(teacher.email || '');
+    setEditTeacherBatches(Array.isArray(teacher.assignedBatchIds) ? [...teacher.assignedBatchIds] : []);
+    setEditTeacherStudents(Array.isArray(teacher.assignedStudentIds) ? [...teacher.assignedStudentIds] : []);
+    setEditTeacherStudentQuery('');
+    setEditTeacherErrors({});
+    setEditTeacherPassVisible(false);
+  };
+
+  const handleCancelEditTeacher = () => {
+    setEditingTeacherId(null);
+    setEditTeacherErrors({});
+  };
+
+  const handleSaveEditTeacher = async (e) => {
+    e.preventDefault();
+    const errors = {};
+    if (!editTeacherName || editTeacherName.trim().length < 2) {
+      errors.name = 'Please enter a valid teacher name (min 2 characters).';
+    }
+    if (!editTeacherUsername || editTeacherUsername.trim().length < 3) {
+      errors.username = 'Teacher username must be at least 3 characters.';
+    }
+    if (!editTeacherPassword || editTeacherPassword.trim().length < 6) {
+      errors.password = 'Password must be at least 6 characters.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditTeacherErrors(errors);
+      return;
+    }
+
+    setIsSavingTeacher(true);
+    try {
+      const updates = {
+        name: editTeacherName.trim(),
+        subject: editTeacherSubject.trim(),
+        username: editTeacherUsername.trim(),
+        password: editTeacherPassword.trim(),
+        phone: editTeacherPhone ? editTeacherPhone.trim() : '',
+        email: editTeacherEmail ? editTeacherEmail.trim() : '',
+        assignedBatchIds: editTeacherBatches,
+        assignedStudentIds: editTeacherStudents
+      };
+
+      const res = updateTeacherAccount(editingTeacherId, updates);
+      if (!res.success) {
+        setStaffMsg({ type: 'error', text: res.message || 'Failed to update teacher' });
+        setIsSavingTeacher(false);
+        return;
+      }
+
+      // Update batches tutor names if name or subject changed
+      const stored = getStoredData();
+      const newTutorLabel = `${editTeacherName.trim()} (${editTeacherSubject.trim() || 'Faculty'})`;
+      const updatedBatches = (stored.batches || []).map(b => {
+        if (editTeacherBatches.includes(b.id)) {
+          return { ...b, tutor: newTutorLabel };
+        }
+        return b;
+      });
+      if (typeof onSaveData === 'function') {
+        onSaveData({ ...stored, batches: updatedBatches });
+      } else {
+        saveStoredData({ ...stored, batches: updatedBatches });
+      }
+
+      // Sync to Supabase PostgreSQL Database immediately!
+      let dbSynced = false;
+      const config = getSupabaseConfig();
+      if (config.isConnected) {
+        const syncRes = await syncStaffAccountsToSupabase(getStaffAccounts());
+        dbSynced = syncRes && syncRes.success;
+      }
+
+      setTeachers(getTeacherAccounts());
+      setEditingTeacherId(null);
+      setStaffMsg({
+        type: 'success',
+        text: `✓ Teacher "${editTeacherName}" credentials updated successfully!${dbSynced ? ' (Synced to Supabase DB)' : ''}`
+      });
+      setTimeout(() => setStaffMsg(null), 4000);
+    } catch (err) {
+      setStaffMsg({ type: 'error', text: 'Error updating teacher: ' + err.message });
+    } finally {
+      setIsSavingTeacher(false);
+    }
+  };
+
+  const handleDeleteTeacher = async (teacherId, teacherName) => {
     if (window.confirm(`Are you sure you want to remove the teacher account for "${teacherName}"?`)) {
       const res = deleteTeacherAccount(teacherId);
       if (res.success) {
@@ -442,10 +567,10 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
 
         // Sync deletion to Supabase PostgreSQL cloud so all other devices and logins purge the deleted teacher
         if (getSupabaseConfig().isConnected) {
-          syncStaffAccountsToSupabase(getStaffAccounts()).catch(() => {});
+          await syncStaffAccountsToSupabase(getStaffAccounts());
         }
 
-        setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted and batch assignments updated.` });
+        setStaffMsg({ type: 'success', text: `Teacher "${teacherName}" deleted from Database & Local Storage.` });
         setTimeout(() => setStaffMsg(null), 3000);
       } else {
         setStaffMsg({ type: 'error', text: res.message || 'Failed to delete teacher' });
@@ -875,6 +1000,26 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                           </span>
                         )}
                       </div>
+                      <div className="form-group mb-2">
+                        <label className="form-label">Contact Mobile (Optional)</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. 9848266892"
+                          className="form-input"
+                          value={newTeacherPhone}
+                          onChange={(e) => setNewTeacherPhone(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group mb-2">
+                        <label className="form-label">Email Address (Optional)</label>
+                        <input 
+                          type="email" 
+                          placeholder="e.g. teacher@hayagriva.edu"
+                          className="form-input"
+                          value={newTeacherEmail}
+                          onChange={(e) => setNewTeacherEmail(e.target.value)}
+                        />
+                      </div>
                     </div>
 
                     <div className="form-group mb-2 mt-2">
@@ -1006,6 +1151,20 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                           <div className="text-xs text-muted font-mono mt-0.5">
                             Username: <strong className="text-emerald">@{teacher.username}</strong>
                           </div>
+                          {(teacher.phone || teacher.email) && (
+                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-300">
+                              {teacher.phone && (
+                                <span className="flex items-center gap-1 font-mono">
+                                  <Phone size={11} className="text-muted" /> {teacher.phone}
+                                </span>
+                              )}
+                              {teacher.email && (
+                                <span className="flex items-center gap-1">
+                                  <Mail size={11} className="text-muted" /> {teacher.email}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -1024,7 +1183,22 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                             </button>
                           </div>
 
-                          <div className="teacher-actions-col">
+                          <div className="teacher-actions-col flex items-center gap-1.5">
+                            <button 
+                              type="button" 
+                              className="btn-edit-mini"
+                              title="Edit Teacher Credentials & Details"
+                              onClick={() => {
+                                if (editingTeacherId === teacher.id) {
+                                  handleCancelEditTeacher();
+                                } else {
+                                  handleStartEditTeacher(teacher);
+                                }
+                              }}
+                            >
+                              <Edit3 size={13} />
+                              <span>{editingTeacherId === teacher.id ? 'Close' : 'Edit'}</span>
+                            </button>
                             <button 
                               type="button" 
                               className="btn-delete-mini"
@@ -1037,6 +1211,167 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
                           </div>
                         </div>
                       </div>
+
+                      {/* Inline Edit Form for Teacher Credentials */}
+                      {editingTeacherId === teacher.id && (
+                        <div className="edit-teacher-form-card mt-3 mb-3 p-3.5" style={{ background: 'rgba(99, 102, 241, 0.08)', borderRadius: '10px', border: '1px solid rgba(99, 102, 241, 0.35)' }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-xs text-indigo-300 flex items-center gap-1.5">
+                              <Edit3 size={13} /> Edit Credentials for {teacher.name}
+                            </span>
+                            <button 
+                              type="button" 
+                              className="btn-delete-mini"
+                              onClick={handleCancelEditTeacher}
+                              title="Cancel"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleSaveEditTeacher}>
+                            <div className="form-grid-2">
+                              <div className="form-group mb-2">
+                                <label className="form-label">Teacher Name *</label>
+                                <input 
+                                  type="text" 
+                                  className={`form-input ${editTeacherErrors.name ? 'input-error' : ''}`}
+                                  value={editTeacherName}
+                                  onChange={(e) => {
+                                    setEditTeacherName(e.target.value);
+                                    if (editTeacherErrors.name) setEditTeacherErrors(prev => ({ ...prev, name: null }));
+                                  }}
+                                />
+                                {editTeacherErrors.name && (
+                                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '2px', display: 'block' }}>
+                                    {editTeacherErrors.name}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="form-group mb-2">
+                                <label className="form-label">Subject / Faculty Specialization</label>
+                                <input 
+                                  type="text" 
+                                  className="form-input"
+                                  value={editTeacherSubject}
+                                  onChange={(e) => setEditTeacherSubject(e.target.value)}
+                                />
+                              </div>
+
+                              <div className="form-group mb-2">
+                                <label className="form-label">Teacher Username *</label>
+                                <input 
+                                  type="text" 
+                                  className={`form-input font-mono ${editTeacherErrors.username ? 'input-error' : ''}`}
+                                  value={editTeacherUsername}
+                                  onChange={(e) => {
+                                    setEditTeacherUsername(e.target.value);
+                                    if (editTeacherErrors.username) setEditTeacherErrors(prev => ({ ...prev, username: null }));
+                                  }}
+                                />
+                                {editTeacherErrors.username && (
+                                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '2px', display: 'block' }}>
+                                    {editTeacherErrors.username}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="form-group mb-2">
+                                <label className="form-label">Login Password *</label>
+                                <div className="input-with-icon-right">
+                                  <input 
+                                    type={editTeacherPassVisible ? 'text' : 'password'}
+                                    className={`form-input font-mono ${editTeacherErrors.password ? 'input-error' : ''}`}
+                                    value={editTeacherPassword}
+                                    onChange={(e) => {
+                                      setEditTeacherPassword(e.target.value);
+                                      if (editTeacherErrors.password) setEditTeacherErrors(prev => ({ ...prev, password: null }));
+                                    }}
+                                  />
+                                  <button 
+                                    type="button" 
+                                    className="pass-eye-btn" 
+                                    onClick={() => setEditTeacherPassVisible(!editTeacherPassVisible)}
+                                    title={editTeacherPassVisible ? "Hide password" : "Show password"}
+                                  >
+                                    {editTeacherPassVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                                  </button>
+                                </div>
+                                {editTeacherErrors.password && (
+                                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '2px', display: 'block' }}>
+                                    {editTeacherErrors.password}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="form-group mb-2">
+                                <label className="form-label">Contact Mobile (Optional)</label>
+                                <input 
+                                  type="text" 
+                                  placeholder="e.g. 9848266892"
+                                  className="form-input"
+                                  value={editTeacherPhone}
+                                  onChange={(e) => setEditTeacherPhone(e.target.value)}
+                                />
+                              </div>
+
+                              <div className="form-group mb-2">
+                                <label className="form-label">Email Address (Optional)</label>
+                                <input 
+                                  type="email" 
+                                  placeholder="e.g. teacher@hayagriva.edu"
+                                  className="form-input"
+                                  value={editTeacherEmail}
+                                  onChange={(e) => setEditTeacherEmail(e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="form-group mb-2 mt-2">
+                              <label className="form-label mb-1 text-xs text-slate-300 font-semibold">Assigned Batches</label>
+                              <div className="teacher-batch-chips">
+                                {allBatches.map(b => {
+                                  const isAssigned = editTeacherBatches.some(id => String(id) === String(b.id));
+                                  return (
+                                    <button
+                                      key={b.id}
+                                      type="button"
+                                      className={`batch-chip-btn ${isAssigned ? 'assigned' : ''}`}
+                                      onClick={() => {
+                                        setEditTeacherBatches(prev => {
+                                          const exists = prev.some(id => String(id) === String(b.id));
+                                          return exists 
+                                            ? prev.filter(id => String(id) !== String(b.id)) 
+                                            : [...prev, b.id];
+                                        });
+                                      }}
+                                    >
+                                      <Check size={11} className={isAssigned ? 'icon-show' : 'icon-hide'} />
+                                      <span>{b.name}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 mt-3 pt-2" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary btn-sm"
+                                onClick={handleCancelEditTeacher}
+                                disabled={isSavingTeacher}
+                              >
+                                Cancel
+                              </button>
+                              <button type="submit" className="btn btn-primary btn-sm" disabled={isSavingTeacher}>
+                                <Check size={14} />
+                                <span>{isSavingTeacher ? 'Saving to Database...' : 'Save Credentials'}</span>
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
 
                       {/* Local In-Place Feedback Banner for Teacher Scope */}
                       {scopeFeedback[teacher.id] && (
@@ -1613,6 +1948,47 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
         .teacher-actions-col {
           display: flex;
           align-items: center;
+          gap: 6px;
+        }
+        .btn-edit-mini {
+          background: rgba(99, 102, 241, 0.15);
+          border: 1px solid rgba(99, 102, 241, 0.35);
+          color: #a5b4fc;
+          border-radius: var(--radius-sm);
+          padding: 4px 8px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.75rem;
+          font-weight: 500;
+          transition: all 0.15s ease;
+        }
+        .btn-edit-mini:hover {
+          background: rgba(99, 102, 241, 0.3);
+          color: white;
+          border-color: rgba(99, 102, 241, 0.6);
+        }
+        .btn-delete-mini {
+          background: rgba(239, 68, 68, 0.12);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #f87171;
+          border-radius: var(--radius-sm);
+          padding: 4px 6px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+        }
+        .btn-delete-mini:hover:not(:disabled) {
+          background: rgba(239, 68, 68, 0.25);
+          color: #fca5a5;
+          border-color: rgba(239, 68, 68, 0.6);
+        }
+        .btn-delete-mini:disabled {
+          opacity: 0.35;
+          cursor: not-allowed;
         }
         .backup-card {
           display: flex;

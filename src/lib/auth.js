@@ -437,25 +437,61 @@ export function updateTeacherAccount(id, updates) {
   const idx = teachers.findIndex(t => t.id === id);
   if (idx === -1) return { success: false, message: 'Teacher account not found' };
 
-  if (updates.username) {
-    const cleanUser = updates.username.trim().toLowerCase();
+  const sanitized = { ...updates };
+
+  if (sanitized.username) {
+    const cleanUser = sanitized.username.trim().toLowerCase();
     if (cleanUser === accounts.admin.username.toLowerCase()) {
       return { success: false, message: 'Username cannot match Admin username' };
     }
     const duplicate = teachers.some((t, i) => i !== idx && t.username.toLowerCase() === cleanUser);
     if (duplicate) {
-      return { success: false, message: 'Username is already taken by another teacher' };
+      return { success: false, message: `Username "${cleanUser}" is already taken by another teacher` };
     }
+    sanitized.username = cleanUser;
+  }
+
+  if (sanitized.name) {
+    sanitized.name = sanitized.name.trim();
+  }
+
+  if (sanitized.password) {
+    sanitized.password = sanitized.password.trim();
+  }
+
+  if (sanitized.subject !== undefined) {
+    sanitized.subject = (sanitized.subject || '').trim();
+    sanitized.title = sanitized.subject ? `Faculty (${sanitized.subject})` : (teachers[idx].title || 'Tuition Faculty');
+  }
+
+  if (sanitized.phone !== undefined) {
+    sanitized.phone = (sanitized.phone || '').trim();
+  }
+
+  if (sanitized.email !== undefined) {
+    sanitized.email = (sanitized.email || '').trim();
+  }
+
+  if (Array.isArray(sanitized.assignedBatchIds)) {
+    sanitized.assignedBatchIds = sanitized.assignedBatchIds.map(batchId => (!isNaN(Number(batchId)) && String(batchId).trim() !== '') ? Number(batchId) : batchId);
+  }
+
+  if (Array.isArray(sanitized.assignedStudentIds)) {
+    sanitized.assignedStudentIds = sanitized.assignedStudentIds.map(stId => (!isNaN(Number(stId)) && String(stId).trim() !== '') ? Number(stId) : stId);
   }
 
   teachers[idx] = {
     ...teachers[idx],
-    ...updates,
-    title: updates.subject ? `Faculty (${updates.subject})` : teachers[idx].title
+    ...sanitized
   };
   accounts.teachers = teachers;
-  accounts.teacher = teachers[0];
-  return saveStaffAccounts(accounts);
+  accounts.teacher = teachers[0] || null;
+
+  const saveRes = saveStaffAccounts(accounts);
+  if (saveRes.success) {
+    return { success: true, teacher: teachers[idx] };
+  }
+  return saveRes;
 }
 
 // Delete teacher account
