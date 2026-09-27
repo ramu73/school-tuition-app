@@ -325,7 +325,7 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
                   {fieldErrors.parentIdentifier}
                 </span>
               )}
-              <p className="field-hint">E.g. 9876543210 or ADM-1001</p>
+              <p className="field-hint">E.g. 9848266892 or HGT26-025</p>
             </div>
           ) : (
             <>

@@ -703,7 +703,7 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
                 <span className="bubble-time font-mono">Today</span>
               </div>
               <div className="bubble-content-text">
-                {formatMessageForStudent(message, targetRecipients[0] || { name: 'Aarav Kumar', batchId: 2, classCode: 'CLASS_10' })}
+                {formatMessageForStudent(message, targetRecipients[0] || (students && students.length > 0 ? students[0] : { name: 'Student Name', classCode: 'CLASS_10' }))}
               </div>
             </div>
           </div>

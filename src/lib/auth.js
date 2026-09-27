@@ -216,34 +216,8 @@ export const INITIAL_STAFF_ACCOUNTS = {
     title: 'Administrator',
     email: 'admin@hayagriva.edu'
   },
-  teachers: [
-    {
-      id: 'teacher-01',
-      username: 'teacher',
-      password: 'teacher123',
-      pin: '1234',
-      name: 'Mr. R. Sharma',
-      role: USER_ROLES.TEACHER,
-      title: 'Senior Faculty (Maths & Physics)',
-      subject: 'Mathematics & Physics',
-      phone: '9848266892',
-      email: 'teacher@hayagriva.edu',
-      assignedBatchIds: [1, 2], // Default assigned batches
-      assignedStudentIds: []
-    }
-  ],
-  teacher: {
-    username: 'teacher',
-    password: 'teacher123',
-    pin: '1234',
-    name: 'Mr. R. Sharma',
-    role: USER_ROLES.TEACHER,
-    title: 'Senior Faculty (Maths & Physics)',
-    subject: 'Mathematics & Physics',
-    email: 'teacher@hayagriva.edu',
-    assignedBatchIds: [1, 2],
-    assignedStudentIds: []
-  }
+  teachers: [],
+  teacher: null
 };
 
 const STAFF_ACCOUNTS_KEY = 'hayagriva_staff_accounts_v1';
@@ -258,35 +232,18 @@ export function getStaffAccounts() {
     if (!raw) return INITIAL_STAFF_ACCOUNTS;
     const parsed = JSON.parse(raw);
 
-    // Ensure teachers array is always populated and has assignedBatchIds and assignedStudentIds
-    let teachers = parsed.teachers;
-    if (!Array.isArray(teachers) || teachers.length === 0) {
-      const fallbackTeacher = parsed.teacher || INITIAL_STAFF_ACCOUNTS.teacher;
-      teachers = [{
-        id: 'teacher-01',
-        username: fallbackTeacher.username || 'teacher',
-        password: fallbackTeacher.password || 'teacher123',
-        pin: fallbackTeacher.pin || '1234',
-        name: fallbackTeacher.name || 'Mr. R. Sharma',
-        role: USER_ROLES.TEACHER,
-        title: fallbackTeacher.title || 'Senior Faculty (Maths & Physics)',
-        subject: fallbackTeacher.subject || 'Mathematics & Physics',
-        phone: fallbackTeacher.phone || '9848266892',
-        email: fallbackTeacher.email || 'teacher@hayagriva.edu',
-        assignedBatchIds: Array.isArray(fallbackTeacher.assignedBatchIds) ? fallbackTeacher.assignedBatchIds : [1, 2],
-        assignedStudentIds: Array.isArray(fallbackTeacher.assignedStudentIds) ? fallbackTeacher.assignedStudentIds : []
-      }];
-    } else {
-      teachers = teachers.map((t, idx) => ({
-        ...t,
-        assignedBatchIds: Array.isArray(t.assignedBatchIds) 
-          ? t.assignedBatchIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id) 
-          : (idx === 0 ? [1, 2] : []),
-        assignedStudentIds: Array.isArray(t.assignedStudentIds)
-          ? t.assignedStudentIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id)
-          : []
-      }));
-    }
+    // Filter out legacy dummy demo teacher if it was left from early test templates
+    let teachers = Array.isArray(parsed.teachers) ? parsed.teachers : [];
+    teachers = teachers.filter(t => t.id !== 'teacher-01' && t.username !== 'teacher');
+    teachers = teachers.map((t) => ({
+      ...t,
+      assignedBatchIds: Array.isArray(t.assignedBatchIds) 
+        ? t.assignedBatchIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id) 
+        : [],
+      assignedStudentIds: Array.isArray(t.assignedStudentIds)
+        ? t.assignedStudentIds.map(id => (!isNaN(Number(id)) && String(id).trim() !== '') ? Number(id) : id)
+        : []
+    }));
 
     let admin = { ...INITIAL_STAFF_ACCOUNTS.admin, ...(parsed.admin || {}) };
     // If local storage has the old deprecated placeholder 'admin' / 'admin123', immediately discard it
@@ -300,7 +257,7 @@ export function getStaffAccounts() {
 
     return {
       admin,
-      teacher: teachers[0] || INITIAL_STAFF_ACCOUNTS.teacher,
+      teacher: teachers[0] || null,
       teachers
     };
   } catch (err) {
@@ -505,12 +462,12 @@ export function updateTeacherAccount(id, updates) {
 export function deleteTeacherAccount(id) {
   const accounts = getStaffAccounts();
   const teachers = accounts.teachers || [];
-  if (teachers.length <= 1) {
-    return { success: false, message: 'At least one teacher account must remain in the system.' };
+  if (teachers.length === 0) {
+    return { success: false, message: 'No teacher accounts to delete.' };
   }
   const deletedTeacher = teachers.find(t => t.id === id);
   accounts.teachers = teachers.filter(t => t.id !== id);
-  accounts.teacher = accounts.teachers[0];
+  accounts.teacher = accounts.teachers[0] || null;
   const saveRes = saveStaffAccounts(accounts);
 
   // Invalidate active session if currently logged in as the deleted teacher
@@ -773,9 +730,10 @@ export function authenticateStaff(usernameOrEmail, password, requestedRole) {
   }
 
   if (requestedRole === USER_ROLES.TEACHER) {
-    const teachersList = accounts.teachers && accounts.teachers.length > 0 
-      ? accounts.teachers 
-      : [accounts.teacher];
+    const teachersList = (accounts.teachers || []).filter(Boolean);
+    if (teachersList.length === 0) {
+      return { success: false, message: 'No registered faculty accounts found. Please contact the administrator.' };
+    }
 
     const matchedTeacher = teachersList.find(t => {
       const isUserMatch = cleanUser === t.username.toLowerCase() || 

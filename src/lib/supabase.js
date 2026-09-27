@@ -191,6 +191,7 @@ export async function fetchTuitionDataFromSupabase() {
       id: m.id,
       examId: m.exam_id,
       studentId: m.student_id,
+      subject: m.subject || '',
       marksObtained: Number(m.marks_obtained),
       remarks: m.remarks || ''
     }));
@@ -215,6 +216,57 @@ export async function fetchTuitionDataFromSupabase() {
       // Optional if table not yet created in remote DB
     }
 
+    let tutorFeedback = [];
+    try {
+      const fbRes = await supabase.from('tutor_feedback').select('*').order('id', { ascending: false });
+      if (fbRes.data && fbRes.data.length > 0) {
+        tutorFeedback = fbRes.data.map(f => ({
+          id: f.id,
+          studentId: f.student_id,
+          monthYear: f.month_year,
+          date: f.feedback_date || (f.created_at ? f.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+          strength: f.strength || 'Concepts',
+          improvementArea: f.improvement_area || 'Accuracy',
+          nextStep: f.next_step || 'Practice 5 problems',
+          academicPerformance: f.academic_performance || 'Good',
+          conceptUnderstanding: f.concept_understanding || 'Good',
+          homeworkStatus: f.homework_status || 'Mostly Completed',
+          classParticipation: f.class_participation || 'Active',
+          regularity: f.regularity || 'Regular',
+          monthlyProgress: f.monthly_progress || 'Improving',
+          focusArea: f.focus_area || 'Revision',
+          autoMessage: f.auto_message || '',
+          tutorRemark: f.tutor_remark || '',
+          goal: f.goal || null,
+          createdBy: f.created_by || 'Faculty',
+          createdAt: f.created_at
+        }));
+      }
+    } catch (fbErr) {
+      // Optional if table not yet created
+    }
+
+    let homework = [];
+    try {
+      const hwRes = await supabase.from('homework_records').select('*').order('id', { ascending: false });
+      if (hwRes.data && hwRes.data.length > 0) {
+        homework = hwRes.data.map(h => ({
+          id: h.id,
+          batchId: h.batch_id,
+          classCode: h.class_code,
+          date: h.homework_date || (h.created_at ? h.created_at.split('T')[0] : new Date().toISOString().split('T')[0]),
+          subject: h.subject,
+          topic: h.topic,
+          homeworkTask: h.homework_task,
+          weeklyStatus: h.weekly_status || 'Regularly Completed',
+          dueDate: h.due_date,
+          status: h.status || 'ACTIVE'
+        }));
+      }
+    } catch (hwErr) {
+      // Optional if table not yet created
+    }
+
     // Fetch and sync staff accounts from Supabase PostgreSQL
     try {
       await fetchStaffAccountsFromSupabase();
@@ -232,7 +284,9 @@ export async function fetchTuitionDataFromSupabase() {
       receipts,
       exams,
       marks,
-      announcements
+      announcements,
+      tutorFeedback: tutorFeedback || [],
+      homework: homework || []
     };
   } catch (err) {
     console.error('Error fetching data from Supabase:', err);
@@ -270,8 +324,6 @@ export async function syncTuitionDataToSupabase(data) {
       // Clean deleted batches
       const batchIds = data.batches.map(b => b.id);
       await supabase.from('batches').delete().not('id', 'in', `(${batchIds.join(',')})`);
-    } else if (Array.isArray(data.batches)) {
-      await supabase.from('batches').delete().neq('id', 0);
     }
 
     // 2. Students
@@ -299,8 +351,6 @@ export async function syncTuitionDataToSupabase(data) {
       // Clean deleted students
       const studentIds = data.students.map(s => s.id);
       await supabase.from('students').delete().not('id', 'in', `(${studentIds.join(',')})`);
-    } else if (Array.isArray(data.students)) {
-      await supabase.from('students').delete().neq('id', 0);
     }
 
     // 3. Attendance
@@ -392,15 +442,76 @@ export async function syncTuitionDataToSupabase(data) {
           id: m.id,
           exam_id: m.examId,
           student_id: m.studentId,
+          subject: m.subject || null,
           marks_obtained: Number(m.marksObtained),
           remarks: m.remarks || ''
         }));
       if (markRows.length > 0) {
         await supabase.from('exam_marks').upsert(markRows, { onConflict: 'exam_id, student_id' });
+        // Clean up marks for deleted exams or removed marks
+        const markIds = markRows.map(m => m.id);
+        await supabase.from('exam_marks').delete().not('id', 'in', `(${markIds.join(',')})`);
+      }
+    } else if (Array.isArray(data.marks)) {
+      await supabase.from('exam_marks').delete().neq('id', 0);
+    }
+
+    // 7. Tutor Feedback & Child Improvement Plans
+    if (data.tutorFeedback && data.tutorFeedback.length > 0) {
+      try {
+        const validStudentIds = new Set((data.students || []).map(s => s.id));
+        const feedbackRows = data.tutorFeedback
+          .filter(f => validStudentIds.has(f.studentId))
+          .map(f => ({
+            id: f.id,
+            student_id: f.studentId,
+            month_year: f.monthYear,
+            feedback_date: f.date || new Date().toISOString().split('T')[0],
+            strength: f.strength || 'Concepts',
+            improvement_area: f.improvementArea || 'Accuracy',
+            next_step: f.nextStep || 'Practice 5 problems',
+            academic_performance: f.academicPerformance || 'Good',
+            concept_understanding: f.conceptUnderstanding || 'Good',
+            homework_status: f.homeworkStatus || 'Mostly Completed',
+            class_participation: f.classParticipation || 'Active',
+            regularity: f.regularity || 'Regular',
+            monthly_progress: f.monthlyProgress || 'Improving',
+            focus_area: f.focusArea || 'Revision',
+            auto_message: f.autoMessage || '',
+            tutor_remark: f.tutorRemark || '',
+            goal: f.goal || null,
+            created_by: f.createdBy || 'Faculty'
+          }));
+        if (feedbackRows.length > 0) {
+          await supabase.from('tutor_feedback').upsert(feedbackRows, { onConflict: 'id' });
+        }
+      } catch (fbSyncErr) {
+        console.warn('Could not sync tutor feedback to Supabase (table may not exist yet):', fbSyncErr);
       }
     }
 
-    // 7. Announcements / Broadcast Notifications
+    // 8. Homework & Topic Tracking
+    if (data.homework && data.homework.length > 0) {
+      try {
+        const hwRows = data.homework.map(h => ({
+          id: h.id,
+          batch_id: h.batchId,
+          class_code: h.classCode,
+          homework_date: h.date || new Date().toISOString().split('T')[0],
+          subject: h.subject,
+          topic: h.topic,
+          homework_task: h.homeworkTask,
+          weekly_status: h.weeklyStatus || 'Regularly Completed',
+          due_date: h.dueDate || null,
+          status: h.status || 'ACTIVE'
+        }));
+        await supabase.from('homework_records').upsert(hwRows, { onConflict: 'id' });
+      } catch (hwSyncErr) {
+        console.warn('Could not sync homework to Supabase (table may not exist yet):', hwSyncErr);
+      }
+    }
+
+    // 9. Announcements / Broadcast Notifications
     if (data.announcements && data.announcements.length > 0) {
       try {
         const annRows = data.announcements.map(a => ({
@@ -419,7 +530,7 @@ export async function syncTuitionDataToSupabase(data) {
       }
     }
 
-    // 8. Staff Accounts (sync admin & teachers)
+    // 10. Staff Accounts (sync admin & teachers)
     try {
       await syncStaffAccountsToSupabase(getStaffAccounts());
     } catch (staffErr) {

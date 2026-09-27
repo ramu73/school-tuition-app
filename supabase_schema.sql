@@ -112,18 +112,22 @@ CREATE TABLE IF NOT EXISTS exams (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 8. Exam Marks
+-- 8. Exam Marks (with student-specific subject support)
 CREATE TABLE IF NOT EXISTS exam_marks (
     id SERIAL PRIMARY KEY,
     exam_id INT REFERENCES exams(id) ON DELETE CASCADE,
     student_id INT REFERENCES students(id) ON DELETE CASCADE,
+    subject VARCHAR(100), -- Allows student-specific subject override (e.g. Telugu, Hindi, etc.)
     marks_obtained NUMERIC(5,2) NOT NULL,
     remarks VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(exam_id, student_id)
 );
 
--- 7. Announcements / Broadcast Notifications (Sunday tuition, timing changes, holidays)
+-- Ensure subject column exists if table was already created
+ALTER TABLE exam_marks ADD COLUMN IF NOT EXISTS subject VARCHAR(100);
+
+-- 9. Announcements / Broadcast Notifications (Sunday tuition, timing changes, holidays)
 CREATE TABLE IF NOT EXISTS announcements (
     id SERIAL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -136,7 +140,7 @@ CREATE TABLE IF NOT EXISTS announcements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 8. Staff & Faculty Accounts (Teachers & Admin accounts, passwords, assigned batches & students)
+-- 10. Staff & Faculty Accounts (Teachers & Admin accounts, passwords, assigned batches & students)
 CREATE TABLE IF NOT EXISTS staff_accounts (
     id VARCHAR(50) PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
@@ -153,6 +157,44 @@ CREATE TABLE IF NOT EXISTS staff_accounts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 11. Tutor Feedback & Child Improvement Plans (3-Tap Selection, Auto-Parent Message, Goals)
+CREATE TABLE IF NOT EXISTS tutor_feedback (
+    id SERIAL PRIMARY KEY,
+    student_id INT REFERENCES students(id) ON DELETE CASCADE,
+    month_year VARCHAR(50) NOT NULL,
+    feedback_date DATE DEFAULT CURRENT_DATE,
+    strength VARCHAR(100),
+    improvement_area VARCHAR(100),
+    next_step VARCHAR(150),
+    academic_performance VARCHAR(50),
+    concept_understanding VARCHAR(50),
+    homework_status VARCHAR(50),
+    class_participation VARCHAR(50),
+    regularity VARCHAR(50),
+    monthly_progress VARCHAR(50),
+    focus_area VARCHAR(50),
+    auto_message TEXT,
+    tutor_remark TEXT,
+    goal JSONB,
+    created_by VARCHAR(150),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 12. Homework & Daily Topic Records
+CREATE TABLE IF NOT EXISTS homework_records (
+    id SERIAL PRIMARY KEY,
+    batch_id INT REFERENCES batches(id) ON DELETE CASCADE,
+    class_code VARCHAR(20),
+    homework_date DATE DEFAULT CURRENT_DATE,
+    subject VARCHAR(100),
+    topic VARCHAR(200),
+    homework_task TEXT,
+    weekly_status VARCHAR(50) DEFAULT 'Regularly Completed',
+    due_date DATE,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- =========================================================
 -- Enable Supabase Realtime Replication on Key Tables
 -- =========================================================
@@ -164,6 +206,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE exams;
 ALTER PUBLICATION supabase_realtime ADD TABLE exam_marks;
 ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
 ALTER PUBLICATION supabase_realtime ADD TABLE staff_accounts;
+ALTER PUBLICATION supabase_realtime ADD TABLE tutor_feedback;
+ALTER PUBLICATION supabase_realtime ADD TABLE homework_records;
 
 -- RLS (Row Level Security) - Permissive for tuition institute staff
 ALTER TABLE class_levels ENABLE ROW LEVEL SECURITY;
@@ -176,6 +220,8 @@ ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_marks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tutor_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE homework_records ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read/write for class_levels" ON class_levels FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for batches" ON batches FOR ALL USING (true);
@@ -187,4 +233,6 @@ CREATE POLICY "Allow public read/write for exams" ON exams FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for exam_marks" ON exam_marks FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for announcements" ON announcements FOR ALL USING (true);
 CREATE POLICY "Allow public read/write for staff_accounts" ON staff_accounts FOR ALL USING (true);
+CREATE POLICY "Allow public read/write for tutor_feedback" ON tutor_feedback FOR ALL USING (true);
+CREATE POLICY "Allow public read/write for homework_records" ON homework_records FOR ALL USING (true);
 

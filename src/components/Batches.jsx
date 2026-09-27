@@ -18,9 +18,10 @@ import {
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
 import { logger } from '../lib/logger';
+import TutorFeedbackModal from './TutorFeedbackModal';
 
 export default function Batches({ data, currentUser, onSaveData, setActiveTab, setSelectedClassFilter, onSelectBatchForAttendance }) {
-  const { batches = [], students = [], classes = [] } = data;
+  const { batches = [], students = [], classes = [], tutorFeedback = [], marks = [], attendance = [], exams = [] } = data;
   const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
   const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds) 
     ? currentUser.assignedBatchIds.map(String) 
@@ -46,6 +47,7 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
   const [selectedStudentIdsForBatch, setSelectedStudentIdsForBatch] = useState([]);
   const [batchSaveFeedback, setBatchSaveFeedback] = useState(null);
   const [batchErrors, setBatchErrors] = useState({});
+  const [feedbackStudent, setFeedbackStudent] = useState(null);
 
   // Integrated Student Assignment during Batch Creation
   const [createBatchSelectedStudentIds, setCreateBatchSelectedStudentIds] = useState([]);
@@ -830,7 +832,19 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                           {!isTeacher && ` • Parent: ${student.parentPhone}`}
                         </div>
                       </div>
-                      <span className="font-mono text-xs badge badge-class">{student.admissionNo}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs"
+                          style={{ fontSize: '0.7rem', padding: '3px 8px', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+                          onClick={() => setFeedbackStudent(student)}
+                          title="Give 3-Tap Feedback & Goals"
+                        >
+                          <Sparkles size={11} />
+                          <span>Feedback</span>
+                        </button>
+                        <span className="font-mono text-xs badge badge-class">{student.admissionNo}</span>
+                      </div>
                     </div>
                   );
                 })
@@ -857,6 +871,47 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
             </div>
           </div>
         </div>
+      )}
+
+      {/* 3-Tap Tutor Feedback & Child Improvement Modal */}
+      {feedbackStudent && (
+        <TutorFeedbackModal
+          student={feedbackStudent}
+          existingFeedback={(tutorFeedback || []).find(f => f.studentId === feedbackStudent.id)}
+          studentMarks={(marks || []).filter(m => m.studentId === feedbackStudent.id).map(m => {
+            const exam = (exams || []).find(e => e.id === m.examId);
+            return {
+              ...m,
+              totalMarks: exam?.totalMarks || 50,
+              passingMarks: exam?.passingMarks || 18,
+              subject: m.subject || exam?.subject || 'Mathematics',
+              examTitle: exam?.title || 'Class Test'
+            };
+          })}
+          attendanceRate={(() => {
+            const stdAtt = (attendance || []).filter(a => a.studentId === feedbackStudent.id);
+            if (stdAtt.length === 0) return 92;
+            const pres = stdAtt.filter(a => a.status === 'PRESENT').length;
+            return Math.round((pres / stdAtt.length) * 100);
+          })()}
+          classes={classes}
+          currentUser={currentUser}
+          onSaveFeedback={(newFb) => {
+            const existingIdx = (tutorFeedback || []).findIndex(f => f.studentId === feedbackStudent.id && f.monthYear === newFb.monthYear);
+            let updatedFb = [...(tutorFeedback || [])];
+            if (existingIdx >= 0) {
+              updatedFb[existingIdx] = newFb;
+            } else {
+              updatedFb.push(newFb);
+            }
+            onSaveData({
+              ...data,
+              tutorFeedback: updatedFb
+            });
+            logger.action(currentUser, 'UPDATE_TUTOR_FEEDBACK', `Saved 3-tap monthly evaluation for ${feedbackStudent.name}`, { studentId: feedbackStudent.id, monthYear: newFb.monthYear });
+          }}
+          onClose={() => setFeedbackStudent(null)}
+        />
       )}
 
       {/* Manage Batch Students by Name Modal */}

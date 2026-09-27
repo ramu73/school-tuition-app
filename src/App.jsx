@@ -212,12 +212,8 @@ export default function App() {
         handleStaffChange();
       }
       if (remote) {
-        if (remote.hasData) {
-          setData(remote);
-          saveStoredData(remote);
-        } else {
-          console.log('Connected to Supabase PostgreSQL. Tables are ready.');
-        }
+        setData(remote);
+        saveStoredData(remote);
       }
     } catch (err) {
       console.warn('Supabase initial fetch warning:', err);
@@ -415,6 +411,7 @@ export default function App() {
             {activeTab === 'students' && canAccessTab(currentUser, 'students') && (
               <Students 
                 data={data}
+                currentUser={currentUser}
                 onSaveData={handleSaveData}
                 selectedClassFilter={selectedClassFilter}
                 setSelectedClassFilter={setSelectedClassFilter}
@@ -464,6 +461,7 @@ export default function App() {
                 data={data}
                 currentUser={currentUser}
                 onSaveData={handleSaveData}
+                initialClassFilter={selectedClassFilter !== 'ALL' ? selectedClassFilter : undefined}
               />
             )}
 

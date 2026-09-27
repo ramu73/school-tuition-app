@@ -35,14 +35,7 @@ import {
   getStoredData, 
   saveStoredData, 
   getEmptyTuitionData, 
-  INITIAL_CLASSES, 
-  INITIAL_BATCHES, 
-  INITIAL_STUDENTS, 
-  INITIAL_FEES, 
-  INITIAL_RECEIPTS, 
-  INITIAL_EXAMS, 
-  INITIAL_MARKS, 
-  INITIAL_ATTENDANCE 
+  INITIAL_CLASSES
 } from '../lib/storage';
 import { 
   getStaffAccounts, 
@@ -78,8 +71,8 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
   const [showAdminPass, setShowAdminPass] = useState(false);
 
   // Teacher Accounts State
-  const allBatches = batches.length > 0 ? batches : (getStoredData().batches || INITIAL_BATCHES);
-  const allStudents = students.length > 0 ? students : (getStoredData().students || INITIAL_STUDENTS);
+  const allBatches = batches.length > 0 ? batches : (getStoredData().batches || []);
+  const allStudents = students.length > 0 ? students : (getStoredData().students || []);
   const availableClasses = ['ALL', ...Array.from(new Set(allStudents.map(s => s.classCode).filter(Boolean))).sort()];
   const [teachers, setTeachers] = useState(initialAccounts.teachers || []);
   const [showAddTeacher, setShowAddTeacher] = useState(false);
@@ -466,7 +459,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
   };
 
   const handleStartClean = async () => {
-    if (window.confirm('Clear all sample students, fees, attendance, and exams to start fresh with 0 students? (Class 1 to 10 structure will be kept).')) {
+    if (window.confirm('Clear all student, fee, attendance, and exam records to start fresh with 0 students? (Class 1 to 10 structure will be kept).')) {
       const cleanData = getEmptyTuitionData();
       saveStoredData(cleanData);
       onDataReset(cleanData);
@@ -491,30 +484,6 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     link.click();
     document.body.removeChild(link);
     logger.action(null, 'EXPORT_JSON_BACKUP', 'Exported JSON backup file');
-  };
-
-  const handleResetData = () => {
-    if (window.confirm('Reset all records to standard Class 1 to 10 sample demo data?')) {
-      const defaultData = {
-        classes: INITIAL_CLASSES,
-        batches: INITIAL_BATCHES,
-        students: INITIAL_STUDENTS,
-        fees: INITIAL_FEES,
-        receipts: INITIAL_RECEIPTS,
-        exams: INITIAL_EXAMS,
-        marks: INITIAL_MARKS,
-        attendance: INITIAL_ATTENDANCE
-      };
-      saveStoredData(defaultData);
-      onDataReset(defaultData);
-
-      const config = getSupabaseConfig();
-      if (config.isConnected) {
-        syncTuitionDataToSupabase(defaultData);
-      }
-      logger.action(null, 'DATABASE_RESET_DEMO', 'Reset tuition database to default demo dataset');
-      onClose();
-    }
   };
 
   const sqlCode = `-- Run this in Supabase SQL Editor to create all tables with real-time replication:
@@ -1344,22 +1313,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records,
               </button>
             </div>
 
-            {/* Clear or Demo Reset */}
-            <div className="backup-card mb-3">
-              <div>
-                <div className="font-semibold text-sm text-amber">Reset to Demo Data</div>
-                <div className="text-xs text-muted">Load 12 sample demo students across classes 1 to 10 for testing</div>
-              </div>
-              <button className="btn btn-secondary btn-sm" onClick={handleResetData}>
-                <RefreshCw size={14} />
-                <span>Load Demo Data</span>
-              </button>
-            </div>
-
             <div className="backup-card danger-card">
               <div>
                 <div className="font-semibold text-sm text-rose-400">Start Fresh with 0 Students</div>
-                <div className="text-xs text-muted">Wipes out all test/demo students & fee records so you can begin real admissions</div>
+                <div className="text-xs text-muted">Clears all student, fee, attendance, and exam records while keeping your class and staff structure intact</div>
               </div>
               <button className="btn btn-danger btn-sm" onClick={handleStartClean}>
                 <Trash2 size={14} />

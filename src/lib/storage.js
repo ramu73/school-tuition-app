@@ -20,84 +20,99 @@ export const INITIAL_CLASSES = [
   { id: 10, code: 'CLASS_10', name: 'Class 10', category: 'High School', defaultFee: 1250, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English'] }
 ];
 
-export const INITIAL_BATCHES = [
-  { id: 1, name: 'Class 10 - Morning Focus', classCode: 'CLASS_10', timing: '06:00 AM - 07:30 AM', tutor: 'Mr. R. Sharma (Maths & Physics)', room: 'Hall A', capacity: 25 },
-  { id: 2, name: 'Class 10 - Evening Prime', classCode: 'CLASS_10', timing: '05:30 PM - 07:30 PM', tutor: 'Mrs. S. Lakshmi (Maths & Science)', room: 'Hall A', capacity: 30 },
-  { id: 3, name: 'Class 9 - Evening Batch', classCode: 'CLASS_9', timing: '05:00 PM - 06:30 PM', tutor: 'Mr. P. Verma', room: 'Room 102', capacity: 25 },
-  { id: 4, name: 'Class 8 - Foundation Batch', classCode: 'CLASS_8', timing: '04:30 PM - 06:00 PM', tutor: 'Ms. A. Reddy', room: 'Room 103', capacity: 20 },
-  { id: 5, name: 'Class 5 to 7 - Junior Champs', classCode: 'CLASS_6', timing: '04:00 PM - 05:30 PM', tutor: 'Mrs. K. Deepa', room: 'Room 101', capacity: 20 },
-  { id: 6, name: 'Class 1 to 4 - Primary Care', classCode: 'CLASS_3', timing: '04:00 PM - 05:15 PM', tutor: 'Ms. M. Priya', room: 'Room 104', capacity: 15 }
-];
+export const INITIAL_BATCHES = [];
+export const INITIAL_STUDENTS = [];
+export const INITIAL_FEES = [];
+export const INITIAL_RECEIPTS = [];
+export const INITIAL_EXAMS = [];
+export const INITIAL_MARKS = [];
+export const INITIAL_ATTENDANCE = [];
+export const INITIAL_ANNOUNCEMENTS = [];
+export const INITIAL_TUTOR_FEEDBACK = [];
+export const INITIAL_HOMEWORK = [];
 
-export const INITIAL_STUDENTS = [
-  { id: 1, admissionNo: 'ADM-1001', name: 'Aarav Kumar', gender: 'Male', classCode: 'CLASS_10', batchId: 2, school: 'St. Ann\'s High School', parentName: 'Rajesh Kumar', parentPhone: '9876543210', monthlyFee: 1250, status: 'ACTIVE', admissionDate: '2026-01-10' },
-  { id: 2, admissionNo: 'ADM-1002', name: 'Sneha Patel', gender: 'Female', classCode: 'CLASS_10', batchId: 2, school: 'Delhi Public School', parentName: 'Mahesh Patel', parentPhone: '9876543211', monthlyFee: 1250, status: 'ACTIVE', admissionDate: '2026-01-12' },
-  { id: 3, admissionNo: 'ADM-1003', name: 'Rohan Varma', gender: 'Male', classCode: 'CLASS_10', batchId: 1, school: 'Narayana Olympiad', parentName: 'K. Varma', parentPhone: '9876543212', monthlyFee: 1250, status: 'ACTIVE', admissionDate: '2026-01-15' },
-  { id: 4, admissionNo: 'ADM-1004', name: 'Pooja Reddy', gender: 'Female', classCode: 'CLASS_9', batchId: 3, school: 'Little Flower School', parentName: 'Suresh Reddy', parentPhone: '9876543213', monthlyFee: 1100, status: 'ACTIVE', admissionDate: '2026-01-18' },
-  { id: 5, admissionNo: 'ADM-1005', name: 'Karthik Rao', gender: 'Male', classCode: 'CLASS_9', batchId: 3, school: 'Bhavan\'s Sri Ramakrishna', parentName: 'G. Rao', parentPhone: '9876543214', monthlyFee: 1100, status: 'ACTIVE', admissionDate: '2026-01-20' },
-  { id: 6, admissionNo: 'ADM-1006', name: 'Ananya Sharma', gender: 'Female', classCode: 'CLASS_8', batchId: 4, school: 'Kendriya Vidyalaya', parentName: 'V. Sharma', parentPhone: '9876543215', monthlyFee: 900, status: 'ACTIVE', admissionDate: '2026-02-01' },
-  { id: 7, admissionNo: 'ADM-1007', name: 'Aditya Das', gender: 'Male', classCode: 'CLASS_7', batchId: 5, school: 'DAV Public School', parentName: 'Sunil Das', parentPhone: '9876543216', monthlyFee: 850, status: 'ACTIVE', admissionDate: '2026-02-05' },
-  { id: 8, admissionNo: 'ADM-1008', name: 'Diya Murthy', gender: 'Female', classCode: 'CLASS_6', batchId: 5, school: 'Sri Chaitanya Techno', parentName: 'Ravi Murthy', parentPhone: '9876543217', monthlyFee: 800, status: 'ACTIVE', admissionDate: '2026-02-10' },
-  { id: 9, admissionNo: 'ADM-1009', name: 'Sai Teja', gender: 'Male', classCode: 'CLASS_5', batchId: 5, school: 'St. Joseph\'s Convent', parentName: 'N. Teja', parentPhone: '9876543218', monthlyFee: 700, status: 'ACTIVE', admissionDate: '2026-02-15' },
-  { id: 10, admissionNo: 'ADM-1010', name: 'Kavya Singh', gender: 'Female', classCode: 'CLASS_4', batchId: 6, school: 'Army Public School', parentName: 'Arjun Singh', parentPhone: '9876543219', monthlyFee: 650, status: 'ACTIVE', admissionDate: '2026-02-18' },
-  { id: 11, admissionNo: 'ADM-1011', name: 'Manish Goud', gender: 'Male', classCode: 'CLASS_2', batchId: 6, school: 'St. Mary\'s High School', parentName: 'B. Goud', parentPhone: '9876543220', monthlyFee: 550, status: 'ACTIVE', admissionDate: '2026-02-22' },
-  { id: 12, admissionNo: 'ADM-1012', name: 'Isha Nambiar', gender: 'Female', classCode: 'CLASS_1', batchId: 6, school: 'Oakridge International', parentName: 'K. Nambiar', parentPhone: '9876543221', monthlyFee: 500, status: 'ACTIVE', admissionDate: '2026-03-01' }
-];
 
-export const INITIAL_FEES = [
-  { id: 1, studentId: 1, monthYear: 'March 2026', amountDue: 1250, amountPaid: 1250, balance: 0, status: 'PAID', lastPaymentDate: '2026-03-02', receiptNo: 'REC-2026-001', paymentMode: 'UPI' },
-  { id: 2, studentId: 2, monthYear: 'March 2026', amountDue: 1250, amountPaid: 1000, balance: 250, status: 'PARTIAL', lastPaymentDate: '2026-03-03', receiptNo: 'REC-2026-002', paymentMode: 'CASH' },
-  { id: 3, studentId: 3, monthYear: 'March 2026', amountDue: 1250, amountPaid: 0, balance: 1250, status: 'PENDING', lastPaymentDate: null, receiptNo: null, paymentMode: null },
-  { id: 4, studentId: 4, monthYear: 'March 2026', amountDue: 1100, amountPaid: 1100, balance: 0, status: 'PAID', lastPaymentDate: '2026-03-01', receiptNo: 'REC-2026-003', paymentMode: 'PHONEPE' },
-  { id: 5, studentId: 5, monthYear: 'March 2026', amountDue: 1100, amountPaid: 0, balance: 1100, status: 'PENDING', lastPaymentDate: null, receiptNo: null, paymentMode: null },
-  { id: 6, studentId: 6, monthYear: 'March 2026', amountDue: 900, amountPaid: 900, balance: 0, status: 'PAID', lastPaymentDate: '2026-03-04', receiptNo: 'REC-2026-004', paymentMode: 'GPAY' },
-  { id: 7, studentId: 7, monthYear: 'March 2026', amountDue: 850, amountPaid: 850, balance: 0, status: 'PAID', lastPaymentDate: '2026-03-05', receiptNo: 'REC-2026-005', paymentMode: 'CASH' },
-  { id: 8, studentId: 8, monthYear: 'March 2026', amountDue: 800, amountPaid: 0, balance: 800, status: 'PENDING', lastPaymentDate: null, receiptNo: null, paymentMode: null },
-  { id: 9, studentId: 9, monthYear: 'March 2026', amountDue: 700, amountPaid: 700, balance: 0, status: 'PAID', lastPaymentDate: '2026-03-02', receiptNo: 'REC-2026-006', paymentMode: 'UPI' },
-  { id: 10, studentId: 10, monthYear: 'March 2026', amountDue: 650, amountPaid: 650, balance: 0, status: 'PAID', lastPaymentDate: '2026-03-03', receiptNo: 'REC-2026-007', paymentMode: 'CASH' }
-];
+// Helper: Synthesize parent-friendly feedback note from 3-tap picks
+export function generateParentFeedbackMessage({
+  strength = 'Concepts',
+  improvementArea = 'Accuracy',
+  nextStep = 'Practice 5 problems',
+  studentName = 'Your child',
+  monthlyProgress = 'Improving'
+}) {
+  const strengthMap = {
+    'Concepts': 'understands core concepts very well and grasps classroom explanations quickly',
+    'Problem Solving': 'demonstrates sharp problem-solving skills and methodical thinking',
+    'Homework': 'is diligent and completes assigned homework consistently on time',
+    'Participation': 'actively participates in class discussions and shows enthusiastic interest',
+    'Reading': 'reads lesson material attentively and follows textbook topics thoroughly'
+  };
 
-export const INITIAL_RECEIPTS = [
-  { id: 1, receiptNo: 'REC-2026-001', studentId: 1, studentName: 'Aarav Kumar', classCode: 'CLASS_10', amount: 1250, monthYear: 'March 2026', date: '2026-03-02', mode: 'UPI', transactionRef: 'UPI-9831741289', notes: 'Monthly tuition full payment' },
-  { id: 2, receiptNo: 'REC-2026-002', studentId: 2, studentName: 'Sneha Patel', classCode: 'CLASS_10', amount: 1000, monthYear: 'March 2026', date: '2026-03-03', mode: 'CASH', transactionRef: 'CASH-REC', notes: 'Partial payment - balance Rs 250' },
-  { id: 3, receiptNo: 'REC-2026-003', studentId: 4, studentName: 'Pooja Reddy', classCode: 'CLASS_9', amount: 1100, monthYear: 'March 2026', date: '2026-03-01', mode: 'PHONEPE', transactionRef: 'PP-18928371', notes: 'Full fee cleared' }
-];
+  const improvementMap = {
+    'Concept Clarity': 'further strengthening foundational clarity in complex topics',
+    'Problem Solving': 'structuring step-by-step problem-solving approaches',
+    'Accuracy': 'improving calculation accuracy and minimizing avoidable test mistakes',
+    'Speed': 'enhancing solving speed and effective time management during tests',
+    'Revision': 'maintaining regular weekly revision of covered chapters',
+    'Homework': 'bringing more consistency and completeness to daily homework',
+    'Participation': 'speaking up more confidently and actively resolving doubts'
+  };
 
-export const INITIAL_EXAMS = [
-  { id: 1, title: 'Class 10 - Mathematics Unit Test (Linear Equations)', classCode: 'CLASS_10', subject: 'Mathematics', totalMarks: 50, passingMarks: 18, date: '2026-02-25' },
-  { id: 2, title: 'Class 10 - Physical Science Slip Test', classCode: 'CLASS_10', subject: 'Physics', totalMarks: 25, passingMarks: 10, date: '2026-02-28' },
-  { id: 3, title: 'Class 9 - Biology Fundamentals Quiz', classCode: 'CLASS_9', subject: 'Biology', totalMarks: 30, passingMarks: 12, date: '2026-03-01' }
-];
+  const nextStepMap = {
+    'Daily 15-min revision': 'dedicating 15 minutes every day for focused concept revision',
+    'Practice 5 problems': 'practicing 5 targeted problems daily',
+    'Revise weak topics': 'revisiting weak spots and reviewing chapter summaries',
+    'Complete pending work': 'clearing pending exercises systematically before the next session',
+    'Read and explain the lesson': 'reading lessons aloud and explaining the main points in their own words',
+    'Practice mistakes from previous test': 're-solving test mistakes carefully to avoid repeating them'
+  };
 
-export const INITIAL_MARKS = [
-  { id: 1, examId: 1, studentId: 1, marksObtained: 47, remarks: 'Outstanding work!' },
-  { id: 2, examId: 1, studentId: 2, marksObtained: 42, remarks: 'Very good' },
-  { id: 3, examId: 1, studentId: 3, marksObtained: 38, remarks: 'Needs more practice in word problems' },
-  { id: 4, examId: 2, studentId: 1, marksObtained: 24, remarks: 'Excellent' },
-  { id: 5, examId: 2, studentId: 2, marksObtained: 21, remarks: 'Good grasp of optics' }
-];
+  const strText = strengthMap[strength] || 'shows sincere effort in class';
+  const impText = improvementMap[improvementArea] || 'focusing on key growth areas';
+  const stepText = nextStepMap[nextStep] || 'consistent daily practice';
 
-export const INITIAL_ATTENDANCE = [
-  { id: 1, studentId: 1, date: new Date().toISOString().split('T')[0], status: 'PRESENT', batchId: 2 },
-  { id: 2, studentId: 2, date: new Date().toISOString().split('T')[0], status: 'PRESENT', batchId: 2 },
-  { id: 3, studentId: 3, date: new Date().toISOString().split('T')[0], status: 'ABSENT', batchId: 1, remarks: 'Fever reported by parent' },
-  { id: 4, studentId: 4, date: new Date().toISOString().split('T')[0], status: 'PRESENT', batchId: 3 },
-  { id: 5, studentId: 5, date: new Date().toISOString().split('T')[0], status: 'PRESENT', batchId: 3 }
-];
+  let icon = '🌱';
+  if (monthlyProgress === 'Excellent') icon = '🚀';
+  else if (monthlyProgress === 'Good' || monthlyProgress === 'Improving') icon = '🌟';
 
-export const INITIAL_ANNOUNCEMENTS = [
-  {
-    id: 1,
-    title: 'Special Sunday Tuition Class',
-    message: 'Dear Sir/Mam, Please note that there will be a Special Sunday Revision Class for Class 10 on Sunday from 09:00 AM to 12:00 PM for board exam preparation. Attendance is compulsory.',
-    targetType: 'ALL',
-    targetId: null,
-    targetName: 'All Students & Batches',
-    postedBy: 'Admin (Director)',
-    date: new Date().toISOString().split('T')[0],
-    createdAt: new Date().toISOString()
+  return `${icon} Child Improvement Plan: ${studentName} ${strText}. The primary focus this month is ${impText}. We recommend ${stepText}, which will solidify understanding and bring noticeable improvement.`;
+}
+
+// Helper: Check goal achievement status against test marks
+export function calculateStudentGoalProgress(goal, marks = [], exams = []) {
+  if (!goal || !goal.targetScore) return null;
+
+  const matchingMarks = (marks || []).filter(m => {
+    const exam = (exams || []).find(e => e.id === m.examId);
+    const markSubject = (m.subject || exam?.subject || '').toLowerCase().trim();
+    const goalSubject = (goal.subject || '').toLowerCase().trim();
+    return markSubject.includes(goalSubject) || goalSubject.includes(markSubject);
+  });
+
+  if (matchingMarks.length === 0) {
+    return {
+      ...goal,
+      currentProgress: goal.currentScore || 0,
+      achieved: false,
+      status: 'IN_PROGRESS',
+      latestExamMarks: null
+    };
   }
-];
+
+  const latestMark = matchingMarks[matchingMarks.length - 1];
+  const exam = (exams || []).find(e => e.id === latestMark.examId);
+  const totalMarks = exam?.totalMarks || 50;
+  const percentage = Math.round((Number(latestMark.marksObtained) / totalMarks) * 100);
+
+  const achieved = percentage >= goal.targetScore;
+  return {
+    ...goal,
+    currentProgress: percentage,
+    achieved,
+    status: achieved ? 'ACHIEVED' : 'IN_PROGRESS',
+    latestExamMarks: `${latestMark.marksObtained}/${totalMarks} (${percentage}%)`
+  };
+}
 
 // Initialize Storage
 export function getStoredData() {
@@ -105,9 +120,47 @@ export function getStoredData() {
   if (existing) {
     try {
       const parsed = JSON.parse(existing);
-      if (!parsed.announcements || !Array.isArray(parsed.announcements)) {
-        parsed.announcements = INITIAL_ANNOUNCEMENTS;
+
+      // Clean out any legacy static mock/demo records so they never pollute production
+      if (Array.isArray(parsed.students)) {
+        parsed.students = parsed.students.filter(s => 
+          !s.admissionNo?.startsWith('ADM-10') && 
+          s.name !== 'Aarav Kumar' && 
+          s.name !== 'Sneha Patel' &&
+          s.name !== 'Rohan Varma' &&
+          s.name !== 'Pooja Reddy' &&
+          s.name !== 'Karthik Rao'
+        );
       }
+      if (Array.isArray(parsed.batches)) {
+        parsed.batches = parsed.batches.filter(b => 
+          b.name !== 'Class 10 - Morning Focus' && 
+          b.name !== 'Class 10 - Evening Prime' &&
+          b.name !== 'Class 9 - Evening Batch' &&
+          b.name !== 'Class 8 - Foundation Batch' &&
+          b.name !== 'Class 5 to 7 - Junior Champs' &&
+          b.name !== 'Class 1 to 4 - Primary Care'
+        );
+      }
+      if (Array.isArray(parsed.exams)) {
+        parsed.exams = parsed.exams.filter(e => 
+          !e.title?.includes('Linear Equations') &&
+          !e.title?.includes('Slip Test') &&
+          !e.title?.includes('Fundamentals Quiz')
+        );
+      }
+
+      if (!parsed.batches || !Array.isArray(parsed.batches)) parsed.batches = [];
+      if (!parsed.students || !Array.isArray(parsed.students)) parsed.students = [];
+      if (!parsed.fees || !Array.isArray(parsed.fees)) parsed.fees = [];
+      if (!parsed.receipts || !Array.isArray(parsed.receipts)) parsed.receipts = [];
+      if (!parsed.exams || !Array.isArray(parsed.exams)) parsed.exams = [];
+      if (!parsed.marks || !Array.isArray(parsed.marks)) parsed.marks = [];
+      if (!parsed.attendance || !Array.isArray(parsed.attendance)) parsed.attendance = [];
+      if (!parsed.announcements || !Array.isArray(parsed.announcements)) parsed.announcements = [];
+      if (!parsed.tutorFeedback || !Array.isArray(parsed.tutorFeedback)) parsed.tutorFeedback = [];
+      if (!parsed.homework || !Array.isArray(parsed.homework)) parsed.homework = [];
+
       if (Array.isArray(parsed.classes)) {
         let changed = false;
         parsed.classes = parsed.classes.map(c => {
@@ -130,20 +183,11 @@ export function getStoredData() {
       console.error('Failed to parse local storage', e);
     }
   }
-  const defaultData = {
-    classes: INITIAL_CLASSES,
-    batches: INITIAL_BATCHES,
-    students: INITIAL_STUDENTS,
-    fees: INITIAL_FEES,
-    receipts: INITIAL_RECEIPTS,
-    exams: INITIAL_EXAMS,
-    marks: INITIAL_MARKS,
-    attendance: INITIAL_ATTENDANCE,
-    announcements: INITIAL_ANNOUNCEMENTS
-  };
+  const defaultData = getEmptyTuitionData();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
   return defaultData;
 }
+
 
 export function saveStoredData(data) {
   if (data && Array.isArray(data.classes)) {
@@ -209,7 +253,9 @@ export function getEmptyTuitionData() {
     exams: [],
     marks: [],
     attendance: [],
-    announcements: []
+    announcements: [],
+    tutorFeedback: [],
+    homework: []
   };
 }
 

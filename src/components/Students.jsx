@@ -14,10 +14,12 @@ import {
   X,
   IndianRupee,
   Award,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { logger, LOG_CATEGORIES } from '../lib/logger';
+import TutorFeedbackModal from './TutorFeedbackModal';
 
 export default function Students({ 
   data, 
@@ -25,27 +27,42 @@ export default function Students({
   selectedClassFilter, 
   setSelectedClassFilter,
   admitModalOpen,
-  setAdmitModalOpen 
+  setAdmitModalOpen,
+  currentUser
 }) {
-  const { students = [], batches = [], classes = [], fees = [], exams = [], marks = [] } = data;
+  const { students = [], batches = [], classes = [], fees = [], exams = [], marks = [], tutorFeedback = [], attendance = [] } = data;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [feedbackStudent, setFeedbackStudent] = useState(null);
 
   const [formErrors, setFormErrors] = useState({});
+
+  const generateNextAdmissionNo = (existingStudents = []) => {
+    let maxNum = 0;
+    (existingStudents || []).forEach(s => {
+      const match = (s.admissionNo || '').match(/HGT26-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    const nextNum = maxNum > 0 ? maxNum + 1 : ((existingStudents || []).length + 1);
+    return `HGT26-${String(nextNum).padStart(3, '0')}`;
+  };
 
   // New Student Form State
   const [formData, setFormData] = useState({
     name: '',
-    admissionNo: `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
+    admissionNo: generateNextAdmissionNo(students),
     gender: 'Male',
-    classCode: 'CLASS_10',
+    classCode: 'CLASS_1',
     batchId: '',
     school: '',
     parentName: '',
     parentPhone: '',
-    monthlyFee: 1250,
+    monthlyFee: 500,
     admissionDate: new Date().toISOString().split('T')[0],
     address: ''
   });
@@ -253,16 +270,19 @@ export default function Students({
           className="btn btn-primary"
           onClick={() => {
             setEditingStudent(null);
+            const defaultClass = selectedClassFilter && selectedClassFilter.startsWith('CLASS_') ? selectedClassFilter : 'CLASS_1';
+            const matchedClass = classes.find(c => c.code === defaultClass);
             setFormData({
               name: '',
-              admissionNo: `ADM-${Math.floor(1000 + Math.random() * 9000)}`,
+              admissionNo: generateNextAdmissionNo(students),
               gender: 'Male',
-              classCode: 'CLASS_10',
+              classCode: defaultClass,
               batchId: '',
               school: '',
               parentName: '',
               parentPhone: '',
-              monthlyFee: 1250,
+              monthlyFee: matchedClass?.defaultFee || 500,
+              admissionDate: new Date().toISOString().split('T')[0],
               address: ''
             });
             setAdmitModalOpen(true);
@@ -422,6 +442,14 @@ export default function Students({
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div className="action-buttons-flex">
+                        <button 
+                          className="btn-icon" 
+                          title="3-Tap Monthly Feedback & Goal"
+                          style={{ color: '#F59E0B' }}
+                          onClick={() => setFeedbackStudent(student)}
+                        >
+                          <Sparkles size={15} />
+                        </button>
                         <button 
                           className="btn-icon" 
                           title="View Profile & Ledger"
@@ -764,13 +792,63 @@ export default function Students({
               )}
             </div>
 
-            <div className="modal-actions-flex mt-4">
+            <div className="modal-actions-flex mt-4" style={{ justifyContent: 'space-between' }}>
+              <button 
+                type="button"
+                className="btn btn-secondary" 
+                style={{ borderColor: 'rgba(245, 158, 11, 0.4)', color: '#FBBF24', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => setFeedbackStudent(selectedStudent)}
+              >
+                <Sparkles size={14} />
+                <span>3-Tap Feedback & Goals</span>
+              </button>
               <button className="btn btn-secondary" onClick={() => setSelectedStudent(null)}>
                 Close
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* 3-Tap Tutor Feedback & Child Improvement Modal */}
+      {feedbackStudent && (
+        <TutorFeedbackModal
+          student={feedbackStudent}
+          existingFeedback={(tutorFeedback || []).find(f => f.studentId === feedbackStudent.id)}
+          studentMarks={(marks || []).filter(m => m.studentId === feedbackStudent.id).map(m => {
+            const exam = (exams || []).find(e => e.id === m.examId);
+            return {
+              ...m,
+              totalMarks: exam?.totalMarks || 50,
+              passingMarks: exam?.passingMarks || 18,
+              subject: m.subject || exam?.subject || 'Mathematics',
+              examTitle: exam?.title || 'Class Test'
+            };
+          })}
+          attendanceRate={(() => {
+            const stdAtt = (attendance || []).filter(a => a.studentId === feedbackStudent.id);
+            if (stdAtt.length === 0) return 92;
+            const pres = stdAtt.filter(a => a.status === 'PRESENT').length;
+            return Math.round((pres / stdAtt.length) * 100);
+          })()}
+          classes={classes}
+          currentUser={currentUser}
+          onSaveFeedback={(newFb) => {
+            const existingIdx = (tutorFeedback || []).findIndex(f => f.studentId === feedbackStudent.id && f.monthYear === newFb.monthYear);
+            let updatedFb = [...(tutorFeedback || [])];
+            if (existingIdx >= 0) {
+              updatedFb[existingIdx] = newFb;
+            } else {
+              updatedFb.push(newFb);
+            }
+            onSaveData({
+              ...data,
+              tutorFeedback: updatedFb
+            });
+            logger.action(currentUser, 'UPDATE_TUTOR_FEEDBACK', `Saved 3-tap monthly evaluation for ${feedbackStudent.name}`, { studentId: feedbackStudent.id, monthYear: newFb.monthYear });
+          }}
+          onClose={() => setFeedbackStudent(null)}
+        />
       )}
 
       <style>{`
