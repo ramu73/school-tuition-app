@@ -66,6 +66,7 @@ export default function TutorFeedbackModal({
 }) {
   if (!student) return null;
 
+  const isTeacher = currentUser?.role === 'TEACHER';
   const currentMonthYear = 'March 2026';
   const studentClass = classes.find(c => c.code === student.classCode);
   const classSubjects = studentClass?.subjects || ['Mathematics', 'Science', 'English'];
@@ -155,6 +156,7 @@ export default function TutorFeedbackModal({
   };
 
   const handleWhatsAppSend = () => {
+    if (isTeacher) return;
     const cleanPhone = (student.parentPhone || '').replace(/\D/g, '');
     const goalText = `🎯 *This Month's Goal:* Improve ${goalSubject} from ${goalCurrentScore}% → ${goalTargetScore}%`;
 
@@ -543,15 +545,21 @@ ${tutorRemark ? `💬 *Tutor Remark:* "${tutorRemark}"\n` : ''}
 
         {/* Modal Actions */}
         <div className="modal-actions-flex pt-3" style={{ borderTop: '1px solid var(--border-subtle)', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-          <button 
-            type="button"
-            className="btn btn-success"
-            onClick={handleWhatsAppSend}
-            style={{ background: '#10B981', color: 'white', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <MessageSquare size={14} />
-            <span>Send to Parent WhatsApp</span>
-          </button>
+          {!isTeacher ? (
+            <button 
+              type="button"
+              className="btn btn-success"
+              onClick={handleWhatsAppSend}
+              style={{ background: '#10B981', color: 'white', border: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <MessageSquare size={14} />
+              <span>Send to Parent WhatsApp</span>
+            </button>
+          ) : (
+            <div className="text-xs text-muted flex items-center gap-1.5" style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+              <span>🔒 Feedback will be published to Student & Parent Portal</span>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <button type="button" className="btn btn-secondary" onClick={onClose}>

@@ -425,9 +425,9 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     ].join('\n');
   };
 
-  // Share Scorecard directly to the Parent's WhatsApp chat (NO unwanted auto-downloads or popups)
+  // Share Scorecard directly to the Parent's WhatsApp chat (Admin only)
   const handleShareCardImage = (student, exam, mark) => {
-    if (!student || !exam) return;
+    if (isTeacher || !student || !exam) return;
     const targetPhone = getCleanWhatsAppPhone(student.parentPhone);
     const textMessage = buildScorecardTextMessage(student, exam, mark);
 
@@ -771,25 +771,27 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                             <FileText size={13} />
                             <span>Scorecard</span>
                           </button>
-                          <button 
-                            className="btn btn-sm"
-                            onClick={() => setReportCardStudent({ student, exam: currentExam, mark: markRecord, autoShare: true })}
-                            disabled={!hasMarks}
-                            title={`Send Scorecard Card to ${student.parentName} (${student.parentPhone}) via WhatsApp`}
-                            style={{ 
-                              background: '#10B981', 
-                              color: 'white', 
-                              border: 'none', 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '4px',
-                              opacity: hasMarks ? 1 : 0.4,
-                              cursor: hasMarks ? 'pointer' : 'not-allowed'
-                            }}
-                          >
-                            <MessageSquare size={13} />
-                            <span>WhatsApp</span>
-                          </button>
+                          {!isTeacher && (
+                            <button 
+                              className="btn btn-sm"
+                              onClick={() => setReportCardStudent({ student, exam: currentExam, mark: markRecord, autoShare: true })}
+                              disabled={!hasMarks}
+                              title={`Send Scorecard Card to ${student.parentName} via WhatsApp`}
+                              style={{ 
+                                background: '#10B981', 
+                                color: 'white', 
+                                border: 'none', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px',
+                                opacity: hasMarks ? 1 : 0.4,
+                                cursor: hasMarks ? 'pointer' : 'not-allowed'
+                              }}
+                            >
+                              <MessageSquare size={13} />
+                              <span>WhatsApp</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1233,26 +1235,28 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                     <span>Print Scorecard</span>
                   </button>
 
-                  <button 
-                    type="button"
-                    className="btn"
-                    disabled={isSharingCard}
-                    onClick={() => handleShareCardImage(student, exam, mark)}
-                    style={{
-                      background: '#10B981',
-                      color: 'white',
-                      border: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      fontWeight: 600,
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
-                    }}
-                    title={`Send directly to ${student.name}'s parent (${student.parentPhone}) on WhatsApp`}
-                  >
-                    <MessageSquare size={15} />
-                    <span>{isSharingCard ? 'Opening...' : 'Send to WhatsApp'}</span>
-                  </button>
+                  {!isTeacher && (
+                    <button 
+                      type="button"
+                      className="btn"
+                      disabled={isSharingCard}
+                      onClick={() => handleShareCardImage(student, exam, mark)}
+                      style={{
+                        background: '#10B981',
+                        color: 'white',
+                        border: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        fontWeight: 600,
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                      }}
+                      title="Send directly to parent on WhatsApp"
+                    >
+                      <MessageSquare size={15} />
+                      <span>{isSharingCard ? 'Opening...' : 'Send to WhatsApp'}</span>
+                    </button>
+                  )}
 
                   <button 
                     type="button" 

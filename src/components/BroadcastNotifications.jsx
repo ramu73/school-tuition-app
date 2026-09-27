@@ -19,7 +19,9 @@ import {
   UserCheck,
   Search,
   CheckSquare,
-  Square
+  Square,
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
@@ -198,23 +200,26 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
       .replace(/{class_name}/g, studentClass?.name || 'Class');
   };
 
-  // Build WhatsApp URL
+  // Build WhatsApp URL (Admin only)
   const getWhatsAppUrlForStudent = (student) => {
+    if (isTeacher) return '';
     const cleanPhone = String(student?.parentPhone || '').replace(/\D/g, '');
     const personalized = formatMessageForStudent(message, student);
     return `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(personalized)}`;
   };
 
-  // Mark sent when clicked
+  // Mark sent when clicked (Admin only)
   const handleOpenWhatsApp = (student) => {
-    if (!student) return;
+    if (isTeacher || !student) return;
     const url = getWhatsAppUrlForStudent(student);
+    if (!url) return;
     window.open(url, '_blank');
     setSentStudentIds(prev => new Set([...prev, student.id]));
   };
 
-  // Copy All Phone Numbers
+  // Copy All Phone Numbers (Admin only)
   const handleCopyPhoneNumbers = () => {
+    if (isTeacher) return;
     const numbers = targetRecipients
       .map(s => String(s?.parentPhone || '').replace(/\D/g, ''))
       .filter(Boolean)
@@ -226,6 +231,8 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
       setTimeout(() => setCopiedNumbers(false), 2200);
     });
   };
+
+
 
   // Copy Formatted Message
   const handleCopyFormattedMessage = () => {
@@ -298,8 +305,9 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
     }
   };
 
-  // Open next unsent student WhatsApp
+  // Open next unsent student WhatsApp (Admin only)
   const handleOpenNextUnsent = () => {
+    if (isTeacher) return;
     const unsent = targetRecipients.find(s => !sentStudentIds.has(s.id));
     if (unsent) {
       handleOpenWhatsApp(unsent);
@@ -336,13 +344,19 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
       </div>
 
       {isTeacher && (
-        <div className="teacher-scope-banner glass-card mb-4" style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)' }}>
-          <div className="flex items-center gap-2 text-xs">
-            <Users size={15} className="text-emerald" />
-            <span className="font-semibold text-white">Faculty Access:</span>
-            <span className="text-slate-300">
-              You are authorized to broadcast notices to students in your {accessibleBatches.length} assigned batches.
-            </span>
+        <div className="teacher-scope-banner glass-card mb-4" style={{ padding: '12px 16px', background: 'rgba(99, 102, 241, 0.08)', borderColor: 'rgba(99, 102, 241, 0.25)', borderRadius: 'var(--radius-md)' }}>
+          <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Users size={16} className="text-indigo-400 flex-shrink-0" />
+              <span className="font-semibold text-white">Faculty Portal Announcements:</span>
+              <span className="text-slate-300">
+                You are authorized to publish announcements to students in your {accessibleBatches.length} assigned batches.
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-amber-300 font-medium px-2.5 py-1 rounded" style={{ background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+              <ShieldCheck size={14} className="text-amber-400 flex-shrink-0" />
+              <span>Parent Contacts Protected (Admin Only)</span>
+            </div>
           </div>
         </div>
       )}
@@ -713,25 +727,29 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
             <div className="roster-header-row">
               <div>
                 <div className="font-semibold text-sm text-white flex items-center gap-2">
-                  <span>Target Parents ({targetRecipients.length})</span>
+                  <span>{isTeacher ? 'Target Student Audience' : 'Target Parents'} ({targetRecipients.length})</span>
                   <span className="badge badge-class text-xs">{getTargetDescription()}</span>
                 </div>
                 <div className="text-xs text-muted mt-0.5">
-                  {sentStudentIds.size} of {targetRecipients.length} messaged
+                  {isTeacher 
+                    ? 'Official notices will be published to the Student & Parent Portal' 
+                    : `${sentStudentIds.size} of ${targetRecipients.length} messaged`}
                 </div>
               </div>
 
-              {/* Bulk Quick Action Buttons */}
+              {/* Bulk Quick Action Buttons (Admin Only for Phone Actions) */}
               <div className="flex items-center gap-2 flex-wrap">
-                <button 
-                  type="button"
-                  className={`btn btn-xs ${copiedNumbers ? 'btn-success' : 'btn-secondary'}`}
-                  onClick={handleCopyPhoneNumbers}
-                  title="Copy all parent phone numbers for WhatsApp group"
-                >
-                  {copiedNumbers ? <Check size={12} /> : <Copy size={12} />}
-                  <span>{copiedNumbers ? 'Numbers Copied!' : 'Copy Numbers'}</span>
-                </button>
+                {!isTeacher && (
+                  <button 
+                    type="button"
+                    className={`btn btn-xs ${copiedNumbers ? 'btn-success' : 'btn-secondary'}`}
+                    onClick={handleCopyPhoneNumbers}
+                    title="Copy all parent phone numbers for WhatsApp group"
+                  >
+                    {copiedNumbers ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{copiedNumbers ? 'Numbers Copied!' : 'Copy Numbers'}</span>
+                  </button>
+                )}
 
                 <button 
                   type="button"
@@ -743,15 +761,17 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
                   <span>{copiedMessage ? 'Copied!' : 'Copy Text'}</span>
                 </button>
 
-                <button 
-                  type="button"
-                  className="btn btn-xs btn-primary"
-                  onClick={handleOpenNextUnsent}
-                  title="Open WhatsApp for the next unsent parent"
-                >
-                  <ArrowRight size={12} />
-                  <span>Next Unsent</span>
-                </button>
+                {!isTeacher && (
+                  <button 
+                    type="button"
+                    className="btn btn-xs btn-primary"
+                    onClick={handleOpenNextUnsent}
+                    title="Open WhatsApp for the next unsent parent"
+                  >
+                    <ArrowRight size={12} />
+                    <span>Next Unsent</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -793,30 +813,42 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
                           <span className="badge badge-class text-3xs">{studentClass?.name || student.classCode}</span>
                         </div>
                         <div className="text-3xs text-muted flex items-center gap-1.5 mt-0.5">
-                          <span>Parent: {student.parentName}</span>
-                          <span>•</span>
-                          <span className="font-mono text-emerald">{student.parentPhone}</span>
+                          <span>Parent: {student.parentName || 'Parent'}</span>
+                          {!isTeacher && (
+                            <>
+                              <span>•</span>
+                              <span className="font-mono text-emerald">{student.parentPhone}</span>
+                            </>
+                          )}
                           <span>•</span>
                           <span>{studentBatch?.name || 'Main Batch'}</span>
                         </div>
                       </div>
 
                       <div className="recipient-action-col">
-                        {isSent && (
-                          <span className="sent-status-badge">
-                            <CheckCircle2 size={11} className="text-emerald" />
-                            <span>Sent</span>
+                        {!isTeacher ? (
+                          <>
+                            {isSent && (
+                              <span className="sent-status-badge">
+                                <CheckCircle2 size={11} className="text-emerald" />
+                                <span>Sent</span>
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-xs btn-success whatsapp-send-btn"
+                              onClick={() => handleOpenWhatsApp(student)}
+                              title="Open WhatsApp chat with pre-filled customized message"
+                            >
+                              <Send size={11} />
+                              <span>WhatsApp</span>
+                            </button>
+                          </>
+                        ) : (
+                          <span className="badge badge-secondary text-3xs" style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                            Portal Notice
                           </span>
                         )}
-                        <button
-                          type="button"
-                          className="btn btn-xs btn-success whatsapp-send-btn"
-                          onClick={() => handleOpenWhatsApp(student)}
-                          title="Open WhatsApp chat with pre-filled customized message"
-                        >
-                          <Send size={11} />
-                          <span>WhatsApp</span>
-                        </button>
                       </div>
                     </div>
                   );
