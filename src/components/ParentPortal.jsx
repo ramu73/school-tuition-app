@@ -59,6 +59,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const [activePortalSection, setActivePortalSection] = useState('overview'); // overview, attendance, exams, homework, feedback, progress
   const [feeModalOpen, setFeeModalOpen] = useState(false);
   const [noticesModalOpen, setNoticesModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [activeScorecard, setActiveScorecard] = useState(null);
   const [downloadingScorecard, setDownloadingScorecard] = useState(false);
 
@@ -207,8 +208,26 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   });
 
   const facultyWhatsAppUrl = `https://wa.me/919848266892?text=${encodeURIComponent(
-    `Hello Hayagriva Tutorials, I am ${currentUser?.name || currentStudent?.parentName || 'Parent'}, parent of ${currentStudent?.name} (${studentClass?.name || 'Class'}). I would like an update regarding my child's studies.`
+    `Hello Hayagriva Tutorials, I am ${currentUser?.name || currentStudent?.parentName || 'Parent'}, parent of ${currentStudent?.name || 'Student'} (${studentClass?.name || 'Class'}). I would like an update regarding my child's studies.`
   )}`;
+
+  if (!currentStudent) {
+    return (
+      <div className="parent-portal-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: '24px' }}>
+        <div className="glass-card" style={{ maxWidth: '440px', width: '100%', textAlign: 'center', padding: '32px' }}>
+          <HayagrivaLogo size={48} showGlow={false} />
+          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: '16px' }}>Student Profile Not Found</h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginTop: '8px', lineHeight: '1.5' }}>
+            We could not find active student records linked to mobile number <strong>{parentPhone || 'entered'}</strong>. Please contact academy administration to verify your registered number.
+          </p>
+          <button type="button" className="btn btn-secondary" style={{ marginTop: '20px', display: 'inline-flex', alignItems: 'center', gap: '8px' }} onClick={onLogout}>
+            <LogOut size={16} />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="parent-portal-container">
@@ -998,7 +1017,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
 
             <div className="p-4">
               <div className="text-xs text-secondary mb-3">
-                Have questions regarding {currentStudent.name}'s studies or attendance? Connect directly with faculty:
+                Have questions regarding {currentStudent?.name || 'your child'}'s studies or attendance? Connect directly with faculty:
               </div>
 
               <div className="flex flex-col gap-2.5">
