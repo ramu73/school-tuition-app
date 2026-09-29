@@ -318,6 +318,20 @@ export default function App() {
           handleStaffChange();
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_marks' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
+      })
       .subscribe();
 
     return () => {

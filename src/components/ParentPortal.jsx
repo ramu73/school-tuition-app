@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   User, 
   Calendar, 
@@ -24,7 +24,10 @@ import {
   Layers,
   BarChart3,
   CalendarDays,
-  Download
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Check
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { calculateStudentGoalProgress } from '../lib/storage';
@@ -57,6 +60,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   );
 
   const [activePortalSection, setActivePortalSection] = useState('overview'); // overview, attendance, exams, homework, feedback, progress
+  const [calDate, setCalDate] = useState(() => new Date());
+  const [attendanceDisplayMode, setAttendanceDisplayMode] = useState('calendar'); // 'calendar' | 'list'
   const [feeModalOpen, setFeeModalOpen] = useState(false);
   const [noticesModalOpen, setNoticesModalOpen] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
@@ -111,6 +116,46 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const totalMarkedDays = studentAttendance.length;
   const attendanceRate = totalMarkedDays > 0 ? Math.round((presentDays / totalMarkedDays) * 100) : 94;
   const recentAttendance = [...studentAttendance].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10);
+
+  // Calendar calculations for selected month
+  const calYear = calDate.getFullYear();
+  const calMonth = calDate.getMonth(); // 0 to 11
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const calMonthLabel = `${monthNames[calMonth]} ${calYear}`;
+  const daysInCalMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const startDayOfWeek = new Date(calYear, calMonth, 1).getDay(); // 0 = Sunday
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const studentMonthAttendanceMap = useMemo(() => {
+    const map = new Map();
+    studentAttendance.forEach(a => {
+      if (a.date) {
+        map.set(a.date, a);
+      }
+    });
+    return map;
+  }, [studentAttendance]);
+
+  const currentMonthRecords = studentAttendance.filter(a => {
+    if (!a.date) return false;
+    const parts = a.date.split('-');
+    if (parts.length < 2) return false;
+    return Number(parts[0]) === calYear && Number(parts[1]) === (calMonth + 1);
+  });
+
+  const monthPresentCount = currentMonthRecords.filter(a => a.status === 'PRESENT').length;
+  const monthAbsentCount = currentMonthRecords.filter(a => a.status === 'ABSENT').length;
+  const monthTotalCount = currentMonthRecords.length;
+  const monthPercentage = monthTotalCount > 0 
+    ? Math.round((monthPresentCount / monthTotalCount) * 100) 
+    : 100;
+
+  const monthAbsenceList = currentMonthRecords
+    .filter(a => a.status === 'ABSENT')
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
   // Student Exam Marks & Trends
   const studentMarks = marks.filter(m => m.studentId === currentStudent?.id).map(m => {
@@ -671,7 +716,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       )}
 
       {/* ============================================================== */}
-      {/* 1. ATTENDANCE SECTION */}
+      {/* 1. ATTENDANCE SECTION (Interactive Calendar with Absence Highlights) */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'attendance') && (
         <div className="portal-section-card glass-card">
@@ -680,47 +725,272 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <div className="title-icon-badge bg-emerald-soft">
                 <Calendar size={18} className="text-emerald" />
               </div>
-              <h3 className="section-title">Attendance &amp; Regularity Log</h3>
+              <div>
+                <h3 className="section-title">Attendance &amp; Regularity Calendar</h3>
+                <p className="text-3xs text-secondary mt-0.5">Monthly calendar view with highlighted absence days and tutor remarks</p>
+              </div>
             </div>
-            <span className="badge badge-success font-mono text-xs">{attendanceRate}% Present</span>
+
+            <div className="flex items-center gap-2">
+              <div className="attendance-view-toggle">
+                <button
+                  type="button"
+                  className={`btn-toggle-view ${attendanceDisplayMode === 'calendar' ? 'active' : ''}`}
+                  onClick={() => setAttendanceDisplayMode('calendar')}
+                >
+                  <Calendar size={12} />
+                  <span>Calendar</span>
+                </button>
+                <button
+                  type="button"
+                  className={`btn-toggle-view ${attendanceDisplayMode === 'list' ? 'active' : ''}`}
+                  onClick={() => setAttendanceDisplayMode('list')}
+                >
+                  <FileText size={12} />
+                  <span>List</span>
+                </button>
+              </div>
+              <span className={`badge ${monthAbsentCount > 0 ? 'badge-warning' : 'badge-success'} font-mono text-xs`}>
+                {monthTotalCount > 0 ? `${monthPercentage}% ${monthNames[calMonth]}` : `${attendanceRate}% Overall`}
+              </span>
+            </div>
           </div>
 
-          <div className="attendance-grid-layout">
-            <div>
-              <div className="text-xs font-semibold text-secondary mb-2">Recent Roll Call Records:</div>
-              {recentAttendance.length === 0 ? (
-                <div className="text-xs text-muted">Attendance records will appear here as daily roll calls are recorded.</div>
-              ) : (
-                <div className="attendance-log-pills">
-                  {recentAttendance.map((rec, i) => (
-                    <div key={i} className={`attendance-log-item ${rec.status === 'ABSENT' ? 'log-absent' : 'log-present'}`}>
-                      <span className="log-date font-mono">{rec.date}</span>
-                      <span className={`badge badge-sm ${rec.status === 'ABSENT' ? 'badge-danger' : 'badge-success'}`}>
-                        {rec.status === 'ABSENT' ? '✕ Absent' : '✓ Present'}
-                      </span>
+          {/* 🚨 Prominent High-Visibility Absence Alert */}
+          {monthAbsentCount > 0 ? (
+            <div className="absence-banner-card mb-4">
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="absence-pulsing-dot" />
+                  <span className="font-bold text-rose text-sm">
+                    {monthAbsentCount} {monthAbsentCount === 1 ? 'Day' : 'Days'} Absent Highlighted in {calMonthLabel}
+                  </span>
+                </div>
+                <span className="badge badge-danger text-xs font-mono font-bold">
+                  {monthAbsentCount} {monthAbsentCount === 1 ? 'Missed Class' : 'Missed Classes'}
+                </span>
+              </div>
+              <div className="absence-chip-list">
+                {monthAbsenceList.map((rec, i) => (
+                  <div key={i} className="absence-day-chip">
+                    <span className="chip-cross-icon">✕</span>
+                    <span className="chip-date-text">
+                      {new Date(rec.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                    {rec.remarks ? (
+                      <span className="chip-reason-tag">Note: {rec.remarks}</span>
+                    ) : (
+                      <span className="chip-reason-tag muted">Uninformed leave</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="absence-action-hint text-3xs text-secondary mt-2">
+                📌 <strong>Parent Tip:</strong> Regular attendance directly correlates with exam scores. Check the <em>Homework &amp; Daily Learning</em> tab to catch up on lessons taught on these dates.
+              </div>
+            </div>
+          ) : monthTotalCount > 0 ? (
+            <div className="perfect-attendance-banner mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-emerald" />
+                <span className="text-xs font-semibold text-emerald">
+                  🌟 100% Perfect Attendance in {calMonthLabel}! {currentStudent?.name} has attended all scheduled sessions.
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Quick Metrics Bar for Selected Month */}
+          <div className="cal-metrics-bar mb-3">
+            <div className="cal-metric-box">
+              <span className="cal-metric-lbl">Total Recorded</span>
+              <span className="cal-metric-num text-white">{monthTotalCount}</span>
+            </div>
+            <div className="cal-metric-box metric-present">
+              <span className="cal-metric-lbl">Present Days</span>
+              <span className="cal-metric-num text-emerald">{monthPresentCount}</span>
+            </div>
+            <div className={`cal-metric-box metric-absent ${monthAbsentCount > 0 ? 'highlight-box' : ''}`}>
+              <span className="cal-metric-lbl">Absent Days</span>
+              <span className="cal-metric-num text-rose font-bold">{monthAbsentCount}</span>
+            </div>
+            <div className="cal-metric-box">
+              <span className="cal-metric-lbl">Monthly Ratio</span>
+              <span className="cal-metric-num text-sky">{monthTotalCount > 0 ? `${monthPercentage}%` : '100%'}</span>
+            </div>
+          </div>
+
+          {attendanceDisplayMode === 'calendar' ? (
+            <div className="parent-calendar-container">
+              {/* Calendar Controls */}
+              <div className="cal-controls-row mb-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm cal-nav-btn"
+                    onClick={() => setCalDate(new Date(calYear, calMonth - 1, 1))}
+                    title="Previous Month"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="cal-current-month-heading">
+                    {calMonthLabel}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm cal-nav-btn"
+                    onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
+                    title="Next Month"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs"
+                  onClick={() => setCalDate(new Date())}
+                  style={{ fontSize: '0.72rem', padding: '3px 9px' }}
+                >
+                  Current Month
+                </button>
+              </div>
+
+              {/* Day of week headers */}
+              <div className="cal-week-grid">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
+                  <div key={idx} className={`cal-week-head ${idx === 0 ? 'text-rose-head' : ''}`}>
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Grid */}
+              <div className="cal-days-grid">
+                {/* Empty cells for leading offset */}
+                {Array.from({ length: startDayOfWeek }).map((_, idx) => (
+                  <div key={`empty-${idx}`} className="cal-cell cal-cell-empty" />
+                ))}
+
+                {/* Day cells */}
+                {Array.from({ length: daysInCalMonth }).map((_, i) => {
+                  const dayNum = i + 1;
+                  const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                  const dayOfWeek = new Date(calYear, calMonth, dayNum).getDay();
+                  const isSunday = dayOfWeek === 0;
+                  const isToday = dateStr === todayStr;
+                  const isFuture = dateStr > todayStr;
+                  const record = studentMonthAttendanceMap.get(dateStr);
+                  const isAbsent = record && record.status === 'ABSENT';
+                  const isPresent = record && record.status === 'PRESENT';
+
+                  let cellClass = 'cal-cell';
+                  if (isAbsent) cellClass += ' cell-absent';
+                  else if (isPresent) cellClass += ' cell-present';
+                  else if (isSunday) cellClass += ' cell-weekend';
+                  else if (isFuture) cellClass += ' cell-future';
+                  else cellClass += ' cell-no-session';
+
+                  if (isToday) cellClass += ' cell-today';
+
+                  return (
+                    <div key={dayNum} className={cellClass}>
+                      <div className="cell-top-bar">
+                        <span className={`cell-day-number ${isToday ? 'today-pill' : ''}`}>
+                          {dayNum}
+                        </span>
+                        {isToday && <span className="today-badge">Today</span>}
+                      </div>
+
+                      <div className="cell-status-content">
+                        {isAbsent ? (
+                          <div className="absent-marker-box">
+                            <span className="badge-absent-glow">✕ ABSENT</span>
+                            {record?.remarks && (
+                              <span className="cell-remark-text" title={record.remarks}>
+                                {record.remarks}
+                              </span>
+                            )}
+                          </div>
+                        ) : isPresent ? (
+                          <div className="present-marker-box">
+                            <span className="badge-present-subtle">✓ Present</span>
+                          </div>
+                        ) : isSunday ? (
+                          <span className="cell-dim-label">Weekend</span>
+                        ) : isFuture ? (
+                          <span className="cell-dim-label">—</span>
+                        ) : (
+                          <span className="cell-dim-label">No Class</span>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
 
-            <div className="attendance-stats-summary p-3 rounded-lg" style={{ background: 'rgba(15, 23, 42, 0.4)', border: '1px solid var(--border-subtle)' }}>
-              <div className="text-xs font-bold text-white mb-2">Monthly Regularity Ratio</div>
-              <div className="flex items-center gap-4 mb-3">
-                <div>
-                  <div className="text-2xl font-extrabold text-emerald">{presentDays}</div>
-                  <div className="text-3xs text-muted">Classes Attended</div>
+              {/* Calendar Legend */}
+              <div className="cal-legend-bar mt-3">
+                <div className="legend-item">
+                  <span className="legend-dot dot-present" />
+                  <span>Present</span>
                 </div>
-                <div className="border-l border-slate-700 pl-4">
-                  <div className="text-2xl font-extrabold text-rose">{absentDays}</div>
-                  <div className="text-3xs text-muted">Leaves / Absent</div>
+                <div className="legend-item">
+                  <span className="legend-dot dot-absent" />
+                  <span className="font-bold text-rose">Absent (Highlighted in Red)</span>
                 </div>
-              </div>
-              <div className="text-xs text-secondary">
-                Regular attendance is the key pillar for board and class syllabus mastery.
+                <div className="legend-item">
+                  <span className="legend-dot dot-weekend" />
+                  <span>Sunday / Weekend</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-dot dot-today" />
+                  <span>Today</span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Traditional List View Fallback */
+            <div className="attendance-grid-layout">
+              <div>
+                <div className="text-xs font-semibold text-secondary mb-2">Roll Call History:</div>
+                {recentAttendance.length === 0 ? (
+                  <div className="text-xs text-muted">No attendance marked for this student yet.</div>
+                ) : (
+                  <div className="attendance-log-pills">
+                    {recentAttendance.map((rec, i) => (
+                      <div key={i} className={`attendance-log-item ${rec.status === 'ABSENT' ? 'log-absent' : 'log-present'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="log-date font-mono">{rec.date}</span>
+                          {rec.remarks && <span className="text-3xs text-secondary italic">({rec.remarks})</span>}
+                        </div>
+                        <span className={`badge badge-sm ${rec.status === 'ABSENT' ? 'badge-danger' : 'badge-success'}`}>
+                          {rec.status === 'ABSENT' ? '✕ Absent' : '✓ Present'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="attendance-stats-summary p-3 rounded-lg" style={{ background: 'rgba(15, 23, 42, 0.4)', border: '1px solid var(--border-subtle)' }}>
+                <div className="text-xs font-bold text-white mb-2">All-Time Attendance Ratio</div>
+                <div className="flex items-center gap-4 mb-3">
+                  <div>
+                    <div className="text-2xl font-extrabold text-emerald">{presentDays}</div>
+                    <div className="text-3xs text-muted">Total Present</div>
+                  </div>
+                  <div className="border-l border-slate-700 pl-4">
+                    <div className="text-2xl font-extrabold text-rose">{absentDays}</div>
+                    <div className="text-3xs text-muted">Total Absent</div>
+                  </div>
+                </div>
+                <div className="text-xs text-secondary">
+                  Regular attendance is the key pillar for board and class syllabus mastery.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1602,7 +1872,321 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           .homework-layout-grid { grid-template-columns: 1fr; }
         }
 
-        /* Attendance Section */
+        /* Attendance Section & Calendar */
+        .attendance-view-toggle {
+          display: inline-flex;
+          background: rgba(15, 23, 42, 0.6);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-sm);
+          padding: 2px;
+          gap: 2px;
+        }
+        .btn-toggle-view {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 4px 10px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .btn-toggle-view:hover { color: #FFF; }
+        .btn-toggle-view.active {
+          background: var(--primary-600);
+          color: #FFF;
+          box-shadow: 0 1px 4px rgba(79, 70, 229, 0.4);
+        }
+
+        /* Absence Highlight Banner */
+        .absence-banner-card {
+          background: linear-gradient(135deg, rgba(244, 63, 94, 0.16) 0%, rgba(30, 27, 46, 0.7) 100%);
+          border: 1.5px solid rgba(244, 63, 94, 0.45);
+          border-radius: var(--radius-md);
+          padding: 14px 16px;
+          box-shadow: 0 0 20px rgba(244, 63, 94, 0.15);
+        }
+        .absence-pulsing-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #F43F5E;
+          box-shadow: 0 0 10px #F43F5E;
+          animation: pulseDot 1.5s infinite;
+        }
+        @keyframes pulseDot {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.3); opacity: 0.7; }
+        }
+        .absence-chip-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 6px;
+        }
+        .absence-day-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(244, 63, 94, 0.22);
+          border: 1px solid rgba(244, 63, 94, 0.55);
+          padding: 5px 10px;
+          border-radius: 8px;
+          font-size: 0.78rem;
+          color: #FFF;
+        }
+        .chip-cross-icon {
+          color: #FDA4AF;
+          font-weight: 800;
+        }
+        .chip-date-text {
+          font-weight: 700;
+          letter-spacing: -0.01em;
+        }
+        .chip-reason-tag {
+          font-size: 0.7rem;
+          background: rgba(0, 0, 0, 0.35);
+          padding: 2px 6px;
+          border-radius: 4px;
+          color: #FECDD3;
+        }
+        .chip-reason-tag.muted {
+          color: #94A3B8;
+        }
+
+        .perfect-attendance-banner {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.6) 100%);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          border-radius: var(--radius-md);
+          padding: 10px 14px;
+        }
+
+        /* Quick Metrics Bar */
+        .cal-metrics-bar {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+        }
+        @media (max-width: 600px) {
+          .cal-metrics-bar { grid-template-columns: repeat(2, 1fr); }
+        }
+        .cal-metric-box {
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-sm);
+          padding: 8px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .cal-metric-box.highlight-box {
+          background: rgba(244, 63, 94, 0.12);
+          border-color: rgba(244, 63, 94, 0.4);
+        }
+        .cal-metric-lbl {
+          font-size: 0.68rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          font-weight: 600;
+        }
+        .cal-metric-num {
+          font-size: 1.15rem;
+          font-weight: 800;
+          font-family: var(--font-heading);
+        }
+
+        /* Calendar Layout */
+        .parent-calendar-container {
+          background: rgba(11, 15, 25, 0.6);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 16px;
+        }
+        .cal-controls-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .cal-current-month-heading {
+          font-family: var(--font-heading);
+          font-size: 1.1rem;
+          font-weight: 800;
+          color: #FFF;
+          min-width: 160px;
+          text-align: center;
+        }
+        .cal-nav-btn {
+          padding: 4px 10px !important;
+        }
+        .cal-week-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 6px;
+          margin-bottom: 6px;
+        }
+        .cal-week-head {
+          text-align: center;
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: var(--text-muted);
+          padding: 4px 0;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .text-rose-head { color: #FB7185 !important; }
+
+        .cal-days-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 6px;
+        }
+        .cal-cell {
+          min-height: 72px;
+          background: rgba(15, 23, 42, 0.45);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 8px;
+          padding: 6px 7px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          transition: all 0.2s ease;
+        }
+        @media (max-width: 600px) {
+          .cal-cell { min-height: 56px; padding: 4px; }
+        }
+        .cal-cell-empty {
+          background: transparent;
+          border-color: transparent;
+        }
+        .cell-top-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .cell-day-number {
+          font-size: 0.8rem;
+          font-weight: 700;
+          color: #CBD5E1;
+        }
+        .today-pill {
+          background: var(--primary-500);
+          color: #FFF;
+          width: 22px;
+          height: 22px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          font-size: 0.72rem;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+        }
+        .today-badge {
+          font-size: 0.6rem;
+          color: #A5B4FC;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+
+        /* Absent Cell Highlight (HIGH VISIBILITY) */
+        .cell-absent {
+          background: rgba(244, 63, 94, 0.18) !important;
+          border: 1.5px solid #F43F5E !important;
+          box-shadow: 0 0 12px rgba(244, 63, 94, 0.3) !important;
+        }
+        .absent-marker-box {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          margin-top: 2px;
+        }
+        .badge-absent-glow {
+          background: #F43F5E;
+          color: #FFFFFF;
+          font-size: 0.65rem;
+          font-weight: 800;
+          padding: 2px 5px;
+          border-radius: 4px;
+          display: inline-block;
+          text-align: center;
+          letter-spacing: 0.02em;
+          box-shadow: 0 2px 6px rgba(244, 63, 94, 0.5);
+        }
+        .cell-remark-text {
+          font-size: 0.62rem;
+          color: #FECDD3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          font-style: italic;
+        }
+
+        /* Present Cell */
+        .cell-present {
+          background: rgba(16, 185, 129, 0.09) !important;
+          border: 1px solid rgba(16, 185, 129, 0.3) !important;
+        }
+        .present-marker-box {
+          margin-top: 2px;
+        }
+        .badge-present-subtle {
+          background: rgba(16, 185, 129, 0.2);
+          color: #34D399;
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 2px 5px;
+          border-radius: 4px;
+          display: inline-block;
+        }
+
+        /* Weekend / Future / No Session */
+        .cell-weekend {
+          background: rgba(15, 23, 42, 0.25);
+          opacity: 0.65;
+        }
+        .cell-future {
+          background: rgba(15, 23, 42, 0.15);
+          opacity: 0.4;
+          border-style: dashed;
+        }
+        .cell-no-session {
+          background: rgba(15, 23, 42, 0.25);
+        }
+        .cell-dim-label {
+          font-size: 0.62rem;
+          color: var(--text-muted);
+        }
+
+        /* Calendar Legend */
+        .cal-legend-bar {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 16px;
+          padding-top: 10px;
+          border-top: 1px solid var(--border-subtle);
+          font-size: 0.72rem;
+          color: var(--text-secondary);
+        }
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .legend-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 3px;
+        }
+        .dot-present { background: #10B981; }
+        .dot-absent { background: #F43F5E; box-shadow: 0 0 6px rgba(244, 63, 94, 0.6); }
+        .dot-weekend { background: rgba(255, 255, 255, 0.2); }
+        .dot-today { background: var(--primary-500); }
+
         .attendance-grid-layout {
           display: grid;
           grid-template-columns: 1.2fr 1fr;

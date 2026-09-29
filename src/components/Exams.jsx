@@ -77,6 +77,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const [reportCardStudent, setReportCardStudent] = useState(null);
   const [examErrors, setExamErrors] = useState({});
   const [isSharingCard, setIsSharingCard] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle');
 
   // New Exam Form
   const [newExamData, setNewExamData] = useState({
@@ -281,13 +282,13 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     const existingIndex = marks.findIndex(m => m.examId === currentExam.id && m.studentId === studentId);
     let updatedMarks = [...marks];
 
-    const val = marksObtained === '' ? 0 : Math.min(Number(marksObtained), currentExam.totalMarks);
+    const val = marksObtained === '' ? '' : Math.min(Number(marksObtained), currentExam.totalMarks);
 
     if (existingIndex >= 0) {
       updatedMarks[existingIndex] = {
         ...updatedMarks[existingIndex],
         marksObtained: val,
-        remarks: val >= currentExam.passingMarks ? 'Passed' : 'Needs improvement'
+        remarks: (val !== '' && Number(val) >= currentExam.passingMarks) ? 'Passed' : 'Needs improvement'
       };
     } else {
       updatedMarks.push({
@@ -296,7 +297,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         studentId,
         subject: currentExam.subject,
         marksObtained: val,
-        remarks: val >= currentExam.passingMarks ? 'Passed' : 'Needs improvement'
+        remarks: (val !== '' && Number(val) >= currentExam.passingMarks) ? 'Passed' : 'Needs improvement'
       });
     }
 
@@ -304,6 +305,23 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       ...data,
       marks: updatedMarks
     });
+
+    setSaveStatus('saved');
+    setTimeout(() => {
+      setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
+    }, 2500);
+  };
+
+  const handleSaveAllMarks = () => {
+    setSaveStatus('saving');
+    onSaveData({
+      ...data,
+      marks: [...marks]
+    });
+    setTimeout(() => {
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2500);
+    }, 400);
   };
 
   // Update student-specific subject for this exam (independent per student!)
@@ -620,8 +638,30 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 <span>Pass: <strong>{currentExam.passingMarks}</strong></span>
               </div>
 
-              {/* Edit & Delete Action Buttons */}
-              <div className="flex items-center gap-1">
+              {/* Save Status & Action Buttons */}
+              <div className="flex items-center gap-2">
+                {saveStatus === 'saved' ? (
+                  <span className="badge badge-success text-xs font-semibold flex items-center gap-1">
+                    <CheckCircle size={12} />
+                    <span>Saved to Database</span>
+                  </span>
+                ) : saveStatus === 'saving' ? (
+                  <span className="badge badge-warning text-xs font-semibold flex items-center gap-1">
+                    <span>Saving to DB...</span>
+                  </span>
+                ) : null}
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleSaveAllMarks}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  title="Save All Marks to Cloud Database"
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Save Marks</span>
+                </button>
+
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"

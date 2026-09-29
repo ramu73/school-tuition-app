@@ -187,14 +187,17 @@ export async function fetchTuitionDataFromSupabase() {
       date: e.exam_date
     }));
 
-    const marks = (marksRes.data || []).map(m => ({
-      id: m.id,
-      examId: m.exam_id,
-      studentId: m.student_id,
-      subject: m.subject || '',
-      marksObtained: Number(m.marks_obtained),
-      remarks: m.remarks || ''
-    }));
+    const marks = (marksRes.data || []).map(m => {
+      const parentExam = exams.find(e => e.id === m.exam_id);
+      return {
+        id: m.id,
+        examId: m.exam_id,
+        studentId: m.student_id,
+        subject: m.subject || parentExam?.subject || '',
+        marksObtained: Number(m.marks_obtained),
+        remarks: m.remarks || ''
+      };
+    });
 
     let announcements = [];
     try {
@@ -452,23 +455,55 @@ export async function syncTuitionDataToSupabase(data) {
     }
 
     if (data.marks && data.marks.length > 0) {
-      const validExamIds = new Set((data.exams || []).map(e => e.id));
-      const validStudentIds = new Set((data.students || []).map(s => s.id));
-      const markRows = data.marks
-        .filter(m => validExamIds.has(m.examId) && validStudentIds.has(m.studentId))
-        .map(m => ({
-          id: m.id,
-          exam_id: m.examId,
-          student_id: m.studentId,
-          subject: m.subject || null,
-          marks_obtained: Number(m.marksObtained),
-          remarks: m.remarks || ''
-        }));
-      if (markRows.length > 0) {
-        await supabase.from('exam_marks').upsert(markRows, { onConflict: 'exam_id, student_id' });
-        // Clean up marks for deleted exams or removed marks
-        const markIds = markRows.map(m => m.id);
-        await supabase.from('exam_marks').delete().not('id', 'in', `(${markIds.join(',')})`);
+      try {
+        const validExamIds = new Set((data.exams || []).map(e => e.id));
+        const validStudentIds = new Set((data.students || []).map(s => s.id));
+
+        // Fetch existing marks to know their DB IDs and prevent sequence collisions
+        const { data: existingDbMarks } = await supabase
+          .from('exam_marks')
+          .select('id, exam_id, student_id');
+        
+        const existingMap = new Map();
+        let maxDbId = 0;
+        (existingDbMarks || []).forEach(row => {
+          existingMap.set(`${row.exam_id}_${row.student_id}`, row.id);
+          if (row.id > maxDbId) maxDbId = row.id;
+        });
+
+        // Deduplicate client marks by exam_id + student_id to prevent ON CONFLICT aborts
+        const markMap = new Map();
+        data.marks
+          .filter(m => validExamIds.has(m.examId) && validStudentIds.has(m.studentId))
+          .forEach(m => {
+            const key = `${m.examId}_${m.studentId}`;
+            let rowId = existingMap.get(key) || m.id;
+            if (!rowId || (rowId <= maxDbId && !existingMap.has(key))) {
+              maxDbId += 1;
+              rowId = maxDbId;
+            }
+            if (rowId > maxDbId) maxDbId = rowId;
+
+            markMap.set(key, {
+              id: rowId,
+              exam_id: m.examId,
+              student_id: m.studentId,
+              marks_obtained: Number(m.marksObtained || 0),
+              remarks: m.remarks || ''
+            });
+          });
+
+        const markRows = Array.from(markMap.values());
+        if (markRows.length > 0) {
+          const { error: markErr } = await supabase
+            .from('exam_marks')
+            .upsert(markRows, { onConflict: 'exam_id, student_id' });
+          if (markErr) {
+            console.error('Failed to sync marks to Supabase:', markErr);
+          }
+        }
+      } catch (markSyncErr) {
+        console.error('Exception syncing marks to Supabase:', markSyncErr);
       }
     } else if (Array.isArray(data.marks)) {
       await supabase.from('exam_marks').delete().neq('id', 0);
