@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Sparkles, 
@@ -13,23 +13,74 @@ import {
   UserPlus, 
   Filter, 
   Search,
-  Check
+  Check,
+  RefreshCw
 } from 'lucide-react';
-import { updateInquiryStatus, deleteInquiry } from '../lib/inquiries';
+import { updateInquiryStatus, deleteInquiry, getStoredInquiries, fetchInquiriesFromSupabase } from '../lib/inquiries';
 
 export default function InquiriesModal({ 
   isOpen, 
   onClose, 
-  inquiries = [], 
+  inquiries: propInquiries, 
   onAdmitLead,
+  onAdmitStudent,
   classes = []
 }) {
   const [filterType, setFilterType] = useState('ALL'); // ALL, STUDENT_DEMO, TEACHER_APPLICATION, NEW
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Manage self-hydrating state from local storage or props
+  const [localInquiries, setLocalInquiries] = useState(() => {
+    if (Array.isArray(propInquiries) && propInquiries.length > 0) return propInquiries;
+    return getStoredInquiries();
+  });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const latest = await fetchInquiriesFromSupabase();
+      if (latest && Array.isArray(latest)) {
+        setLocalInquiries(latest);
+      }
+    } catch (e) {
+      console.warn('Error refreshing inquiries from Supabase:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Re-sync when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalInquiries(getStoredInquiries());
+      handleRefresh();
+    }
+  }, [isOpen]);
+
+  // Sync if parent passes updated inquiries array
+  useEffect(() => {
+    if (Array.isArray(propInquiries) && propInquiries.length > 0) {
+      setLocalInquiries(propInquiries);
+    }
+  }, [propInquiries]);
+
+  // Real-time listener for updates across components or background sync
+  useEffect(() => {
+    const handleUpdate = (e) => {
+      setLocalInquiries(e.detail || getStoredInquiries());
+    };
+    window.addEventListener('hayagriva-inquiries-updated', handleUpdate);
+    return () => window.removeEventListener('hayagriva-inquiries-updated', handleUpdate);
+  }, []);
 
   if (!isOpen) return null;
 
-  const filteredInquiries = inquiries.filter(item => {
+  const handleAdmit = onAdmitLead || onAdmitStudent;
+
+  const currentList = Array.isArray(localInquiries) ? localInquiries : [];
+
+  const filteredInquiries = currentList.filter(item => {
     if (filterType === 'STUDENT_DEMO' && item.type !== 'STUDENT_DEMO') return false;
     if (filterType === 'TEACHER_APPLICATION' && item.type !== 'TEACHER_APPLICATION') return false;
     if (filterType === 'NEW' && item.status !== 'NEW') return false;
@@ -40,21 +91,23 @@ export default function InquiriesModal({
       const matchPhone = (item.phone || '').includes(q);
       const matchParent = (item.parentName || '').toLowerCase().includes(q);
       const matchSubjects = (item.subjects || '').toLowerCase().includes(q);
-      return matchName || matchPhone || matchParent || matchSubjects;
+      const matchNotes = (item.notes || '').toLowerCase().includes(q);
+      return matchName || matchPhone || matchParent || matchSubjects || matchNotes;
     }
     return true;
   });
 
-  const newCount = inquiries.filter(i => i.status === 'NEW').length;
-  const demoCount = inquiries.filter(i => i.type === 'STUDENT_DEMO').length;
-  const teacherCount = inquiries.filter(i => i.type === 'TEACHER_APPLICATION').length;
+  const newCount = currentList.filter(i => i.status === 'NEW').length;
+  const demoCount = currentList.filter(i => i.type === 'STUDENT_DEMO').length;
+  const teacherCount = currentList.filter(i => i.type === 'TEACHER_APPLICATION').length;
 
   const handleWhatsApp = (item) => {
     let msg = '';
     if (item.type === 'STUDENT_DEMO') {
-      msg = `Hello ${item.parentName || item.name}! This is from Hayagriva Tutorials Academy regarding your request for a Free Demo Class for ${item.name} (${item.classCode?.replace('CLASS_', 'Class ')}). When would be a good time to speak?`;
+      const className = item.classCode ? item.classCode.replace('CLASS_', 'Class ') : '';
+      msg = `Hello ${item.parentName || item.name}! This is from Hayagriva Tutorials Academy regarding your request for a Free Demo Class for ${item.name}${className ? ' (' + className + ')' : ''}. When would be a good time to speak?`;
     } else {
-      msg = `Hello ${item.name}! This is from Hayagriva Tutorials Academy regarding your Faculty Application for ${item.subjects}. We would like to schedule a brief discussion with our Director.`;
+      msg = `Hello ${item.name}! This is from Hayagriva Tutorials Academy regarding your Faculty Application for ${item.subjects || 'Teaching'}. We would like to schedule a brief discussion with our Director.`;
     }
     const cleanPhone = (item.phone || '').replace(/\D/g, '');
     const url = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`;
@@ -63,9 +116,9 @@ export default function InquiriesModal({
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content glass-card inquiries-modal-card" style={{ maxWidth: '850px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal-content glass-card inquiries-modal-card" style={{ maxWidth: '880px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
-        <div className="modal-header pb-3 border-b border-slate-800">
+        <div className="modal-header pb-3 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="title-icon-badge bg-primary-soft">
               <Sparkles size={20} className="text-primary" />
@@ -82,9 +135,20 @@ export default function InquiriesModal({
               <p className="text-xs text-secondary">Prospective student demo bookings and teacher job inquiries from the landing page</p>
             </div>
           </div>
-          <button type="button" className="close-btn" onClick={onClose}>
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className={`btn btn-secondary btn-xs flex items-center gap-1.5 ${isRefreshing ? 'opacity-70' : ''}`}
+              onClick={handleRefresh}
+              title="Sync latest leads from Supabase"
+            >
+              <RefreshCw size={12} className={isRefreshing ? 'animate-spin text-primary' : ''} />
+              <span>{isRefreshing ? 'Syncing...' : 'Sync Cloud'}</span>
+            </button>
+            <button type="button" className="close-btn" onClick={onClose} title="Close Modal">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Filter & Search Bar */}
@@ -95,7 +159,7 @@ export default function InquiriesModal({
               className={`btn btn-xs ${filterType === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setFilterType('ALL')}
             >
-              All ({inquiries.length})
+              All ({currentList.length})
             </button>
             <button
               type="button"
@@ -135,9 +199,18 @@ export default function InquiriesModal({
         {/* Inquiries List */}
         <div className="inquiries-list-scroll flex-1 p-3 overflow-y-auto" style={{ maxHeight: '60vh' }}>
           {filteredInquiries.length === 0 ? (
-            <div className="text-center py-10 text-muted">
-              <Sparkles size={36} className="mx-auto mb-2 opacity-40" />
-              <p className="text-sm">No inquiries matching this filter.</p>
+            <div className="text-center py-12 text-muted">
+              <Sparkles size={36} className="mx-auto mb-2 opacity-40 text-amber" />
+              <p className="text-sm font-semibold text-white">No inquiries matching this filter.</p>
+              <p className="text-xs text-secondary mt-1">When students request a demo or teachers apply from the landing page, they appear here instantly.</p>
+              <button 
+                type="button"
+                className="btn btn-secondary btn-xs mt-3 inline-flex items-center gap-1"
+                onClick={handleRefresh}
+              >
+                <RefreshCw size={12} />
+                <span>Check for New Leads</span>
+              </button>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
@@ -153,12 +226,12 @@ export default function InquiriesModal({
                     }`}
                   >
                     <div className="flex items-start justify-between flex-wrap gap-2 mb-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className={`badge ${isStudent ? 'badge-success' : 'badge-primary'} text-3xs font-bold uppercase`}>
                           {isStudent ? '🎓 Student Demo' : '💼 Teacher Job'}
                         </span>
                         {isNew && (
-                          <span className="badge badge-danger text-3xs font-extrabold">NEW</span>
+                          <span className="badge badge-danger text-3xs font-extrabold animate-pulse">NEW</span>
                         )}
                         <h4 className="text-sm font-bold text-white m-0">{item.name}</h4>
                         {item.parentName && (
@@ -180,7 +253,7 @@ export default function InquiriesModal({
                       <div>
                         <span className="text-muted text-3xs uppercase block">Target / Class</span>
                         <span className="font-semibold text-white">
-                          {item.classCode ? item.classCode.replace('CLASS_', 'Class ') : 'All'}
+                          {item.classCode ? item.classCode.replace('CLASS_', 'Class ') : 'All Classes'}
                         </span>
                       </div>
                       <div>
@@ -201,6 +274,12 @@ export default function InquiriesModal({
                       </div>
                     </div>
 
+                    {item.schoolName && (
+                      <div className="text-2xs text-slate-300 mb-1.5">
+                        🏫 <strong>School / College:</strong> {item.schoolName}
+                      </div>
+                    )}
+
                     {item.notes && (
                       <div className="inquiry-notes text-2xs text-secondary bg-slate-950/40 p-2 rounded mb-2 border border-slate-800/80">
                         💬 <em>"{item.notes}"</em>
@@ -209,7 +288,7 @@ export default function InquiriesModal({
 
                     {/* Actions Row */}
                     <div className="inquiry-actions-row flex items-center justify-between pt-2 border-t border-slate-800/60 flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <a 
                           href={`tel:+91${item.phone}`}
                           className="btn btn-secondary btn-xs flex items-center gap-1"
@@ -228,17 +307,23 @@ export default function InquiriesModal({
                           <span>WhatsApp</span>
                         </button>
 
-                        {isStudent && onAdmitLead && (
+                        {isStudent && handleAdmit && (
                           <button 
                             type="button" 
                             className="btn btn-primary btn-xs flex items-center gap-1"
                             onClick={() => {
-                              onAdmitLead({
+                              handleAdmit({
                                 name: item.name,
+                                studentName: item.name,
                                 parentName: item.parentName || '',
+                                parent_name: item.parentName || '',
+                                phone: item.phone,
                                 parentPhone: item.phone,
                                 classCode: item.classCode || 'CLASS_10',
-                                school: item.schoolName || ''
+                                class_grade: item.classCode ? item.classCode.replace('CLASS_', '') : '10',
+                                school: item.schoolName || '',
+                                schoolName: item.schoolName || '',
+                                notes: `Demo Inquiry (${item.subjects || 'General'}) - Timing: ${item.timingPreference || 'Evening'}`
                               });
                               updateInquiryStatus(item.id, 'ADMITTED');
                               onClose();

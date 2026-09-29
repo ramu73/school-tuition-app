@@ -18,7 +18,8 @@ import {
   X,
   Check,
   Megaphone,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
@@ -32,7 +33,9 @@ export default function Dashboard({
   setSelectedClassFilter, 
   setAttendanceViewMode,
   onOpenAdmitModal, 
-  onOpenFeeCollectModal 
+  onOpenFeeCollectModal,
+  onOpenInquiries,
+  inquiriesCount = 0
 }) {
   const { students = [], batches = [], fees = [], attendance = [], classes = [], exams = [] } = data;
   const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
@@ -182,6 +185,25 @@ export default function Dashboard({
                 <span>Admit Student</span>
               </button>
             )}
+            {!isTeacher && onOpenInquiries && (
+              <button 
+                type="button"
+                className="btn btn-secondary relative" 
+                onClick={onOpenInquiries}
+                title="View Website Demo Bookings and Faculty Inquiries"
+              >
+                <Sparkles size={16} className="text-amber" />
+                <span>Website Leads</span>
+                {inquiriesCount > 0 && (
+                  <span 
+                    className="badge badge-danger text-3xs font-extrabold font-mono ml-1.5"
+                    style={{ padding: '1px 6px', borderRadius: '9999px', animation: 'pulse 2s infinite' }}
+                  >
+                    {inquiriesCount} New
+                  </span>
+                )}
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={() => setActiveTab('attendance')}>
               <CheckCircle size={16} />
               <span>Roll Call</span>
@@ -213,6 +235,48 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
+      {/* Website Leads Notification Banner (Admin Only) */}
+      {!isTeacher && inquiriesCount > 0 && onOpenInquiries && (
+        <div 
+          className="glass-card mb-4 cursor-pointer hover:border-amber/60 transition-all" 
+          onClick={onOpenInquiries}
+          style={{ 
+            padding: '14px 20px', 
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(239, 68, 68, 0.08) 100%)', 
+            borderColor: 'rgba(245, 158, 11, 0.35)', 
+            borderRadius: 'var(--radius-lg)' 
+          }}
+        >
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div style={{ background: 'rgba(245, 158, 11, 0.2)', padding: '8px', borderRadius: '10px' }}>
+                <Sparkles size={22} className="text-amber animate-pulse" />
+              </div>
+              <div>
+                <div className="font-bold text-white text-sm flex items-center gap-2">
+                  <span>{inquiriesCount} New Website Lead{inquiriesCount > 1 ? 's' : ''} Received!</span>
+                  <span className="badge badge-danger text-3xs font-extrabold font-mono">ACTION REQUIRED</span>
+                </div>
+                <div className="text-xs text-slate-300 mt-0.5">
+                  Prospective student demo class bookings or faculty inquiries are waiting for your response.
+                </div>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              className="btn btn-warning btn-sm flex items-center gap-1.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenInquiries();
+              }}
+            >
+              <span>View &amp; Contact Leads ({inquiriesCount})</span>
+              <ArrowUpRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {isTeacher && (
         <div className="teacher-scope-banner glass-card mb-4" style={{ padding: '12px 18px', background: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-lg)' }}>

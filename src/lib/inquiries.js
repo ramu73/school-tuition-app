@@ -1,7 +1,7 @@
 // ==========================================================================
 // Inquiries & Leads Management Pipeline
 // Supports New Student Demo Registrations & Faculty Hiring Applications
-// LocalStorage caching with PostgreSQL / Supabase sync and real-time alerts
+// LocalStorage reactive persistence + Supabase PostgreSQL real-time sync
 // ==========================================================================
 
 import { getSupabaseClient } from './supabase.js';
@@ -11,7 +11,7 @@ const INQUIRIES_STORAGE_KEY = 'hayagriva_inquiries_v1';
 // Initial sample inquiries if none exist
 const DEFAULT_INQUIRIES = [
   {
-    id: 101,
+    id: 500101,
     type: 'STUDENT_DEMO',
     name: 'K. Sai Akhil',
     parentName: 'K. Venkatesh',
@@ -26,7 +26,7 @@ const DEFAULT_INQUIRIES = [
     createdAt: new Date(Date.now() - 3600000 * 4).toISOString()
   },
   {
-    id: 102,
+    id: 500102,
     type: 'TEACHER_APPLICATION',
     name: 'B. Srilatha',
     parentName: '',
@@ -46,9 +46,11 @@ const DEFAULT_INQUIRIES = [
 
 export function getStoredInquiries() {
   try {
-    const raw = localStorage.getItem(INQUIRIES_STORAGE_KEY);
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(INQUIRIES_STORAGE_KEY) : null;
     if (!raw) {
-      localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(DEFAULT_INQUIRIES));
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(DEFAULT_INQUIRIES));
+      }
       return DEFAULT_INQUIRIES;
     }
     const parsed = JSON.parse(raw);
@@ -61,8 +63,12 @@ export function getStoredInquiries() {
 
 export function saveStoredInquiries(inquiries) {
   try {
-    localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(inquiries));
-    window.dispatchEvent(new CustomEvent('hayagriva-inquiries-updated', { detail: inquiries }));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(inquiries));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hayagriva-inquiries-updated', { detail: inquiries }));
+    }
   } catch (e) {
     console.error('Error saving inquiries:', e);
   }
@@ -70,12 +76,17 @@ export function saveStoredInquiries(inquiries) {
 
 export async function addInquiry(data) {
   const existing = getStoredInquiries();
+  // Ensure ID fits within 32-bit signed integer (< 2,147,483,647) for PostgreSQL SERIAL / INTEGER
+  const safeId = (data.id && Number(data.id) < 2000000000)
+    ? Number(data.id)
+    : (500000 + Math.floor(Math.random() * 400000));
+
   const newInquiry = {
-    id: Date.now(),
+    id: safeId,
     type: data.type || 'STUDENT_DEMO', // 'STUDENT_DEMO' | 'TEACHER_APPLICATION'
     name: data.name?.trim() || 'Prospective User',
     parentName: data.parentName?.trim() || '',
-    phone: data.phone?.trim() || '',
+    phone: (data.phone || '').replace(/\D/g, ''),
     email: data.email?.trim() || '',
     classCode: data.classCode || 'CLASS_10',
     schoolName: data.schoolName?.trim() || '',
@@ -88,33 +99,44 @@ export async function addInquiry(data) {
     createdAt: new Date().toISOString()
   };
 
-  const updated = [newInquiry, ...existing];
+  const updated = [newInquiry, ...existing.filter(i => i.id !== newInquiry.id)];
   saveStoredInquiries(updated);
 
-  // Sync to Supabase if inquiries table exists
+  // Sync to Supabase PostgreSQL in background
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const payload = {
-        id: newInquiry.id,
-        inquiry_type: newInquiry.type,
-        name: newInquiry.name,
-        parent_name: newInquiry.parentName || null,
-        phone: newInquiry.phone,
-        email: newInquiry.email || null,
-        class_code: newInquiry.classCode || null,
-        school_name: newInquiry.schoolName || null,
-        subjects: newInquiry.subjects || null,
-        timing_preference: newInquiry.timingPreference || null,
-        experience: newInquiry.experience || null,
-        qualification: newInquiry.qualification || null,
-        notes: newInquiry.notes || null,
-        status: 'NEW',
-        created_at: newInquiry.createdAt
+      const isTeacher = newInquiry.type === 'TEACHER_APPLICATION';
+      const metadata = {
+        type: newInquiry.type,
+        subjects: newInquiry.subjects,
+        timingPreference: newInquiry.timingPreference,
+        experience: newInquiry.experience,
+        qualification: newInquiry.qualification,
+        notes: newInquiry.notes,
+        status: newInquiry.status,
+        createdAt: newInquiry.createdAt
       };
-      await supabase.from('inquiries').upsert([payload], { onConflict: 'id' });
+
+      const studentLeadRow = {
+        id: newInquiry.id,
+        admission_no: 'LEAD-' + newInquiry.id,
+        full_name: newInquiry.name,
+        gender: 'Other',
+        class_code: newInquiry.classCode || 'CLASS_10',
+        school_name: newInquiry.schoolName || '',
+        parent_name: newInquiry.parentName || (isTeacher ? 'Direct Faculty Applicant' : 'Parent'),
+        parent_phone: newInquiry.phone,
+        parent_email: newInquiry.email || null,
+        address: JSON.stringify(metadata),
+        monthly_fee: 0,
+        status: isTeacher ? 'TEACHER_INQUIRY' : 'DEMO_LEAD',
+        admission_date: new Date().toISOString().split('T')[0]
+      };
+
+      await supabase.from('students').upsert([studentLeadRow], { onConflict: 'id' });
     } catch (err) {
-      // Table may not exist yet, local state will still work
+      console.warn('Could not sync lead to Supabase students table:', err);
     }
   }
 
@@ -129,9 +151,9 @@ export async function updateInquiryStatus(id, newStatus) {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from('inquiries').update({ status: newStatus }).eq('id', id);
+      await supabase.from('students').update({ status: newStatus }).eq('id', id);
     } catch (err) {
-      // Ignore if table not created
+      console.warn('Could not update inquiry status in Supabase:', err);
     }
   }
 }
@@ -144,39 +166,77 @@ export async function deleteInquiry(id) {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from('inquiries').delete().eq('id', id);
+      await supabase.from('students').delete().eq('id', id);
     } catch (err) {
-      // Ignore if table not created
+      console.warn('Could not delete inquiry from Supabase:', err);
     }
   }
 }
 
 export async function fetchInquiriesFromSupabase() {
   const supabase = getSupabaseClient();
-  if (!supabase) return null;
+  const localList = getStoredInquiries();
+  if (!supabase) return localList;
+
   try {
-    const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
-    if (error || !data) return null;
-    const mapped = data.map(row => ({
-      id: row.id,
-      type: row.inquiry_type || 'STUDENT_DEMO',
-      name: row.name,
-      parentName: row.parent_name || '',
-      phone: row.phone,
-      email: row.email || '',
-      classCode: row.class_code || 'CLASS_10',
-      schoolName: row.school_name || '',
-      subjects: row.subjects || '',
-      timingPreference: row.timing_preference || '',
-      experience: row.experience || '',
-      qualification: row.qualification || '',
-      notes: row.notes || '',
-      status: row.status || 'NEW',
-      createdAt: row.created_at
-    }));
-    saveStoredInquiries(mapped);
-    return mapped;
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .in('status', ['DEMO_LEAD', 'TEACHER_INQUIRY', 'CONTACTED', 'ADMITTED'])
+      .order('id', { ascending: false });
+
+    if (error || !data) {
+      return localList;
+    }
+
+    const remoteInquiries = data.map(row => {
+      let meta = {};
+      try {
+        if (row.address && typeof row.address === 'string' && row.address.trim().startsWith('{')) {
+          meta = JSON.parse(row.address);
+        }
+      } catch (e) {
+        meta = {};
+      }
+
+      const isTeacher = row.status === 'TEACHER_INQUIRY' || meta.type === 'TEACHER_APPLICATION';
+      return {
+        id: row.id,
+        type: isTeacher ? 'TEACHER_APPLICATION' : (meta.type || 'STUDENT_DEMO'),
+        name: row.full_name || 'Prospective Lead',
+        parentName: (row.parent_name === 'Direct Faculty Applicant' || row.parent_name === 'Parent') ? '' : (row.parent_name || ''),
+        phone: (row.parent_phone || '').replace(/\D/g, ''),
+        email: row.parent_email || '',
+        classCode: row.class_code || 'CLASS_10',
+        schoolName: row.school_name || '',
+        subjects: meta.subjects || 'All Subjects',
+        timingPreference: meta.timingPreference || 'Evening',
+        experience: meta.experience || '',
+        qualification: meta.qualification || '',
+        notes: meta.notes || '',
+        status: (row.status === 'CONTACTED' || row.status === 'ADMITTED') ? row.status : (meta.status || 'NEW'),
+        createdAt: meta.createdAt || row.created_at || new Date().toISOString()
+      };
+    });
+
+    // Merge remote inquiries with local inquiries by ID
+    const mergedMap = new Map();
+    // 1. Add local entries
+    localList.forEach(item => mergedMap.set(String(item.id), item));
+    // 2. Overlay remote entries from Supabase
+    remoteInquiries.forEach(item => mergedMap.set(String(item.id), item));
+
+    const mergedList = Array.from(mergedMap.values()).sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return timeB - timeA;
+    });
+
+    saveStoredInquiries(mergedList);
+    return mergedList;
   } catch (err) {
-    return null;
+    console.warn('Error fetching inquiries from Supabase:', err);
+    return localList;
   }
 }
+

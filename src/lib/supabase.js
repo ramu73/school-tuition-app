@@ -120,7 +120,58 @@ export async function fetchTuitionDataFromSupabase() {
       capacity: b.max_capacity || 25
     }));
 
-    const students = (studentsRes.data || []).map(s => ({
+    // Filter regular enrolled students vs. public website demo leads & inquiries
+    const isLeadStatus = (status) => status === 'DEMO_LEAD' || status === 'TEACHER_INQUIRY' || status === 'CONTACTED';
+    const rawStudentRows = studentsRes.data || [];
+    const regularStudentRows = rawStudentRows.filter(s => !isLeadStatus(s.status));
+    const leadRows = rawStudentRows.filter(s => isLeadStatus(s.status));
+
+    // If leads are found in Supabase, update inquiries storage reactively
+    if (leadRows.length > 0 && typeof localStorage !== 'undefined') {
+      try {
+        const INQ_KEY = 'hayagriva_inquiries_v1';
+        const existingInq = JSON.parse(localStorage.getItem(INQ_KEY) || '[]');
+        const map = new Map();
+        if (Array.isArray(existingInq)) {
+          existingInq.forEach(i => map.set(String(i.id), i));
+        }
+        leadRows.forEach(row => {
+          let meta = {};
+          try {
+            if (row.address && typeof row.address === 'string' && row.address.trim().startsWith('{')) {
+              meta = JSON.parse(row.address);
+            }
+          } catch (e) {}
+          const isTeacher = row.status === 'TEACHER_INQUIRY' || meta.type === 'TEACHER_APPLICATION';
+          map.set(String(row.id), {
+            id: row.id,
+            type: isTeacher ? 'TEACHER_APPLICATION' : (meta.type || 'STUDENT_DEMO'),
+            name: row.full_name || 'Prospective Lead',
+            parentName: (row.parent_name === 'Direct Faculty Applicant' || row.parent_name === 'Parent') ? '' : (row.parent_name || ''),
+            phone: (row.parent_phone || '').replace(/\D/g, ''),
+            email: row.parent_email || '',
+            classCode: row.class_code || 'CLASS_10',
+            schoolName: row.school_name || '',
+            subjects: meta.subjects || 'All Subjects',
+            timingPreference: meta.timingPreference || 'Evening',
+            experience: meta.experience || '',
+            qualification: meta.qualification || '',
+            notes: meta.notes || '',
+            status: (row.status === 'CONTACTED' || row.status === 'ADMITTED') ? row.status : (meta.status || 'NEW'),
+            createdAt: meta.createdAt || row.created_at || new Date().toISOString()
+          });
+        });
+        const mergedInquiries = Array.from(map.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        localStorage.setItem(INQ_KEY, JSON.stringify(mergedInquiries));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('hayagriva-inquiries-updated', { detail: mergedInquiries }));
+        }
+      } catch (err) {
+        console.warn('Could not cache leads from Supabase:', err);
+      }
+    }
+
+    const students = regularStudentRows.map(s => ({
       id: s.id,
       admissionNo: s.admission_no,
       name: s.full_name,
@@ -369,9 +420,15 @@ export async function syncTuitionDataToSupabase(data) {
       }));
       await supabase.from('students').upsert(studentRows, { onConflict: 'id' });
 
-      // Clean deleted students
+      // Clean deleted students (Never delete public website demo leads or teacher inquiries)
       const studentIds = data.students.map(s => s.id);
-      await supabase.from('students').delete().not('id', 'in', `(${studentIds.join(',')})`);
+      if (studentIds.length > 0) {
+        await supabase
+          .from('students')
+          .delete()
+          .not('id', 'in', `(${studentIds.join(',')})`)
+          .not('status', 'in', '("DEMO_LEAD","TEACHER_INQUIRY","CONTACTED")');
+      }
     }
 
     // 3. Attendance

@@ -17,7 +17,7 @@ import InquiriesModal from './components/InquiriesModal';
 import SessionExpiryModal from './components/SessionExpiryModal';
 import { useSessionManager } from './hooks/useSessionManager';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
-import { getStoredInquiries } from './lib/inquiries';
+import { getStoredInquiries, fetchInquiriesFromSupabase } from './lib/inquiries';
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
 import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES, canAccessTab, hasPermission, PERMISSIONS } from './lib/auth';
 import { logger } from './lib/logger';
@@ -160,8 +160,15 @@ export default function App() {
     };
   }, [currentUser]);
 
-  // Inquiries listener for real-time lead updates across components
+  // Inquiries listener for real-time lead updates across components and Supabase cloud sync
   useEffect(() => {
+    // Initial fetch from Supabase to catch leads submitted from other devices/browsers
+    fetchInquiriesFromSupabase().then(latest => {
+      if (latest && Array.isArray(latest)) {
+        setInquiries(latest);
+      }
+    });
+
     const handleInquiriesChange = (e) => {
       setInquiries(e.detail || getStoredInquiries());
     };
@@ -170,6 +177,17 @@ export default function App() {
       window.removeEventListener('hayagriva-inquiries-updated', handleInquiriesChange);
     };
   }, []);
+
+  // When admin logs in, pull latest inquiries from Supabase
+  useEffect(() => {
+    if (currentUser?.role === USER_ROLES.ADMIN) {
+      fetchInquiriesFromSupabase().then(latest => {
+        if (latest && Array.isArray(latest)) {
+          setInquiries(latest);
+        }
+      });
+    }
+  }, [currentUser]);
 
   const unreadInquiriesCount = (inquiries || []).filter(i => i.status === 'NEW').length;
 
@@ -541,6 +559,8 @@ export default function App() {
                     setFeeCollectModalOpen(true);
                   }
                 }}
+                onOpenInquiries={() => setInquiriesModalOpen(true)}
+                inquiriesCount={unreadInquiriesCount}
               />
             )}
 
@@ -632,15 +652,35 @@ export default function App() {
         <InquiriesModal 
           isOpen={inquiriesModalOpen}
           onClose={() => setInquiriesModalOpen(false)}
+          inquiries={inquiries}
+          classes={data.classes || []}
           onAdmitStudent={(lead) => {
             setActiveTab('students');
             setPrefilledStudentData({
-              name: lead.name || '',
-              class_grade: lead.class_grade || '10',
-              school: lead.school || '',
-              parent_name: lead.parent_name || '',
-              phone: lead.phone || '',
-              notes: `Demo inquiry (${lead.focus_subjects ? 'Subjects: ' + lead.focus_subjects : 'General'})`
+              name: lead.name || lead.studentName || '',
+              class_grade: lead.class_grade || (lead.classCode ? lead.classCode.replace('CLASS_', '') : '10'),
+              classCode: lead.classCode || (lead.class_grade ? `CLASS_${lead.class_grade}` : 'CLASS_10'),
+              school: lead.school || lead.schoolName || '',
+              parent_name: lead.parent_name || lead.parentName || '',
+              parentName: lead.parent_name || lead.parentName || '',
+              phone: lead.phone || lead.parentPhone || '',
+              parentPhone: lead.phone || lead.parentPhone || '',
+              notes: lead.notes || `Demo inquiry (${lead.subjects || 'General'})`
+            });
+            setAdmitModalOpen(true);
+          }}
+          onAdmitLead={(lead) => {
+            setActiveTab('students');
+            setPrefilledStudentData({
+              name: lead.name || lead.studentName || '',
+              class_grade: lead.class_grade || (lead.classCode ? lead.classCode.replace('CLASS_', '') : '10'),
+              classCode: lead.classCode || (lead.class_grade ? `CLASS_${lead.class_grade}` : 'CLASS_10'),
+              school: lead.school || lead.schoolName || '',
+              parent_name: lead.parent_name || lead.parentName || '',
+              parentName: lead.parent_name || lead.parentName || '',
+              phone: lead.phone || lead.parentPhone || '',
+              parentPhone: lead.phone || lead.parentPhone || '',
+              notes: lead.notes || `Demo inquiry (${lead.subjects || 'General'})`
             });
             setAdmitModalOpen(true);
           }}
