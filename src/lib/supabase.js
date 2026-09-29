@@ -123,8 +123,13 @@ export async function fetchTuitionDataFromSupabase() {
     // Filter regular enrolled students vs. public website demo leads & inquiries
     const isLeadStatus = (status) => status === 'DEMO_LEAD' || status === 'TEACHER_INQUIRY' || status === 'CONTACTED';
     const rawStudentRows = studentsRes.data || [];
-    const regularStudentRows = rawStudentRows.filter(s => !isLeadStatus(s.status));
-    const leadRows = rawStudentRows.filter(s => isLeadStatus(s.status));
+    const DELETED_KEY = 'hayagriva_deleted_leads_v1';
+    const deletedLeadIds = new Set(
+      JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem(DELETED_KEY)) || '[]').map(String)
+    );
+    const leadRows = rawStudentRows
+      .filter(s => isLeadStatus(s.status))
+      .filter(s => !deletedLeadIds.has(String(s.id)));
 
     // If leads are found in Supabase, update inquiries storage reactively
     if (leadRows.length > 0 && typeof localStorage !== 'undefined') {
@@ -133,7 +138,9 @@ export async function fetchTuitionDataFromSupabase() {
         const existingInq = JSON.parse(localStorage.getItem(INQ_KEY) || '[]');
         const map = new Map();
         if (Array.isArray(existingInq)) {
-          existingInq.forEach(i => map.set(String(i.id), i));
+          existingInq
+            .filter(i => !deletedLeadIds.has(String(i.id)))
+            .forEach(i => map.set(String(i.id), i));
         }
         leadRows.forEach(row => {
           let meta = {};

@@ -14,7 +14,9 @@ import {
   Filter, 
   Search,
   Check,
-  RefreshCw
+  RefreshCw,
+  CloudCheck,
+  Database
 } from 'lucide-react';
 import { updateInquiryStatus, deleteInquiry, getStoredInquiries, fetchInquiriesFromSupabase } from '../lib/inquiries';
 
@@ -29,6 +31,7 @@ export default function InquiriesModal({
   const [filterType, setFilterType] = useState('ALL'); // ALL, STUDENT_DEMO, TEACHER_APPLICATION, NEW
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   // Manage self-hydrating state from local storage or props
   const [localInquiries, setLocalInquiries] = useState(() => {
@@ -60,7 +63,7 @@ export default function InquiriesModal({
 
   // Sync if parent passes updated inquiries array
   useEffect(() => {
-    if (Array.isArray(propInquiries) && propInquiries.length > 0) {
+    if (Array.isArray(propInquiries)) {
       setLocalInquiries(propInquiries);
     }
   }, [propInquiries]);
@@ -73,6 +76,27 @@ export default function InquiriesModal({
     window.addEventListener('hayagriva-inquiries-updated', handleUpdate);
     return () => window.removeEventListener('hayagriva-inquiries-updated', handleUpdate);
   }, []);
+
+  const handleDeleteInquiry = async (item) => {
+    if (!item?.id) return;
+    const confirmMsg = `Are you sure you want to delete the lead for "${item.name}"?\n\nThis will permanently delete it from both the Supabase cloud database and local storage.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const targetId = item.id;
+    setDeletingId(targetId);
+
+    // 1. Optimistic instant UI removal
+    setLocalInquiries(prev => prev.filter(i => String(i.id) !== String(targetId)));
+
+    try {
+      // 2. Delete from Supabase PostgreSQL & LocalStorage
+      await deleteInquiry(targetId);
+    } catch (err) {
+      console.error('Failed to delete inquiry:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -124,14 +148,19 @@ export default function InquiriesModal({
               <Sparkles size={20} className="text-primary" />
             </div>
             <div>
-              <h2 className="modal-title text-lg font-bold flex items-center gap-2">
-                <span>Website Inquiries &amp; Leads</span>
-                {newCount > 0 && (
-                  <span className="badge badge-danger text-xs font-bold font-mono">
-                    {newCount} New
-                  </span>
-                )}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="modal-title text-lg font-bold flex items-center gap-2">
+                  <span>Website Inquiries &amp; Leads</span>
+                  {newCount > 0 && (
+                    <span className="badge badge-danger text-xs font-bold font-mono">
+                      {newCount} New
+                    </span>
+                  )}
+                </h2>
+                <span className="badge badge-primary text-3xs font-mono" title="Synced in real time to Supabase PostgreSQL database and cached locally">
+                  ☁️ Supabase Cloud Sync
+                </span>
+              </div>
               <p className="text-xs text-secondary">Prospective student demo bookings and teacher job inquiries from the landing page</p>
             </div>
           </div>
@@ -217,6 +246,7 @@ export default function InquiriesModal({
               {filteredInquiries.map((item) => {
                 const isStudent = item.type === 'STUDENT_DEMO';
                 const isNew = item.status === 'NEW';
+                const isDeleting = deletingId === item.id;
 
                 return (
                   <div 
@@ -239,6 +269,9 @@ export default function InquiriesModal({
                             (Parent: <strong>{item.parentName}</strong>)
                           </span>
                         )}
+                        <span className="badge badge-secondary text-3xs" style={{ fontSize: '0.62rem', opacity: 0.8 }}>
+                          ☁️ Cloud Synced
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -354,15 +387,13 @@ export default function InquiriesModal({
 
                         <button
                           type="button"
-                          className="btn btn-secondary btn-xs text-rose"
-                          onClick={() => {
-                            if (window.confirm(`Delete inquiry for ${item.name}?`)) {
-                              deleteInquiry(item.id);
-                            }
-                          }}
-                          title="Delete Lead"
+                          className="btn btn-secondary btn-xs text-rose flex items-center gap-1 hover:bg-rose-500/10"
+                          onClick={() => handleDeleteInquiry(item)}
+                          disabled={isDeleting}
+                          title="Delete Lead permanently"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={12} className={isDeleting ? 'animate-spin' : ''} />
+                          <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
                         </button>
                       </div>
                     </div>

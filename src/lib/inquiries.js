@@ -7,6 +7,7 @@
 import { getSupabaseClient } from './supabase.js';
 
 const INQUIRIES_STORAGE_KEY = 'hayagriva_inquiries_v1';
+const DELETED_LEADS_KEY = 'hayagriva_deleted_leads_v1';
 
 // Initial sample inquiries if none exist
 const DEFAULT_INQUIRIES = [
@@ -44,30 +45,59 @@ const DEFAULT_INQUIRIES = [
   }
 ];
 
+export function getDeletedLeadIds() {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DELETED_LEADS_KEY) : null;
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function markLeadAsDeleted(id) {
+  try {
+    const deleted = getDeletedLeadIds();
+    const strId = String(id);
+    if (!deleted.includes(strId)) {
+      deleted.push(strId);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(DELETED_LEADS_KEY, JSON.stringify(deleted));
+      }
+    }
+  } catch (e) {
+    console.warn('Could not mark lead as deleted:', e);
+  }
+}
+
 export function getStoredInquiries() {
   try {
+    const deletedIds = new Set(getDeletedLeadIds().map(String));
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(INQUIRIES_STORAGE_KEY) : null;
     if (!raw) {
+      const filteredDefaults = DEFAULT_INQUIRIES.filter(i => !deletedIds.has(String(i.id)));
       if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(DEFAULT_INQUIRIES));
+        localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(filteredDefaults));
       }
-      return DEFAULT_INQUIRIES;
+      return filteredDefaults;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : DEFAULT_INQUIRIES;
+    const list = Array.isArray(parsed) ? parsed : DEFAULT_INQUIRIES;
+    return list.filter(i => !deletedIds.has(String(i.id)));
   } catch (e) {
     console.warn('Error reading stored inquiries:', e);
-    return DEFAULT_INQUIRIES;
+    return [];
   }
 }
 
 export function saveStoredInquiries(inquiries) {
   try {
+    const deletedIds = new Set(getDeletedLeadIds().map(String));
+    const cleanList = (Array.isArray(inquiries) ? inquiries : []).filter(i => !deletedIds.has(String(i.id)));
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(inquiries));
+      localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(cleanList));
     }
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('hayagriva-inquiries-updated', { detail: inquiries }));
+      window.dispatchEvent(new CustomEvent('hayagriva-inquiries-updated', { detail: cleanList }));
     }
   } catch (e) {
     console.error('Error saving inquiries:', e);
@@ -99,7 +129,7 @@ export async function addInquiry(data) {
     createdAt: new Date().toISOString()
   };
 
-  const updated = [newInquiry, ...existing.filter(i => i.id !== newInquiry.id)];
+  const updated = [newInquiry, ...existing.filter(i => String(i.id) !== String(newInquiry.id))];
   saveStoredInquiries(updated);
 
   // Sync to Supabase PostgreSQL in background
@@ -144,14 +174,19 @@ export async function addInquiry(data) {
 }
 
 export async function updateInquiryStatus(id, newStatus) {
+  const strId = String(id);
   const existing = getStoredInquiries();
-  const updated = existing.map(item => item.id === id ? { ...item, status: newStatus } : item);
+  const updated = existing.map(item => String(item.id) === strId ? { ...item, status: newStatus } : item);
   saveStoredInquiries(updated);
 
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from('students').update({ status: newStatus }).eq('id', id);
+      const numId = Number(id);
+      if (!isNaN(numId)) {
+        await supabase.from('students').update({ status: newStatus }).eq('id', numId);
+      }
+      await supabase.from('students').update({ status: newStatus }).eq('admission_no', 'LEAD-' + strId);
     } catch (err) {
       console.warn('Could not update inquiry status in Supabase:', err);
     }
@@ -159,24 +194,38 @@ export async function updateInquiryStatus(id, newStatus) {
 }
 
 export async function deleteInquiry(id) {
+  const strId = String(id);
+  // 1. Blacklist ID permanently so it can never be resurrected by background fetches
+  markLeadAsDeleted(strId);
+
+  // 2. Remove immediately from local storage
   const existing = getStoredInquiries();
-  const updated = existing.filter(item => item.id !== id);
+  const updated = existing.filter(item => String(item.id) !== strId);
   saveStoredInquiries(updated);
 
+  // 3. Delete from Supabase PostgreSQL database
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from('students').delete().eq('id', id);
+      const numId = Number(id);
+      if (!isNaN(numId)) {
+        await supabase.from('students').delete().eq('id', numId);
+      }
+      await supabase.from('students').delete().eq('admission_no', 'LEAD-' + strId);
     } catch (err) {
       console.warn('Could not delete inquiry from Supabase:', err);
     }
   }
+
+  return updated;
 }
 
 export async function fetchInquiriesFromSupabase() {
   const supabase = getSupabaseClient();
   const localList = getStoredInquiries();
   if (!supabase) return localList;
+
+  const deletedIds = new Set(getDeletedLeadIds().map(String));
 
   try {
     const { data, error } = await supabase
@@ -189,7 +238,17 @@ export async function fetchInquiriesFromSupabase() {
       return localList;
     }
 
-    const remoteInquiries = data.map(row => {
+    // Filter out deleted IDs from Supabase rows
+    const activeRows = data.filter(row => !deletedIds.has(String(row.id)));
+
+    // Clean up any blacklisted rows that still exist in Supabase
+    const rowsToClean = data.filter(row => deletedIds.has(String(row.id)));
+    if (rowsToClean.length > 0) {
+      const idsToClean = rowsToClean.map(r => r.id);
+      supabase.from('students').delete().in('id', idsToClean).then(() => {});
+    }
+
+    const remoteInquiries = activeRows.map(row => {
       let meta = {};
       try {
         if (row.address && typeof row.address === 'string' && row.address.trim().startsWith('{')) {
@@ -219,12 +278,14 @@ export async function fetchInquiriesFromSupabase() {
       };
     });
 
-    // Merge remote inquiries with local inquiries by ID
+    // Merge remote inquiries with local inquiries by ID (excluding blacklisted IDs)
     const mergedMap = new Map();
-    // 1. Add local entries
-    localList.forEach(item => mergedMap.set(String(item.id), item));
-    // 2. Overlay remote entries from Supabase
-    remoteInquiries.forEach(item => mergedMap.set(String(item.id), item));
+    localList
+      .filter(item => !deletedIds.has(String(item.id)))
+      .forEach(item => mergedMap.set(String(item.id), item));
+    remoteInquiries
+      .filter(item => !deletedIds.has(String(item.id)))
+      .forEach(item => mergedMap.set(String(item.id), item));
 
     const mergedList = Array.from(mergedMap.values()).sort((a, b) => {
       const timeA = new Date(a.createdAt || 0).getTime();
@@ -239,4 +300,3 @@ export async function fetchInquiriesFromSupabase() {
     return localList;
   }
 }
-
