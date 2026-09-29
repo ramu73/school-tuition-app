@@ -19,7 +19,8 @@ import {
   Megaphone,
   ChevronDown,
   Shield,
-  Info
+  Info,
+  Sparkles
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -29,6 +30,8 @@ export default function Navbar({
   activeTab, 
   setActiveTab, 
   onOpenSettings, 
+  onOpenInquiries,
+  inquiriesCount = 0,
   isSupabaseLive, 
   isSyncing,
   currentUser,
@@ -113,6 +116,39 @@ export default function Navbar({
             <span className="live-pill-text">{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Live') : 'Local'}</span>
           </div>
 
+
+          {/* Website Leads & Demo Inquiries (Admin Only) */}
+          {currentUser?.role === USER_ROLES.ADMIN && (
+            <button 
+              onClick={onOpenInquiries}
+              className="btn btn-secondary btn-sm db-settings-btn leads-btn-wrap"
+              style={{ position: 'relative' }}
+              title="Website Inquiries, Student Demos & Teacher Applications"
+            >
+              <Sparkles size={14} className="text-amber" />
+              <span className="btn-label-text">Leads</span>
+              {inquiriesCount > 0 && (
+                <span 
+                  className="leads-unread-count"
+                  style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    background: '#F43F5E',
+                    color: '#FFF',
+                    fontSize: '0.62rem',
+                    fontWeight: 800,
+                    padding: '1px 5px',
+                    borderRadius: '9999px',
+                    boxShadow: '0 0 8px rgba(244, 63, 94, 0.6)',
+                    animation: 'pulse 2s infinite'
+                  }}
+                >
+                  {inquiriesCount}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* System Settings & Database (Admin Only) */}
           {currentUser?.role === USER_ROLES.ADMIN && (

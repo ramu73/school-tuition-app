@@ -12,14 +12,15 @@ import {
   Eye,
   EyeOff,
   Clock,
-  Unlock
+  Unlock,
+  X
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession, getLockoutStatus } from '../lib/auth';
 import { fetchStaffAccountsFromSupabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
 
-export default function LoginModal({ onLoginSuccess, students = [] }) {
+export default function LoginModal({ onLoginSuccess, students = [], onClose, initialRole }) {
   // Detect if Admin access was explicitly requested via URL parameter or hash
   const detectInitialAdminAccess = () => {
     try {
@@ -34,10 +35,15 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
     return false;
   };
 
-  const initialAdminVisible = detectInitialAdminAccess();
+  const initialAdminVisible = detectInitialAdminAccess() || initialRole === 'STAFF' || initialRole === 'ADMIN';
   const [isAdminVisible, setIsAdminVisible] = useState(initialAdminVisible);
-  // Default to PARENT login on startup/logout unless URL explicitly specifies admin
-  const [activeRole, setActiveRole] = useState(initialAdminVisible ? USER_ROLES.ADMIN : USER_ROLES.PARENT);
+  // Default role based on initialRole prop or parent
+  const [activeRole, setActiveRole] = useState(() => {
+    if (initialRole === 'PARENT') return USER_ROLES.PARENT;
+    if (initialRole === 'STAFF' || initialRole === 'ADMIN') return USER_ROLES.ADMIN;
+    if (initialRole === 'TEACHER') return USER_ROLES.TEACHER;
+    return initialAdminVisible ? USER_ROLES.ADMIN : USER_ROLES.PARENT;
+  });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -218,7 +224,34 @@ export default function LoginModal({ onLoginSuccess, students = [] }) {
 
   return (
     <div className="login-backdrop">
-      <div className="login-card">
+      <div className="login-card" style={{ position: 'relative' }}>
+        {onClose && (
+          <button 
+            type="button" 
+            className="login-modal-close-btn" 
+            onClick={onClose}
+            title="Back to Website"
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#94A3B8',
+              cursor: 'pointer',
+              zIndex: 10,
+              transition: 'all 0.2s'
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
         {/* Header with Academy Branding */}
         <div className="login-header">
           <div 

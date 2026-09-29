@@ -10,9 +10,14 @@ import BroadcastNotifications from './components/BroadcastNotifications';
 import SettingsModal from './components/SettingsModal';
 import LoginModal from './components/LoginModal';
 import ParentPortal from './components/ParentPortal';
+import LandingPage from './components/LandingPage';
+import DemoRegistrationModal from './components/DemoRegistrationModal';
+import TeacherInquiryModal from './components/TeacherInquiryModal';
+import InquiriesModal from './components/InquiriesModal';
 import SessionExpiryModal from './components/SessionExpiryModal';
 import { useSessionManager } from './hooks/useSessionManager';
 import { getStoredData, saveStoredData, getSupabaseConfig, getEmptyTuitionData } from './lib/storage';
+import { getStoredInquiries } from './lib/inquiries';
 import { getSupabaseClient, fetchTuitionDataFromSupabase, syncTuitionDataToSupabase, fetchStaffAccountsFromSupabase } from './lib/supabase';
 import { getAuthSession, setAuthSession, clearAuthSession, getStaffAccounts, USER_ROLES, canAccessTab, hasPermission, PERMISSIONS } from './lib/auth';
 import { logger } from './lib/logger';
@@ -97,8 +102,45 @@ export default function App() {
   const [feeCollectModalOpen, setFeeCollectModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
+  // Landing page & Public modals state
+  const [loginModalOpen, setLoginModalOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('login') === 'true' || p.get('admin') === 'true' || p.get('parent') === 'true';
+    }
+    return false;
+  });
+  const [loginInitialRole, setLoginInitialRole] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get('parent') === 'true') return 'PARENT';
+      if (p.get('admin') === 'true' || p.get('staff') === 'true') return 'STAFF';
+    }
+    return 'PARENT';
+  });
+  const [demoModalOpen, setDemoModalOpen] = useState(false);
+  const [teacherModalOpen, setTeacherModalOpen] = useState(false);
+
+  // Inquiries / Leads state
+  const [inquiries, setInquiries] = useState(getStoredInquiries);
+  const [inquiriesModalOpen, setInquiriesModalOpen] = useState(false);
+  const [prefilledStudentData, setPrefilledStudentData] = useState(null);
+
   // Supabase connection state
   const [isSupabaseLive, setIsSupabaseLive] = useState(getSupabaseConfig().isConnected);
+
+  // Inquiries listener for real-time lead updates across components
+  useEffect(() => {
+    const handleInquiriesChange = (e) => {
+      setInquiries(e.detail || getStoredInquiries());
+    };
+    window.addEventListener('hayagriva-inquiries-updated', handleInquiriesChange);
+    return () => {
+      window.removeEventListener('hayagriva-inquiries-updated', handleInquiriesChange);
+    };
+  }, []);
+
+  const unreadInquiriesCount = (inquiries || []).filter(i => i.status === 'NEW').length;
 
   // Centralized Logout Handler
   const handleLogout = useCallback(() => {
@@ -123,7 +165,15 @@ export default function App() {
       SplashScreen.hide().catch(() => {});
 
       const backListener = CapApp.addListener('backButton', () => {
-        if (admitModalOpen) {
+        if (demoModalOpen) {
+          setDemoModalOpen(false);
+        } else if (teacherModalOpen) {
+          setTeacherModalOpen(false);
+        } else if (inquiriesModalOpen) {
+          setInquiriesModalOpen(false);
+        } else if (loginModalOpen) {
+          setLoginModalOpen(false);
+        } else if (admitModalOpen) {
           setAdmitModalOpen(false);
         } else if (feeCollectModalOpen) {
           setFeeCollectModalOpen(false);
@@ -141,7 +191,7 @@ export default function App() {
         backListener.then(handle => handle.remove()).catch(() => {});
       };
     }
-  }, [admitModalOpen, feeCollectModalOpen, settingsModalOpen, activeTab, currentUser]);
+  }, [demoModalOpen, teacherModalOpen, inquiriesModalOpen, loginModalOpen, admitModalOpen, feeCollectModalOpen, settingsModalOpen, activeTab, currentUser]);
 
   // Role-Based Authorization Guard: Redirect if attempting to access unauthorized tab
   useEffect(() => {
@@ -358,19 +408,52 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <LoginModal 
-        students={data.students}
-        onLoginSuccess={(user) => {
-          setData(getStoredData());
-          setCurrentUser(user);
-          loadFromSupabase();
-          if (user.role === USER_ROLES.PARENT) {
-            setActiveTab('parent-portal');
-          } else {
-            setActiveTab('dashboard');
-          }
-        }}
-      />
+      <div className="landing-app-wrapper">
+        <LandingPage 
+          onOpenDemo={() => setDemoModalOpen(true)}
+          onOpenParentLogin={() => {
+            setLoginInitialRole('PARENT');
+            setLoginModalOpen(true);
+          }}
+          onOpenStaffLogin={() => {
+            setLoginInitialRole('STAFF');
+            setLoginModalOpen(true);
+          }}
+          onOpenTeacherInquiry={() => setTeacherModalOpen(true)}
+        />
+
+        {/* Demo Registration Modal */}
+        <DemoRegistrationModal 
+          isOpen={demoModalOpen}
+          onClose={() => setDemoModalOpen(false)}
+        />
+
+        {/* Teacher Job Application Modal */}
+        <TeacherInquiryModal 
+          isOpen={teacherModalOpen}
+          onClose={() => setTeacherModalOpen(false)}
+        />
+
+        {/* Login Modal */}
+        {loginModalOpen && (
+          <LoginModal 
+            initialRole={loginInitialRole}
+            students={data.students}
+            onClose={() => setLoginModalOpen(false)}
+            onLoginSuccess={(user) => {
+              setData(getStoredData());
+              setCurrentUser(user);
+              setLoginModalOpen(false);
+              loadFromSupabase();
+              if (user.role === USER_ROLES.PARENT) {
+                setActiveTab('parent-portal');
+              } else {
+                setActiveTab('dashboard');
+              }
+            }}
+          />
+        )}
+      </div>
     );
   }
 
@@ -381,6 +464,8 @@ export default function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         onOpenSettings={() => hasPermission(currentUser, PERMISSIONS.MANAGE_SETTINGS) && setSettingsModalOpen(true)}
+        onOpenInquiries={() => setInquiriesModalOpen(true)}
+        inquiriesCount={unreadInquiriesCount}
         isSupabaseLive={isSupabaseLive}
         isSyncing={isSyncing}
         currentUser={currentUser}
@@ -431,6 +516,7 @@ export default function App() {
                 setSelectedClassFilter={setSelectedClassFilter}
                 admitModalOpen={admitModalOpen}
                 setAdmitModalOpen={setAdmitModalOpen}
+                prefilledStudentData={prefilledStudentData}
               />
             )}
 
@@ -501,6 +587,26 @@ export default function App() {
           batches={data.batches || []}
           students={data.students || []}
           onSaveData={handleSaveData}
+        />
+      )}
+
+      {/* Inquiries & Leads Management Modal (Admin Only) */}
+      {currentUser?.role === USER_ROLES.ADMIN && (
+        <InquiriesModal 
+          isOpen={inquiriesModalOpen}
+          onClose={() => setInquiriesModalOpen(false)}
+          onAdmitStudent={(lead) => {
+            setActiveTab('students');
+            setPrefilledStudentData({
+              name: lead.name || '',
+              class_grade: lead.class_grade || '10',
+              school: lead.school || '',
+              parent_name: lead.parent_name || '',
+              phone: lead.phone || '',
+              notes: `Demo inquiry (${lead.focus_subjects ? 'Subjects: ' + lead.focus_subjects : 'General'})`
+            });
+            setAdmitModalOpen(true);
+          }}
         />
       )}
 

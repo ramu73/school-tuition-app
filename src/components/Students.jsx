@@ -28,7 +28,8 @@ export default function Students({
   setSelectedClassFilter,
   admitModalOpen,
   setAdmitModalOpen,
-  currentUser
+  currentUser,
+  prefilledStudentData = null
 }) {
   const { students = [], batches = [], classes = [], fees = [], exams = [], marks = [], tutorFeedback = [], attendance = [] } = data;
 
@@ -66,6 +67,26 @@ export default function Students({
     admissionDate: new Date().toISOString().split('T')[0],
     address: ''
   });
+
+  // If prefilledStudentData is provided (from lead inquiry direct admit)
+  React.useEffect(() => {
+    if (prefilledStudentData && admitModalOpen) {
+      const classCode = prefilledStudentData.class_grade 
+        ? `CLASS_${prefilledStudentData.class_grade}` 
+        : 'CLASS_1';
+      const matchedClass = classes.find(c => c.code === classCode);
+      setFormData(prev => ({
+        ...prev,
+        name: prefilledStudentData.name || '',
+        classCode,
+        monthlyFee: matchedClass ? matchedClass.defaultFee : prev.monthlyFee,
+        school: prefilledStudentData.school || '',
+        parentName: prefilledStudentData.parent_name || '',
+        parentPhone: prefilledStudentData.phone || '',
+        address: prefilledStudentData.notes || ''
+      }));
+    }
+  }, [prefilledStudentData, admitModalOpen]);
 
   const clearFieldError = (field) => {
     if (formErrors[field]) {
