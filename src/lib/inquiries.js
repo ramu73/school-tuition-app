@@ -1,6 +1,6 @@
 // ==========================================================================
 // Inquiries & Leads Management Pipeline
-// Supports New Student Demo Registrations & Faculty Hiring Applications
+// Supports Real Student Demo Registrations & Faculty Hiring Applications
 // LocalStorage reactive persistence + Supabase PostgreSQL real-time sync
 // ==========================================================================
 
@@ -9,41 +9,8 @@ import { getSupabaseClient } from './supabase.js';
 const INQUIRIES_STORAGE_KEY = 'hayagriva_inquiries_v1';
 const DELETED_LEADS_KEY = 'hayagriva_deleted_leads_v1';
 
-// Initial sample inquiries if none exist
-const DEFAULT_INQUIRIES = [
-  {
-    id: 500101,
-    type: 'STUDENT_DEMO',
-    name: 'K. Sai Akhil',
-    parentName: 'K. Venkatesh',
-    phone: '9848123456',
-    email: '',
-    classCode: 'CLASS_10',
-    schoolName: 'St. Joseph High School',
-    subjects: 'Mathematics & Science',
-    timingPreference: 'Evening (5:30 PM - 7:30 PM)',
-    notes: 'Interested in Class 10 Board Exam batch.',
-    status: 'NEW',
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString()
-  },
-  {
-    id: 500102,
-    type: 'TEACHER_APPLICATION',
-    name: 'B. Srilatha',
-    parentName: '',
-    phone: '9876543210',
-    email: 'srilatha.maths@gmail.com',
-    classCode: 'CLASS_8',
-    schoolName: '',
-    subjects: 'Mathematics & Physical Science',
-    timingPreference: 'Evening',
-    experience: '4 Years at Narayana High School',
-    qualification: 'M.Sc. B.Ed (Mathematics)',
-    notes: 'Enquiry for high school mathematics faculty position.',
-    status: 'NEW',
-    createdAt: new Date(Date.now() - 3600000 * 20).toISOString()
-  }
-];
+// Blacklist of legacy mock/dummy sample IDs to ensure they never appear
+const SAMPLE_IDS = new Set(['101', '102', '500101', '500102']);
 
 export function getDeletedLeadIds() {
   try {
@@ -74,15 +41,23 @@ export function getStoredInquiries() {
     const deletedIds = new Set(getDeletedLeadIds().map(String));
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(INQUIRIES_STORAGE_KEY) : null;
     if (!raw) {
-      const filteredDefaults = DEFAULT_INQUIRIES.filter(i => !deletedIds.has(String(i.id)));
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(filteredDefaults));
-      }
-      return filteredDefaults;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    const list = Array.isArray(parsed) ? parsed : DEFAULT_INQUIRIES;
-    return list.filter(i => !deletedIds.has(String(i.id)));
+    const list = Array.isArray(parsed) ? parsed : [];
+    
+    // Purge any legacy sample data or deleted leads
+    const cleanList = list.filter(i => {
+      const idStr = String(i.id);
+      return !SAMPLE_IDS.has(idStr) && !deletedIds.has(idStr);
+    });
+
+    // Auto-update localStorage if dirty sample data was present
+    if (cleanList.length !== list.length && typeof localStorage !== 'undefined') {
+      localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(cleanList));
+    }
+
+    return cleanList;
   } catch (e) {
     console.warn('Error reading stored inquiries:', e);
     return [];
@@ -92,7 +67,10 @@ export function getStoredInquiries() {
 export function saveStoredInquiries(inquiries) {
   try {
     const deletedIds = new Set(getDeletedLeadIds().map(String));
-    const cleanList = (Array.isArray(inquiries) ? inquiries : []).filter(i => !deletedIds.has(String(i.id)));
+    const cleanList = (Array.isArray(inquiries) ? inquiries : []).filter(i => {
+      const idStr = String(i.id);
+      return !SAMPLE_IDS.has(idStr) && !deletedIds.has(idStr);
+    });
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(cleanList));
     }
@@ -238,11 +216,11 @@ export async function fetchInquiriesFromSupabase() {
       return localList;
     }
 
-    // Filter out deleted IDs from Supabase rows
-    const activeRows = data.filter(row => !deletedIds.has(String(row.id)));
+    // Filter out deleted IDs and legacy sample IDs from Supabase rows
+    const activeRows = data.filter(row => !deletedIds.has(String(row.id)) && !SAMPLE_IDS.has(String(row.id)));
 
     // Clean up any blacklisted rows that still exist in Supabase
-    const rowsToClean = data.filter(row => deletedIds.has(String(row.id)));
+    const rowsToClean = data.filter(row => deletedIds.has(String(row.id)) || SAMPLE_IDS.has(String(row.id)));
     if (rowsToClean.length > 0) {
       const idsToClean = rowsToClean.map(r => r.id);
       supabase.from('students').delete().in('id', idsToClean).then(() => {});
@@ -278,13 +256,13 @@ export async function fetchInquiriesFromSupabase() {
       };
     });
 
-    // Merge remote inquiries with local inquiries by ID (excluding blacklisted IDs)
+    // Merge remote inquiries with local inquiries by ID (excluding blacklisted and sample IDs)
     const mergedMap = new Map();
     localList
-      .filter(item => !deletedIds.has(String(item.id)))
+      .filter(item => !deletedIds.has(String(item.id)) && !SAMPLE_IDS.has(String(item.id)))
       .forEach(item => mergedMap.set(String(item.id), item));
     remoteInquiries
-      .filter(item => !deletedIds.has(String(item.id)))
+      .filter(item => !deletedIds.has(String(item.id)) && !SAMPLE_IDS.has(String(item.id)))
       .forEach(item => mergedMap.set(String(item.id), item));
 
     const mergedList = Array.from(mergedMap.values()).sort((a, b) => {

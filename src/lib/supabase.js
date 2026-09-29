@@ -124,22 +124,23 @@ export async function fetchTuitionDataFromSupabase() {
     const isLeadStatus = (status) => status === 'DEMO_LEAD' || status === 'TEACHER_INQUIRY' || status === 'CONTACTED';
     const rawStudentRows = studentsRes.data || [];
     const DELETED_KEY = 'hayagriva_deleted_leads_v1';
+    const SAMPLE_IDS = new Set(['101', '102', '500101', '500102']);
     const deletedLeadIds = new Set(
       JSON.parse((typeof localStorage !== 'undefined' && localStorage.getItem(DELETED_KEY)) || '[]').map(String)
     );
     const leadRows = rawStudentRows
       .filter(s => isLeadStatus(s.status))
-      .filter(s => !deletedLeadIds.has(String(s.id)));
+      .filter(s => !deletedLeadIds.has(String(s.id)) && !SAMPLE_IDS.has(String(s.id)));
 
     // If leads are found in Supabase, update inquiries storage reactively
-    if (leadRows.length > 0 && typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined') {
       try {
         const INQ_KEY = 'hayagriva_inquiries_v1';
         const existingInq = JSON.parse(localStorage.getItem(INQ_KEY) || '[]');
         const map = new Map();
         if (Array.isArray(existingInq)) {
           existingInq
-            .filter(i => !deletedLeadIds.has(String(i.id)))
+            .filter(i => !deletedLeadIds.has(String(i.id)) && !SAMPLE_IDS.has(String(i.id)))
             .forEach(i => map.set(String(i.id), i));
         }
         leadRows.forEach(row => {
