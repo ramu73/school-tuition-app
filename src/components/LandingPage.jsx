@@ -28,7 +28,6 @@ import HayagrivaLogo from './HayagrivaLogo';
 export default function LandingPage({ 
   onOpenLogin, 
   onOpenParentLogin,
-  onOpenStaffLogin,
   onOpenDemo, 
   onOpenTeacher,
   onOpenTeacherInquiry,
@@ -42,14 +41,6 @@ export default function LandingPage({
       onOpenParentLogin();
     } else if (onOpenLogin) {
       onOpenLogin('PARENT');
-    }
-  };
-
-  const handleOpenStaffLogin = () => {
-    if (onOpenStaffLogin) {
-      onOpenStaffLogin();
-    } else if (onOpenLogin) {
-      onOpenLogin('STAFF');
     }
   };
 
@@ -87,7 +78,8 @@ export default function LandingPage({
 
           <nav className="landing-nav-links hidden md:flex items-center gap-6 text-xs font-semibold text-secondary">
             <a href="#about" className="nav-item">Why Hayagriva</a>
-            <a href="#classes" className="nav-item">Classes &amp; Batches</a>
+            <a href="#strategy" className="nav-item">One Day One Subject</a>
+            <a href="#classes" className="nav-item">Classes 1 - 10</a>
             <a href="#features" className="nav-item">Methodology</a>
             <a href="#careers" className="nav-item">Faculty Careers</a>
             <a href="#contact" className="nav-item">Contact</a>
@@ -137,7 +129,7 @@ export default function LandingPage({
           </h1>
 
           <p className="hero-lead-text">
-            Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong>. Small batch sizes, weekly slip tests, personalized child improvement plans, and <strong>weekly WhatsApp reports</strong> for parents.
+            Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with our proven <strong>"One Day, One Subject" focused strategy</strong>, weekly slip tests, personalized child improvement plans, and <strong>weekly WhatsApp reports</strong> for parents.
           </p>
 
           <div className="hero-actions-row flex items-center justify-center flex-wrap gap-3 mb-8">
@@ -167,13 +159,13 @@ export default function LandingPage({
               <MessageCircle size={16} className="text-emerald" />
               <span>Weekly WhatsApp Reports</span>
             </div>
+            <a href="#strategy" className="hero-feature-badge highlight-strategy" style={{ textDecoration: 'none' }}>
+              <Sparkles size={16} className="text-amber-400" />
+              <span>One Day, One Subject Strategy</span>
+            </a>
             <div className="hero-feature-badge">
               <CheckCircle2 size={16} className="text-primary" />
-              <span>Classes 1 to 10 (State Board &amp; CBSE)</span>
-            </div>
-            <div className="hero-feature-badge">
-              <Award size={16} className="text-amber" />
-              <span>Regular Attendance &amp; Slip Tests</span>
+              <span>Classes 1 to 10 (State &amp; CBSE)</span>
             </div>
           </div>
         </div>
@@ -207,21 +199,148 @@ export default function LandingPage({
                 type="button"
                 className="btn btn-primary flex-1 md:flex-initial flex items-center justify-center gap-2"
                 onClick={handleOpenParentLogin}
-                style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', borderColor: '#10B981' }}
+                style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', borderColor: '#10B981', padding: '10px 24px' }}
               >
                 <UserCheck size={16} />
                 <span>Parent / Student Login</span>
               </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-              <button
-                type="button"
-                className="btn btn-secondary flex-1 md:flex-initial flex items-center justify-center gap-1.5"
-                onClick={handleOpenStaffLogin}
-                title="Tutors & Academy Administrator Login"
-              >
-                <LogIn size={15} />
-                <span>Faculty / Admin</span>
-              </button>
+      {/* ============================================================== */}
+      {/* 4. "ONE DAY, ONE SUBJECT" MASTERY STRATEGY SHOWCASE */}
+      {/* ============================================================== */}
+      <section className="landing-section strategy-section" id="strategy">
+        <div className="section-header-center text-center mb-10">
+          <span className="section-pill-tag bg-amber-soft text-amber">
+            <Sparkles size={13} className="inline mr-1 text-amber-400" />
+            Signature Academic Framework
+          </span>
+          <h2 className="section-heading-lg">
+            The <span className="text-gradient-gold">"One Day, One Subject"</span> Strategy
+          </h2>
+          <p className="section-sub-text">
+            Why teach 4 subjects in 2 hours superficially when your child can master 1 subject deeply every evening?
+          </p>
+        </div>
+
+        {/* Comparison: Generic Tuitions vs Hayagriva Focused Way */}
+        <div className="strategy-comparison-grid mb-10">
+          <div className="comparison-card traditional-way">
+            <div className="comparison-header">
+              <span className="comp-tag comp-tag-danger">Generic Tuitions</span>
+              <h3 className="comp-title">The Fragmented Approach</h3>
+            </div>
+            <ul className="comp-list">
+              <li>
+                <span className="comp-cross">✕</span>
+                <div><strong>Scattered 25-Min Periods:</strong> Tutors rush through 4 subjects in 2 hours, leaving concepts half-explained.</div>
+              </li>
+              <li>
+                <span className="comp-cross">✕</span>
+                <div><strong>Cognitive Fatigue:</strong> Brain continuously switches between Maths, Science, Social &amp; English, preventing deep focus.</div>
+              </li>
+              <li>
+                <span className="comp-cross">✕</span>
+                <div><strong>Homework Overload:</strong> Multiple homework tasks given on the same evening lead to bedtime stress and copying.</div>
+              </li>
+              <li>
+                <span className="comp-cross">✕</span>
+                <div><strong>Superficial Learning:</strong> Doubts are left unaddressed because time runs out before problem sets are completed.</div>
+              </li>
+            </ul>
+          </div>
+
+          <div className="comparison-card hayagriva-way">
+            <div className="strategy-badge-float">⭐ High-Retention Model</div>
+            <div className="comparison-header">
+              <span className="comp-tag comp-tag-success">Hayagriva Tutorials</span>
+              <h3 className="comp-title">The "One Day, One Subject" Rule</h3>
+            </div>
+            <ul className="comp-list">
+              <li>
+                <span className="comp-check">✓</span>
+                <div><strong>1.5 to 2 Hours Deep Immersion:</strong> Dedicated single-subject focus ensures concepts, derivations, and textbook exercises are fully completed.</div>
+              </li>
+              <li>
+                <span className="comp-check">✓</span>
+                <div><strong>100% Concept Retention:</strong> Students delve into root principles without distraction, retaining chapters long into board exams.</div>
+              </li>
+              <li>
+                <span className="comp-check">✓</span>
+                <div><strong>Single-Subject Evening Routine:</strong> Only that day's subject is assigned for a focused 25-minute practice session — zero backlog.</div>
+              </li>
+              <li>
+                <span className="comp-check">✓</span>
+                <div><strong>Saturday Slip Test Validation:</strong> Every Saturday tests the week's covered topics, followed by instant scorecards for parents.</div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Weekly Subject Rotation Timetable Matrix */}
+        <div className="weekly-schedule-card glass-card">
+          <div className="schedule-card-header flex items-center justify-between flex-wrap gap-3 mb-6">
+            <div>
+              <span className="badge badge-primary text-3xs font-mono uppercase mb-1">Weekly Academic Timetable</span>
+              <h4 className="text-base md:text-lg font-bold text-white">How the Weekly Rotation Works (Classes 1 to 10)</h4>
+            </div>
+            <div className="text-xs text-muted flex items-center gap-2">
+              <Clock size={14} className="text-amber" />
+              <span>Evening Sessions: 5:00 PM – 8:30 PM | Morning: 6:00 AM – 8:30 AM</span>
+            </div>
+          </div>
+
+          <div className="schedule-days-grid">
+            <div className="schedule-day-box day-mon">
+              <div className="day-name">MONDAY</div>
+              <div className="subject-icon">📐</div>
+              <div className="subject-name">Mathematics</div>
+              <p className="subject-desc">Concept building, formula proofs, speed arithmetic &amp; textbook problem sets</p>
+            </div>
+
+            <div className="schedule-day-box day-tue">
+              <div className="day-name">TUESDAY</div>
+              <div className="subject-icon">⚡</div>
+              <div className="subject-name">Physical Science</div>
+              <p className="subject-desc">Physics laws, numericals, Chemistry chemical equations &amp; conceptual reasoning</p>
+            </div>
+
+            <div className="schedule-day-box day-wed">
+              <div className="day-name">WEDNESDAY</div>
+              <div className="subject-icon">🔬</div>
+              <div className="subject-name">Biological Science</div>
+              <p className="subject-desc">Botany &amp; Zoology, life processes, organ diagrams &amp; technical terminology</p>
+            </div>
+
+            <div className="schedule-day-box day-thu">
+              <div className="day-name">THURSDAY</div>
+              <div className="subject-icon">🌍</div>
+              <div className="subject-name">Social Studies</div>
+              <p className="subject-desc">History timelines, Geography map pointing, Civics, Economics &amp; point-wise answers</p>
+            </div>
+
+            <div className="schedule-day-box day-fri">
+              <div className="day-name">FRIDAY</div>
+              <div className="subject-icon">📖</div>
+              <div className="subject-name">Languages &amp; Grammar</div>
+              <p className="subject-desc">English grammar rules, comprehension, handwriting &amp; Second Language (Telugu/Hindi)</p>
+            </div>
+
+            <div className="schedule-day-box day-sat highlight-test">
+              <div className="day-name text-amber-400">SATURDAY</div>
+              <div className="subject-icon">📝</div>
+              <div className="subject-name text-amber-300">Weekly Slip Test</div>
+              <p className="subject-desc">Evaluation of the week's covered topics with instant percentage &amp; WhatsApp reports</p>
+            </div>
+
+            <div className="schedule-day-box day-sun highlight-doubt">
+              <div className="day-name text-emerald-400">SUNDAY</div>
+              <div className="subject-icon">🎯</div>
+              <div className="subject-name text-emerald-300">Doubt Clarification</div>
+              <p className="subject-desc">1-on-1 tutoring for slow learners, revision of weak topics &amp; board exam prep</p>
             </div>
           </div>
         </div>
@@ -537,13 +656,6 @@ export default function LandingPage({
               >
                 Faculty Careers
               </button>
-              <button 
-                type="button"
-                className="hover:text-white transition-colors"
-                onClick={handleOpenStaffLogin}
-              >
-                Staff Login
-              </button>
             </div>
           </div>
         </div>
@@ -703,6 +815,174 @@ export default function LandingPage({
           border-color: rgba(16, 185, 129, 0.4);
           transform: translateY(-2px);
           background: rgba(17, 24, 39, 0.85);
+        }
+        .highlight-strategy {
+          border-color: rgba(245, 158, 11, 0.4) !important;
+          background: rgba(245, 158, 11, 0.12) !important;
+          color: #FDE68A !important;
+        }
+        .highlight-strategy:hover {
+          border-color: rgba(245, 158, 11, 0.8) !important;
+          background: rgba(245, 158, 11, 0.22) !important;
+        }
+
+        /* Strategy Section */
+        .strategy-comparison-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 20px;
+          max-width: 1140px;
+          margin: 0 auto;
+        }
+        @media (min-width: 768px) {
+          .strategy-comparison-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        .comparison-card {
+          border-radius: var(--radius-lg);
+          padding: 24px;
+          position: relative;
+        }
+        .traditional-way {
+          background: rgba(30, 41, 59, 0.45);
+          border: 1px solid rgba(239, 68, 68, 0.25);
+        }
+        .hayagriva-way {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0.85) 100%);
+          border: 1.5px solid rgba(16, 185, 129, 0.4);
+          box-shadow: 0 10px 30px rgba(16, 185, 129, 0.12);
+        }
+        .strategy-badge-float {
+          position: absolute;
+          top: -12px;
+          right: 20px;
+          background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+          color: white;
+          font-size: 0.725rem;
+          font-weight: 800;
+          padding: 4px 12px;
+          border-radius: 9999px;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        .comp-tag {
+          display: inline-block;
+          font-size: 0.68rem;
+          text-transform: uppercase;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+          padding: 3px 8px;
+          border-radius: 6px;
+          margin-bottom: 8px;
+        }
+        .comp-tag-danger {
+          background: rgba(239, 68, 68, 0.15);
+          color: #F87171;
+          border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .comp-tag-success {
+          background: rgba(16, 185, 129, 0.15);
+          color: #34D399;
+          border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .comp-title {
+          font-size: 1.15rem;
+          font-weight: 800;
+          color: white;
+          margin-bottom: 16px;
+        }
+        .comp-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          font-size: 0.8125rem;
+          color: #94A3B8;
+        }
+        .comp-list li {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          line-height: 1.5;
+        }
+        .comp-cross {
+          color: #EF4444;
+          font-weight: 800;
+          flex-shrink: 0;
+        }
+        .comp-check {
+          color: #10B981;
+          font-weight: 800;
+          flex-shrink: 0;
+        }
+        .text-gradient-gold {
+          background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 50%, #34D399 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        /* Schedule days */
+        .weekly-schedule-card {
+          padding: 24px;
+        }
+        .schedule-days-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+        @media (min-width: 640px) {
+          .schedule-days-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (min-width: 1024px) {
+          .schedule-days-grid {
+            grid-template-columns: repeat(7, 1fr);
+          }
+        }
+        .schedule-day-box {
+          background: rgba(15, 23, 42, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: var(--radius-md);
+          padding: 14px 10px;
+          text-align: center;
+          transition: all 0.2s ease;
+        }
+        .schedule-day-box:hover {
+          transform: translateY(-3px);
+          border-color: rgba(99, 102, 241, 0.35);
+        }
+        .day-name {
+          font-size: 0.65rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          color: #94A3B8;
+          margin-bottom: 6px;
+        }
+        .subject-icon {
+          font-size: 1.4rem;
+          margin-bottom: 6px;
+        }
+        .subject-name {
+          font-size: 0.825rem;
+          font-weight: 700;
+          color: white;
+          margin-bottom: 6px;
+        }
+        .subject-desc {
+          font-size: 0.68rem;
+          color: #64748B;
+          line-height: 1.35;
+        }
+        .highlight-test {
+          border-color: rgba(245, 158, 11, 0.35);
+          background: rgba(245, 158, 11, 0.06);
+        }
+        .highlight-doubt {
+          border-color: rgba(16, 185, 129, 0.35);
+          background: rgba(16, 185, 129, 0.06);
         }
 
         /* Member Banner */

@@ -22,12 +22,22 @@ import { getStoredData } from '../lib/storage';
 import { logger } from '../lib/logger';
 
 export default function LoginModal({ onLoginSuccess, students = [], onClose, initialRole }) {
-  // Detect if Admin access was explicitly requested via URL parameter or hash
+  // Detect if Admin access was explicitly requested via dedicated endpoint or parameter
   const detectInitialAdminAccess = () => {
     try {
+      const path = (window.location.pathname || '').toLowerCase();
       const params = new URLSearchParams(window.location.search);
-      const hash = window.location.hash || '';
-      if (params.get('admin') === 'true' || params.get('admin') === '1' || params.get('role') === 'admin' || hash.toLowerCase().includes('admin')) {
+      const hash = (window.location.hash || '').toLowerCase();
+      if (
+        path === '/admin' || 
+        path.startsWith('/admin/') || 
+        path === '/manage' ||
+        params.get('admin') === 'true' || 
+        params.get('admin') === '1' || 
+        params.get('role') === 'admin' || 
+        hash.includes('admin') || 
+        hash.includes('manage')
+      ) {
         return true;
       }
     } catch (e) {
@@ -36,14 +46,14 @@ export default function LoginModal({ onLoginSuccess, students = [], onClose, ini
     return false;
   };
 
-  const initialAdminVisible = detectInitialAdminAccess() || initialRole === 'STAFF' || initialRole === 'ADMIN';
+  const initialAdminVisible = (initialRole === 'STAFF' || initialRole === 'ADMIN' || detectInitialAdminAccess());
   const [isAdminVisible, setIsAdminVisible] = useState(initialAdminVisible);
   // Default role based on initialRole prop or parent
   const [activeRole, setActiveRole] = useState(() => {
     if (initialRole === 'PARENT') return USER_ROLES.PARENT;
     if (initialRole === 'STAFF' || initialRole === 'ADMIN') return USER_ROLES.ADMIN;
     if (initialRole === 'TEACHER') return USER_ROLES.TEACHER;
-    return initialAdminVisible ? USER_ROLES.ADMIN : USER_ROLES.PARENT;
+    return detectInitialAdminAccess() ? USER_ROLES.ADMIN : USER_ROLES.PARENT;
   });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

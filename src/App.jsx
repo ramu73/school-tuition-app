@@ -102,20 +102,34 @@ export default function App() {
   const [feeCollectModalOpen, setFeeCollectModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
+  // Helper to detect if user requested the dedicated /admin endpoint
+  const checkIsAdminEndpoint = () => {
+    if (typeof window === 'undefined') return false;
+    const path = (window.location.pathname || '').toLowerCase();
+    const p = new URLSearchParams(window.location.search);
+    const hash = (window.location.hash || '').toLowerCase();
+    return (
+      path === '/admin' || 
+      path.startsWith('/admin/') || 
+      path === '/manage' ||
+      p.get('admin') === 'true' || 
+      p.get('admin') === '1' || 
+      p.get('role') === 'admin' ||
+      hash === '#admin' || 
+      hash.includes('admin')
+    );
+  };
+
   // Landing page & Public modals state
   const [loginModalOpen, setLoginModalOpen] = useState(() => {
     if (typeof window !== 'undefined') {
       const p = new URLSearchParams(window.location.search);
-      return p.get('login') === 'true' || p.get('admin') === 'true' || p.get('parent') === 'true';
+      return checkIsAdminEndpoint() || p.get('login') === 'true' || p.get('parent') === 'true';
     }
     return false;
   });
   const [loginInitialRole, setLoginInitialRole] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const p = new URLSearchParams(window.location.search);
-      if (p.get('parent') === 'true') return 'PARENT';
-      if (p.get('admin') === 'true' || p.get('staff') === 'true') return 'STAFF';
-    }
+    if (checkIsAdminEndpoint()) return 'ADMIN';
     return 'PARENT';
   });
   const [demoModalOpen, setDemoModalOpen] = useState(false);
@@ -128,6 +142,23 @@ export default function App() {
 
   // Supabase connection state
   const [isSupabaseLive, setIsSupabaseLive] = useState(getSupabaseConfig().isConnected);
+
+  // Listen for dedicated /admin URL navigation (e.g. typing /admin or #admin)
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      if (checkIsAdminEndpoint() && !currentUser) {
+        setLoginInitialRole('ADMIN');
+        setLoginModalOpen(true);
+      }
+    };
+    handleUrlRoute();
+    window.addEventListener('popstate', handleUrlRoute);
+    window.addEventListener('hashchange', handleUrlRoute);
+    return () => {
+      window.removeEventListener('popstate', handleUrlRoute);
+      window.removeEventListener('hashchange', handleUrlRoute);
+    };
+  }, [currentUser]);
 
   // Inquiries listener for real-time lead updates across components
   useEffect(() => {
@@ -410,16 +441,8 @@ export default function App() {
     return (
       <div className="landing-app-wrapper">
         <LandingPage 
-          onOpenLogin={(role) => {
-            setLoginInitialRole(role || 'PARENT');
-            setLoginModalOpen(true);
-          }}
           onOpenParentLogin={() => {
             setLoginInitialRole('PARENT');
-            setLoginModalOpen(true);
-          }}
-          onOpenStaffLogin={() => {
-            setLoginInitialRole('STAFF');
             setLoginModalOpen(true);
           }}
           onOpenDemo={() => setDemoModalOpen(true)}
@@ -439,12 +462,21 @@ export default function App() {
           onClose={() => setTeacherModalOpen(false)}
         />
 
-        {/* Login Modal */}
+        {/* Login Modal (Parent by default, Admin exclusively via /admin endpoint) */}
         {loginModalOpen && (
           <LoginModal 
             initialRole={loginInitialRole}
             students={data.students}
-            onClose={() => setLoginModalOpen(false)}
+            onClose={() => {
+              setLoginModalOpen(false);
+              if (typeof window !== 'undefined') {
+                const path = (window.location.pathname || '').toLowerCase();
+                const hash = (window.location.hash || '').toLowerCase();
+                if (path === '/admin' || path.startsWith('/admin') || hash === '#admin') {
+                  window.history.replaceState({}, '', '/');
+                }
+              }
+            }}
             onLoginSuccess={(user) => {
               setData(getStoredData());
               setCurrentUser(user);
