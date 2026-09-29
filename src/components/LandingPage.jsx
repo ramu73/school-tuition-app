@@ -27,12 +27,43 @@ import HayagrivaLogo from './HayagrivaLogo';
 
 export default function LandingPage({ 
   onOpenLogin, 
+  onOpenParentLogin,
+  onOpenStaffLogin,
   onOpenDemo, 
   onOpenTeacher,
+  onOpenTeacherInquiry,
   classes = [],
   batches = []
 }) {
   const [selectedStandardTab, setSelectedStandardTab] = useState('ALL');
+
+  const handleOpenParentLogin = () => {
+    if (onOpenParentLogin) {
+      onOpenParentLogin();
+    } else if (onOpenLogin) {
+      onOpenLogin('PARENT');
+    }
+  };
+
+  const handleOpenStaffLogin = () => {
+    if (onOpenStaffLogin) {
+      onOpenStaffLogin();
+    } else if (onOpenLogin) {
+      onOpenLogin('STAFF');
+    }
+  };
+
+  const handleOpenDemo = () => {
+    if (onOpenDemo) onOpenDemo();
+  };
+
+  const handleOpenTeacher = () => {
+    if (onOpenTeacherInquiry) {
+      onOpenTeacherInquiry();
+    } else if (onOpenTeacher) {
+      onOpenTeacher();
+    }
+  };
 
   return (
     <div className="landing-page-root">
@@ -66,7 +97,7 @@ export default function LandingPage({
             <button
               type="button"
               className="btn btn-secondary btn-sm flex items-center gap-1.5"
-              onClick={() => onOpenLogin('PARENT')}
+              onClick={handleOpenParentLogin}
               title="Parent / Student Portal Login"
             >
               <LogIn size={14} className="text-primary" />
@@ -76,7 +107,7 @@ export default function LandingPage({
             <button
               type="button"
               className="btn btn-primary btn-sm flex items-center gap-1.5 cta-glow-btn"
-              onClick={onOpenDemo}
+              onClick={handleOpenDemo}
             >
               <Sparkles size={14} />
               <span>Book Free Demo</span>
@@ -106,14 +137,14 @@ export default function LandingPage({
           </h1>
 
           <p className="hero-lead-text">
-            Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong>. Small batch sizes, weekly slip tests, personalized child improvement plans, and instant WhatsApp scorecards for parents.
+            Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong>. Small batch sizes, weekly slip tests, personalized child improvement plans, and <strong>weekly WhatsApp reports</strong> for parents.
           </p>
 
           <div className="hero-actions-row flex items-center justify-center flex-wrap gap-3 mb-8">
             <button
               type="button"
               className="btn btn-primary btn-lg flex items-center gap-2 hero-primary-cta"
-              onClick={onOpenDemo}
+              onClick={handleOpenDemo}
             >
               <Sparkles size={18} />
               <span>Book a Free 2-Day Trial Demo</span>
@@ -123,30 +154,26 @@ export default function LandingPage({
             <button
               type="button"
               className="btn btn-secondary btn-lg flex items-center gap-2"
-              onClick={() => onOpenLogin('PARENT')}
+              onClick={handleOpenParentLogin}
             >
               <UserCheck size={18} className="text-emerald" />
               <span>Enrolled Parent Login</span>
             </button>
           </div>
 
-          {/* Key Trust Stats Bar */}
-          <div className="hero-stats-grid">
-            <div className="hero-stat-card">
-              <div className="stat-number text-primary">500+</div>
-              <div className="stat-label">Students Mentored</div>
+          {/* Key Academy Highlights Strip */}
+          <div className="hero-features-strip">
+            <div className="hero-feature-badge">
+              <MessageCircle size={16} className="text-emerald" />
+              <span>Weekly WhatsApp Reports</span>
             </div>
-            <div className="hero-stat-card">
-              <div className="stat-number text-emerald">98%</div>
-              <div className="stat-label">Board Pass Rate</div>
+            <div className="hero-feature-badge">
+              <CheckCircle2 size={16} className="text-primary" />
+              <span>Classes 1 to 10 (State Board &amp; CBSE)</span>
             </div>
-            <div className="hero-stat-card">
-              <div className="stat-number text-amber">Max 25</div>
-              <div className="stat-label">Students per Batch</div>
-            </div>
-            <div className="hero-stat-card">
-              <div className="stat-number text-sky">100%</div>
-              <div className="stat-label">Daily WhatsApp Reports</div>
+            <div className="hero-feature-badge">
+              <Award size={16} className="text-amber" />
+              <span>Regular Attendance &amp; Slip Tests</span>
             </div>
           </div>
         </div>
@@ -179,7 +206,7 @@ export default function LandingPage({
               <button
                 type="button"
                 className="btn btn-primary flex-1 md:flex-initial flex items-center justify-center gap-2"
-                onClick={() => onOpenLogin('PARENT')}
+                onClick={handleOpenParentLogin}
                 style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', borderColor: '#10B981' }}
               >
                 <UserCheck size={16} />
@@ -189,7 +216,7 @@ export default function LandingPage({
               <button
                 type="button"
                 className="btn btn-secondary flex-1 md:flex-initial flex items-center justify-center gap-1.5"
-                onClick={() => onOpenLogin('STAFF')}
+                onClick={handleOpenStaffLogin}
                 title="Tutors & Academy Administrator Login"
               >
                 <LogIn size={15} />
@@ -234,7 +261,7 @@ export default function LandingPage({
             <p className="feature-desc">
               Regular testing solidifies exam confidence. Scorecards are generated with detailed percentages, grades, and shared directly on WhatsApp.
             </p>
-            <div className="feature-tag text-primary">✓ Real-Time WhatsApp Scorecards</div>
+            <div className="feature-tag text-primary">✓ Weekly WhatsApp Reports</div>
           </div>
 
           {/* Pillar 3 */}
@@ -292,7 +319,7 @@ export default function LandingPage({
             <button 
               type="button" 
               className="btn btn-secondary w-full text-xs mt-4"
-              onClick={onOpenDemo}
+              onClick={handleOpenDemo}
             >
               Book Class 1-5 Demo
             </button>
@@ -314,7 +341,7 @@ export default function LandingPage({
             <button 
               type="button" 
               className="btn btn-secondary w-full text-xs mt-4"
-              onClick={onOpenDemo}
+              onClick={handleOpenDemo}
             >
               Book Class 6-8 Demo
             </button>
@@ -337,7 +364,7 @@ export default function LandingPage({
             <button 
               type="button" 
               className="btn btn-primary w-full text-xs mt-4"
-              onClick={onOpenDemo}
+              onClick={handleOpenDemo}
             >
               Book Class 9-10 Demo
             </button>
@@ -374,7 +401,7 @@ export default function LandingPage({
                 <button
                   type="button"
                   className="btn btn-primary btn-md flex items-center justify-center gap-2 w-full sm:w-auto"
-                  onClick={onOpenTeacher}
+                  onClick={handleOpenTeacher}
                 >
                   <Briefcase size={16} />
                   <span>Submit Teacher Application</span>
@@ -492,28 +519,28 @@ export default function LandingPage({
               <button 
                 type="button"
                 className="hover:text-white transition-colors"
-                onClick={() => onOpenLogin('PARENT')}
+                onClick={handleOpenParentLogin}
               >
                 Parent Portal
               </button>
               <button 
                 type="button"
                 className="hover:text-white transition-colors"
-                onClick={onOpenDemo}
+                onClick={handleOpenDemo}
               >
                 Free Demo
               </button>
               <button 
                 type="button"
                 className="hover:text-white transition-colors"
-                onClick={onOpenTeacher}
+                onClick={handleOpenTeacher}
               >
                 Faculty Careers
               </button>
               <button 
                 type="button"
                 className="hover:text-white transition-colors"
-                onClick={() => onOpenLogin('STAFF')}
+                onClick={handleOpenStaffLogin}
               >
                 Staff Login
               </button>
@@ -647,37 +674,35 @@ export default function LandingPage({
           padding: 12px 24px;
         }
 
-        /* Stats */
-        .hero-stats-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
+        /* Hero Highlights Strip */
+        .hero-features-strip {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: wrap;
           gap: 12px;
-          max-width: 760px;
+          max-width: 820px;
           margin: 0 auto;
         }
-        @media (min-width: 768px) {
-          .hero-stats-grid { grid-template-columns: repeat(4, 1fr); }
-        }
-        .hero-stat-card {
+        .hero-feature-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 18px;
           background: rgba(17, 24, 39, 0.6);
           border: 1px solid var(--border-subtle);
-          border-radius: var(--radius-md);
-          padding: 14px;
-          backdrop-filter: blur(10px);
-        }
-        .stat-number {
-          font-family: var(--font-heading);
-          font-size: 1.8rem;
-          font-weight: 800;
-          line-height: 1;
-          margin-bottom: 4px;
-        }
-        .stat-label {
-          font-size: 0.72rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+          border-radius: var(--radius-full);
+          font-size: 0.85rem;
           font-weight: 600;
+          color: #E2E8F0;
+          backdrop-filter: blur(10px);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+          transition: all 0.2s ease;
+        }
+        .hero-feature-badge:hover {
+          border-color: rgba(16, 185, 129, 0.4);
+          transform: translateY(-2px);
+          background: rgba(17, 24, 39, 0.85);
         }
 
         /* Member Banner */

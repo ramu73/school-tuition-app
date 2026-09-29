@@ -18,6 +18,7 @@ import {
 import HayagrivaLogo from './HayagrivaLogo';
 import { USER_ROLES, authenticateStaff, authenticateParent, setAuthSession, getLockoutStatus } from '../lib/auth';
 import { fetchStaffAccountsFromSupabase } from '../lib/supabase';
+import { getStoredData } from '../lib/storage';
 import { logger } from '../lib/logger';
 
 export default function LoginModal({ onLoginSuccess, students = [], onClose, initialRole }) {
@@ -67,6 +68,19 @@ export default function LoginModal({ onLoginSuccess, students = [], onClose, ini
     } catch (e) {}
     fetchStaffAccountsFromSupabase().catch(() => {});
   }, []);
+
+  // Update activeRole & admin tab visibility whenever initialRole changes
+  useEffect(() => {
+    if (initialRole === 'PARENT') {
+      setActiveRole(USER_ROLES.PARENT);
+    } else if (initialRole === 'STAFF' || initialRole === 'ADMIN') {
+      setIsAdminVisible(true);
+      setActiveRole(USER_ROLES.ADMIN);
+    } else if (initialRole === 'TEACHER') {
+      setIsAdminVisible(true);
+      setActiveRole(USER_ROLES.TEACHER);
+    }
+  }, [initialRole]);
 
   // Keyboard shortcut listener: Ctrl + Shift + A or Alt + A toggles Admin access
   useEffect(() => {
@@ -185,7 +199,8 @@ export default function LoginModal({ onLoginSuccess, students = [], onClose, ini
     }
 
     if (activeRole === USER_ROLES.PARENT) {
-      const res = authenticateParent(parentIdentifier, students);
+      const candidateStudents = (students && students.length > 0) ? students : (getStoredData()?.students || []);
+      const res = authenticateParent(parentIdentifier, candidateStudents);
       if (res.success) {
         const session = setAuthSession(res.user);
         logger.action(res.user, 'PARENT_LOGIN', `Parent authenticated successfully for student ${res.user.studentName}`);

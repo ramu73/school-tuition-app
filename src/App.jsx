@@ -410,7 +410,10 @@ export default function App() {
     return (
       <div className="landing-app-wrapper">
         <LandingPage 
-          onOpenDemo={() => setDemoModalOpen(true)}
+          onOpenLogin={(role) => {
+            setLoginInitialRole(role || 'PARENT');
+            setLoginModalOpen(true);
+          }}
           onOpenParentLogin={() => {
             setLoginInitialRole('PARENT');
             setLoginModalOpen(true);
@@ -419,6 +422,8 @@ export default function App() {
             setLoginInitialRole('STAFF');
             setLoginModalOpen(true);
           }}
+          onOpenDemo={() => setDemoModalOpen(true)}
+          onOpenTeacher={() => setTeacherModalOpen(true)}
           onOpenTeacherInquiry={() => setTeacherModalOpen(true)}
         />
 
