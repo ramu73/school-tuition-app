@@ -178,30 +178,20 @@ export default function Dashboard({
         </div>
 
         <div className="hero-actions-right">
+          <div className="contact-pills-box">
+            <div className="contact-pill-item">
+              <span>📞 9848266892 / 9849473251</span>
+            </div>
+            <div className="contact-pill-item">
+              <span>📍 Yellareddyguda, Srinagar Colony, Hyderabad</span>
+            </div>
+          </div>
+
           <div className="hero-actions">
             {!isTeacher && (
               <button className="btn btn-primary" onClick={onOpenAdmitModal}>
                 <UserPlus size={16} />
                 <span>Admit Student</span>
-              </button>
-            )}
-            {!isTeacher && onOpenInquiries && (
-              <button 
-                type="button"
-                className="btn btn-secondary relative" 
-                onClick={onOpenInquiries}
-                title="View Website Demo Bookings and Faculty Inquiries"
-              >
-                <Sparkles size={16} className="text-amber" />
-                <span>Website Leads</span>
-                {inquiriesCount > 0 && (
-                  <span 
-                    className="badge badge-danger text-3xs font-extrabold font-mono ml-1.5"
-                    style={{ padding: '1px 6px', borderRadius: '9999px', animation: 'pulse 2s infinite' }}
-                  >
-                    {inquiriesCount} New
-                  </span>
-                )}
               </button>
             )}
             <button className="btn btn-secondary" onClick={() => setActiveTab('attendance')}>
@@ -223,15 +213,6 @@ export default function Dashboard({
               <Megaphone size={16} />
               <span>Broadcast Notice</span>
             </button>
-          </div>
-
-          <div className="contact-pills-box mt-3">
-            <div className="contact-pill-item">
-              <span>📞 9848266892 / 9849473251</span>
-            </div>
-            <div className="contact-pill-item">
-              <span>📍 Yellareddyguda, Srinagar Colony, Hyderabad</span>
-            </div>
           </div>
         </div>
       </div>
@@ -733,18 +714,18 @@ export default function Dashboard({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 20px;
-          padding: 28px 32px;
+          gap: 24px;
+          padding: 24px 28px;
           background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-lg);
           backdrop-filter: blur(12px);
-          flex-wrap: wrap;
         }
         .hero-branding-left {
           display: flex;
           flex-direction: column;
-          max-width: 600px;
+          flex: 1 1 auto;
+          max-width: 580px;
         }
         .hero-logo-row {
           display: flex;
@@ -792,13 +773,16 @@ export default function Dashboard({
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 8px;
+          gap: 14px;
+          flex: 0 0 auto;
         }
         .contact-pills-box {
           display: flex;
-          flex-direction: column;
-          gap: 4px;
-          align-items: flex-end;
+          flex-direction: row;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
           font-size: 0.75rem;
           color: #94A3B8;
         }
@@ -807,6 +791,7 @@ export default function Dashboard({
           padding: 4px 10px;
           border-radius: var(--radius-full);
           border: 1px solid var(--border-subtle);
+          white-space: nowrap;
         }
 
         /* 5 Pillars We Offer Strip */
@@ -1186,18 +1171,40 @@ export default function Dashboard({
         }
 
         /* Mobile & Tablet Responsive Layout */
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
           .dashboard-hero {
-            padding: 16px 14px;
+            padding: 20px 18px;
             flex-direction: column;
             align-items: stretch;
-            gap: 14px;
+            gap: 16px;
           }
           .hero-branding-left {
             max-width: 100%;
           }
-          .hero-logo-row {
+          .hero-actions-right {
+            align-items: stretch;
+            width: 100%;
             gap: 12px;
+          }
+          .contact-pills-box {
+            justify-content: flex-start;
+          }
+          .hero-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            width: 100%;
+          }
+          .hero-actions .btn {
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            justify-content: center;
+          }
+        }
+        @media (max-width: 640px) {
+          .dashboard-hero {
+            padding: 16px 14px;
+            gap: 14px;
           }
           .hero-heading {
             font-size: 1.35rem;
@@ -1212,25 +1219,9 @@ export default function Dashboard({
             flex-direction: column;
             gap: 4px;
           }
-          .hero-actions-right {
-            align-items: stretch;
-            width: 100%;
-          }
-          .hero-actions {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            width: 100%;
-          }
-          .hero-actions .btn {
-            padding: 8px 6px;
-            font-size: 0.75rem;
-            gap: 4px;
-            white-space: nowrap;
-          }
           .contact-pills-box {
+            flex-direction: column;
             align-items: flex-start;
-            width: 100%;
             gap: 4px;
           }
           .contact-pill-item {
@@ -1239,6 +1230,7 @@ export default function Dashboard({
             white-space: normal;
             word-break: break-word;
           }
+        }
           .we-offer-strip {
             padding: 10px 12px;
             flex-direction: column;
