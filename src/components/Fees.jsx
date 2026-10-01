@@ -53,16 +53,32 @@ export default function Fees({
   const [feeNotes, setFeeNotes] = useState('');
   const [feeErrors, setFeeErrors] = useState({});
 
-  // Financial Stats
-  const totalBilled = fees.reduce((sum, f) => sum + Number(f.amountDue), 0);
-  const totalCollected = fees.reduce((sum, f) => sum + Number(f.amountPaid), 0);
-  const totalOutstanding = fees.reduce((sum, f) => sum + Number(f.balance), 0);
-  const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
-
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   // Calculate Fee Cycles based on Joining Date
   const activeStudents = students.filter(s => s.status === 'ACTIVE');
+
+  // Financial Stats for Current Month
+  const currentMonthFees = fees.filter(f => f.monthYear === currentMonth);
+  const currentMonthReceipts = (receipts || []).filter(r => {
+    if (r.monthYear === currentMonth) return true;
+    if (r.date) {
+      const d = new Date(r.date);
+      return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+    }
+    return false;
+  });
+  const receiptsCollected = currentMonthReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const feeRecordsCollected = currentMonthFees.reduce((sum, f) => sum + Number(f.amountPaid || 0), 0);
+  const totalCollected = Math.max(feeRecordsCollected, receiptsCollected);
+
+  const totalBilled = activeStudents.reduce((sum, s) => {
+    const feeRecord = currentMonthFees.find(f => f.studentId === s.id);
+    return sum + (feeRecord ? Number(feeRecord.amountDue) : Number(s.monthlyFee || 0));
+  }, 0);
+  const totalOutstanding = Math.max(totalBilled - totalCollected, 0);
+  const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
+
   const studentFeeCycles = activeStudents.map(student => {
     const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === currentMonth);
     const studentReceipts = (receipts || [])

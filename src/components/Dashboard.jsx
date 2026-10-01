@@ -120,13 +120,29 @@ export default function Dashboard({
     ? Math.round((presentCount / todayAttendance.length) * 100) 
     : 92; // fallback realistic rate if none marked yet today
 
-  // Fees calculation (strictly for Admin)
-  const totalCollected = fees.reduce((sum, f) => sum + (Number(f.amountPaid) || 0), 0);
-  const totalPending = fees.reduce((sum, f) => sum + (Number(f.balance) || 0), 0);
-  const defaultersCount = fees.filter(f => f.balance > 0).length;
-
   // Joining date fee cycles & notification calculations (Admin only)
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Fees calculation for current month (strictly for Admin)
+  const currentMonthFees = fees.filter(f => f.monthYear === currentMonth);
+  const currentMonthReceipts = (receipts || []).filter(r => {
+    if (r.monthYear === currentMonth) return true;
+    if (r.date) {
+      const d = new Date(r.date);
+      return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+    }
+    return false;
+  });
+  const receiptsCollected = currentMonthReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const feeRecordsCollected = currentMonthFees.reduce((sum, f) => sum + (Number(f.amountPaid) || 0), 0);
+  const totalCollected = Math.max(feeRecordsCollected, receiptsCollected);
+
+  const totalMonthlyBilled = activeStudents.reduce((sum, s) => {
+    const feeRecord = currentMonthFees.find(f => f.studentId === s.id);
+    return sum + (feeRecord ? Number(feeRecord.amountDue) : Number(s.monthlyFee || 0));
+  }, 0);
+  const totalPending = Math.max(totalMonthlyBilled - totalCollected, 0);
+
   const studentFeeCycles = isTeacher ? [] : activeStudents.map(student => {
     const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === currentMonth);
     const studentReceipts = (receipts || [])
@@ -136,6 +152,7 @@ export default function Dashboard({
     return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
   });
   const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'OVERDUE');
+  const defaultersCount = dueOrOverdue.length;
 
   // Class 1 to 10 distribution
   const classCounts = classes.map(cls => {
