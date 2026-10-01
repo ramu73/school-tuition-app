@@ -60,9 +60,12 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
 
   // Determine active due date based on joining date cycle
   if (today.getTime() < cycleThisMonth.getTime()) {
-    // Today is before this month's cycle day (e.g. today is Oct 1, cycle is Oct 30)
-    if (!prevCyclePaid) {
-      // The previous cycle was not paid! It completed and is overdue (e.g. B.Yeshwin, due yesterday Sept 30)
+    // Today is before this month's cycle day (e.g. today is Oct 1)
+    const daysSincePrev = Math.round((today.getTime() - cyclePrevMonth.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntilThis = Math.round((cycleThisMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    // The previous cycle only applies if it concluded recently (closer than this month's upcoming cycle, e.g. B.Yeshwin due yesterday Sept 30)
+    if (!prevCyclePaid && daysSincePrev < daysUntilThis) {
       activeDueDate = cyclePrevMonth;
       cycleStatus = 'OVERDUE';
     } else if (thisCyclePaid) {

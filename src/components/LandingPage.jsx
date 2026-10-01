@@ -21,7 +21,9 @@ import {
   ChevronRight,
   UserCheck,
   Zap,
-  LogIn
+  LogIn,
+  Menu,
+  X
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
 
@@ -35,6 +37,7 @@ export default function LandingPage({
   batches = []
 }) {
   const [selectedStandardTab, setSelectedStandardTab] = useState('ALL');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleOpenParentLogin = () => {
     if (onOpenParentLogin) {
@@ -63,32 +66,32 @@ export default function LandingPage({
       {/* ============================================================== */}
       <header className="landing-navbar">
         <div className="landing-nav-container">
-          <div className="flex items-center gap-3">
-            <HayagrivaLogo size={44} showGlow={true} />
-            <div>
-              <div className="brand-title flex items-center gap-2">
-                <span className="font-extrabold text-white text-base md:text-lg tracking-tight">HAYAGRIVA TUTORIALS</span>
-                <span className="badge badge-primary text-3xs font-mono">Classes 1 - X</span>
+          <div className="landing-brand-wrap">
+            <HayagrivaLogo size={36} showGlow={true} />
+            <div className="landing-brand-text">
+              <div className="brand-title-row">
+                <span className="brand-main-name">HAYAGRIVA TUTORIALS</span>
+                <span className="brand-classes-badge">Classes 1 - X</span>
               </div>
-              <p className="brand-subtitle text-3xs text-secondary hidden sm:block">
+              <p className="brand-sub-desc">
                 State Board &amp; CBSE Tuition Academy • Conceptual Coaching
               </p>
             </div>
           </div>
 
-          <nav className="landing-nav-links hidden md:flex items-center gap-6 text-xs font-semibold text-secondary">
+          <nav className="landing-nav-links">
             <a href="#about" className="nav-item">Why Hayagriva</a>
-            <a href="#strategy" className="nav-item">One Day One Subject</a>
+            <a href="#strategy" className="nav-item highlight-nav">One Day One Subject</a>
             <a href="#classes" className="nav-item">Classes 1 - 10</a>
             <a href="#features" className="nav-item">Methodology</a>
             <a href="#careers" className="nav-item">Faculty Careers</a>
             <a href="#contact" className="nav-item">Contact</a>
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="landing-nav-actions">
             <button
               type="button"
-              className="btn btn-secondary btn-sm flex items-center gap-1.5"
+              className="btn btn-secondary btn-sm nav-login-btn flex items-center gap-1.5"
               onClick={handleOpenParentLogin}
               title="Parent / Student Portal Login"
             >
@@ -98,14 +101,112 @@ export default function LandingPage({
 
             <button
               type="button"
-              className="btn btn-primary btn-sm flex items-center gap-1.5 cta-glow-btn"
+              className="btn btn-primary btn-sm nav-demo-btn flex items-center gap-1.5 cta-glow-btn"
               onClick={handleOpenDemo}
             >
               <Sparkles size={14} />
               <span>Book Free Demo</span>
             </button>
+
+            <button
+              type="button"
+              className="mobile-menu-toggle-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Slide-down Menu Drawer */}
+        {mobileMenuOpen && (
+          <div className="mobile-nav-drawer">
+            <a 
+              href="#strategy" 
+              className="mobile-nav-link strategy-highlight"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span className="flex items-center gap-2">
+                <Zap size={16} className="text-amber" />
+                <span>One Day One Subject Strategy</span>
+              </span>
+              <span className="badge badge-warning text-3xs">Special</span>
+            </a>
+            <a 
+              href="#about" 
+              className="mobile-nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span>Why Hayagriva</span>
+              <ChevronRight size={14} className="text-muted" />
+            </a>
+            <a 
+              href="#classes" 
+              className="mobile-nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span>Classes 1 to 10 Curriculum</span>
+              <ChevronRight size={14} className="text-muted" />
+            </a>
+            <a 
+              href="#features" 
+              className="mobile-nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span>Methodology &amp; Faculty</span>
+              <ChevronRight size={14} className="text-muted" />
+            </a>
+            <a 
+              href="#careers" 
+              className="mobile-nav-link"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleOpenTeacher();
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Briefcase size={16} className="text-sky" />
+                <span>Join Our Team (Faculty Careers)</span>
+              </span>
+              <ChevronRight size={14} className="text-muted" />
+            </a>
+            <a 
+              href="#contact" 
+              className="mobile-nav-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span>Contact &amp; Location</span>
+              <ChevronRight size={14} className="text-muted" />
+            </a>
+
+            <div className="mobile-drawer-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm flex items-center justify-center gap-1.5"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleOpenParentLogin();
+                }}
+              >
+                <LogIn size={14} className="text-primary" />
+                <span>Portal Login</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary btn-sm flex items-center justify-center gap-1.5 cta-glow-btn"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleOpenDemo();
+                }}
+              >
+                <Sparkles size={14} />
+                <span>Book Demo</span>
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ============================================================== */}
@@ -678,33 +779,222 @@ export default function LandingPage({
         .landing-navbar {
           position: sticky;
           top: 0;
-          z-index: 50;
-          background: rgba(11, 15, 25, 0.85);
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
+          z-index: 100;
+          background: rgba(11, 15, 25, 0.94);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 12px 0;
+          padding: 10px 0;
+          width: 100%;
         }
         .landing-nav-container {
           max-width: 1240px;
           margin: 0 auto;
-          padding: 0 20px;
+          padding: 0 16px;
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 12px;
+        }
+        .landing-brand-wrap {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          text-decoration: none;
+          min-width: 0;
+        }
+        .landing-brand-text {
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .brand-title-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: nowrap;
+        }
+        .brand-main-name {
+          font-family: var(--font-heading);
+          font-weight: 800;
+          color: #FFFFFF;
+          font-size: 1.05rem;
+          letter-spacing: -0.01em;
+          white-space: nowrap;
+          line-height: 1.2;
+        }
+        .brand-classes-badge {
+          background: rgba(99, 102, 241, 0.2);
+          color: #A5B4FC;
+          border: 1px solid rgba(99, 102, 241, 0.35);
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 1px 6px;
+          border-radius: 4px;
+          white-space: nowrap;
+        }
+        .brand-sub-desc {
+          font-size: 0.68rem;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-top: 2px;
+        }
+
+        /* Desktop Nav Links - Hidden on Mobile */
+        .landing-nav-links {
+          display: none;
+          align-items: center;
+          gap: 20px;
+        }
+        @media (min-width: 992px) {
+          .landing-nav-links {
+            display: flex;
+          }
         }
         .nav-item {
-          color: var(--text-secondary);
+          color: #94A3B8;
+          font-size: 0.8125rem;
+          font-weight: 600;
           text-decoration: none;
-          transition: color 0.2s;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+          padding: 4px 0;
         }
         .nav-item:hover {
           color: #FFFFFF;
+        }
+        .nav-item.highlight-nav {
+          color: #F59E0B;
+        }
+
+        /* Nav Action Buttons */
+        .landing-nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        .nav-login-btn {
+          font-size: 0.78rem;
+          padding: 6px 12px;
+          border-radius: 8px;
+        }
+        .nav-demo-btn {
+          font-size: 0.78rem;
+          padding: 6px 14px;
+          border-radius: 8px;
+          font-weight: 700;
         }
         .cta-glow-btn {
           background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
           box-shadow: 0 0 16px rgba(79, 70, 229, 0.4);
           font-weight: 700;
+        }
+
+        /* Mobile Hamburger Toggle Button */
+        .mobile-menu-toggle-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #F8FAFC;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .mobile-menu-toggle-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+          border-color: rgba(99, 102, 241, 0.4);
+        }
+        @media (min-width: 992px) {
+          .mobile-menu-toggle-btn {
+            display: none;
+          }
+        }
+
+        /* Mobile Slide-down Drawer */
+        .mobile-nav-drawer {
+          background: rgba(15, 23, 42, 0.98);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 14px 16px 20px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          animation: slideDownMobile 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideDownMobile {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .mobile-nav-link {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          border-radius: 8px;
+          color: #CBD5E1;
+          text-decoration: none;
+          font-weight: 600;
+          font-size: 0.88rem;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          transition: all 0.2s ease;
+        }
+        .mobile-nav-link:hover, .mobile-nav-link:active {
+          background: rgba(99, 102, 241, 0.12);
+          color: #FFFFFF;
+          border-color: rgba(99, 102, 241, 0.3);
+        }
+        .mobile-nav-link.strategy-highlight {
+          background: rgba(245, 158, 11, 0.08);
+          border-color: rgba(245, 158, 11, 0.25);
+          color: #FCD34D;
+        }
+        .mobile-drawer-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          margin-top: 6px;
+          padding-top: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        @media (max-width: 640px) {
+          .brand-sub-desc {
+            display: none;
+          }
+          .brand-main-name {
+            font-size: 0.92rem;
+          }
+          .brand-classes-badge {
+            font-size: 0.6rem;
+            padding: 1px 4px;
+          }
+          .nav-login-btn span {
+            display: none;
+          }
+          .nav-login-btn {
+            padding: 7px 9px;
+          }
+          .nav-demo-btn {
+            padding: 6px 10px;
+            font-size: 0.74rem;
+          }
+        }
+        @media (max-width: 420px) {
+          .brand-classes-badge {
+            display: none;
+          }
+          .brand-main-name {
+            font-size: 0.86rem;
+          }
         }
 
         /* Hero */
