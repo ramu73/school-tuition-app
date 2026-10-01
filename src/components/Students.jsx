@@ -184,7 +184,7 @@ export default function Students({
       };
 
       // Also create current month fee record for this student
-      const currentMonthYear = 'March 2026';
+      const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const newFeeRecord = {
         id: generateNextId(fees),
         studentId: newId,

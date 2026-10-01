@@ -67,7 +67,7 @@ export default function TutorFeedbackModal({
   if (!student) return null;
 
   const isTeacher = currentUser?.role === 'TEACHER';
-  const currentMonthYear = 'March 2026';
+  const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const studentClass = classes.find(c => c.code === student.classCode);
   const classSubjects = studentClass?.subjects || ['Mathematics', 'Science', 'English'];
 

@@ -37,7 +37,7 @@ export default function Dashboard({
   onOpenInquiries,
   inquiriesCount = 0
 }) {
-  const { students = [], batches = [], fees = [], attendance = [], classes = [], exams = [] } = data;
+  const { students = [], batches = [], fees = [], attendance = [], classes = [], exams = [], receipts = [] } = data;
   const isTeacher = currentUser?.role === USER_ROLES.TEACHER;
   const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds) 
     ? currentUser.assignedBatchIds.map(String) 
@@ -126,10 +126,14 @@ export default function Dashboard({
   const defaultersCount = fees.filter(f => f.balance > 0).length;
 
   // Joining date fee cycles & notification calculations (Admin only)
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const studentFeeCycles = isTeacher ? [] : activeStudents.map(student => {
-    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026')
-      || fees.find(f => f.studentId === student.id);
-    return calculateStudentFeeCycle(student, feeRecord);
+    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === currentMonth);
+    const studentReceipts = (receipts || [])
+      .filter(r => r.studentId === student.id && r.date)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const lastPaymentDate = studentReceipts[0]?.date || feeRecord?.lastPaymentDate || null;
+    return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
   });
   const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'OVERDUE');
 
@@ -409,7 +413,7 @@ export default function Dashboard({
               </div>
               <div className="kpi-value">₹{totalCollected.toLocaleString('en-IN')}</div>
               <div className="kpi-footer">
-                <span className="kpi-tag tag-sky">March 2026</span>
+                <span className="kpi-tag tag-sky">{currentMonth}</span>
                 <span className="kpi-note">Via Cash, UPI & GPay</span>
               </div>
             </div>

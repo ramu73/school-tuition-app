@@ -59,12 +59,17 @@ export default function Fees({
   const totalOutstanding = fees.reduce((sum, f) => sum + Number(f.balance), 0);
   const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
 
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
   // Calculate Fee Cycles based on Joining Date
   const activeStudents = students.filter(s => s.status === 'ACTIVE');
   const studentFeeCycles = activeStudents.map(student => {
-    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === 'March 2026')
-      || fees.find(f => f.studentId === student.id);
-    return calculateStudentFeeCycle(student, feeRecord);
+    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === currentMonth);
+    const studentReceipts = (receipts || [])
+      .filter(r => r.studentId === student.id && r.date)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const lastPaymentDate = studentReceipts[0]?.date || feeRecord?.lastPaymentDate || null;
+    return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
   });
 
   const dueTodayCycles = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY');
@@ -74,8 +79,7 @@ export default function Fees({
   // Handle student selection in Collect Fee modal
   const handleStudentSelect = (studentId) => {
     setSelectedStudentId(studentId);
-    const existingFee = fees.find(f => f.studentId === Number(studentId) && f.monthYear === 'March 2026')
-      || fees.find(f => f.studentId === Number(studentId));
+    const existingFee = fees.find(f => f.studentId === Number(studentId) && f.monthYear === currentMonth);
     if (existingFee) {
       setPaymentAmount(existingFee.balance);
     } else {
@@ -116,7 +120,6 @@ export default function Fees({
     const sId = Number(selectedStudentId);
     const student = students.find(s => s.id === sId);
     const amountNum = Number(paymentAmount);
-    const currentMonth = 'March 2026';
     const todayStr = new Date().toISOString().split('T')[0];
     const receiptNumber = `REC-2026-${Math.floor(100 + Math.random() * 900)}`;
 
@@ -253,7 +256,7 @@ export default function Fees({
       <div className="fee-kpi-grid">
         <div className="glass-card fee-kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Monthly Billed (March 2026)</span>
+            <span className="kpi-label">Monthly Billed ({currentMonth})</span>
             <Building size={18} className="text-primary" />
           </div>
           <div className="kpi-value">₹{totalBilled.toLocaleString('en-IN')}</div>

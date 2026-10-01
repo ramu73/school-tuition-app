@@ -179,6 +179,8 @@ export async function fetchTuitionDataFromSupabase() {
       }
     }
 
+    const regularStudentRows = rawStudentRows.filter(s => !isLeadStatus(s.status));
+
     const students = regularStudentRows.map(s => ({
       id: s.id,
       admissionNo: s.admission_no,

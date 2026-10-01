@@ -3,16 +3,16 @@
 // Computes monthly fee due dates based on student admission/joining date
 // ==========================================================================
 
-export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new Date()) {
-  const joiningDateStr = student.admissionDate || '2026-01-01';
+export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new Date(), lastPaymentDate = null) {
+  const joiningDateStr = (student.admissionDate || '2026-01-01').split('T')[0];
   // Parse date safely without timezone offset issues
   const [jYear, jMonth, jDay] = joiningDateStr.split('-').map(Number);
   const joiningDate = new Date(jYear, (jMonth || 1) - 1, jDay || 1);
-  const cycleDay = jDay || joiningDate.getDate(); // e.g. 30th of every month
+  const cycleDay = jDay || joiningDate.getDate() || 1; // e.g. 30th of every month
 
   const currentYear = referenceDate.getFullYear();
-  const currentMonth = referenceDate.getMonth(); // 0-indexed (e.g. 8 for September)
-  const currentDay = referenceDate.getDate(); // e.g. 7
+  const currentMonth = referenceDate.getMonth(); // 0-indexed
+  const currentDay = referenceDate.getDate();
 
   const today = new Date(currentYear, currentMonth, currentDay);
 
@@ -33,55 +33,75 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
   const amountDue = feeRecord ? Number(feeRecord.amountDue) : Number(student.monthlyFee || 0);
   const amountPaid = feeRecord ? Number(feeRecord.amountPaid) : 0;
   const balance = feeRecord ? Number(feeRecord.balance) : Number(student.monthlyFee || 0);
-  const isPaid = balance === 0;
+
+  const payDateStr = lastPaymentDate || feeRecord?.lastPaymentDate || student?.lastPaymentDate || null;
+  const payDate = payDateStr ? (() => {
+    const [pY, pM, pD] = String(payDateStr).split('T')[0].split('-').map(Number);
+    return new Date(pY, (pM || 1) - 1, pD || 1);
+  })() : null;
+
+  // Determine if previous cycle was paid:
+  const prevCyclePaid = (() => {
+    if (joiningDate.getTime() > cyclePrevMonth.getTime()) return true;
+    if (payDate && payDate.getTime() >= cyclePrevMonth.getTime()) return true;
+    if (feeRecord && Number(feeRecord.balance) === 0 && Number(feeRecord.amountPaid) > 0) return true;
+    return false;
+  })();
+
+  // Determine if current cycle was paid:
+  const thisCyclePaid = (() => {
+    if (payDate && payDate.getTime() >= cycleThisMonth.getTime()) return true;
+    if (feeRecord && Number(feeRecord.balance) === 0 && Number(feeRecord.amountPaid) > 0) return true;
+    return false;
+  })();
 
   let activeDueDate;
   let cycleStatus = 'UPCOMING'; // UPCOMING, DUE_TODAY, OVERDUE, PAID
-  let daysDiff = 0;
 
-  // Determine active due date:
-  // If today is before this month's cycle day (e.g. Today is Sept 7, cycle day is 30 -> Sept 30 is in the future):
-  // Check if student joined on or before the previous month's cycle day (e.g. June 30 <= Aug 30).
-  // If so, the active billing cycle that was due on Aug 30 is pending and calculates from Aug 30 onwards!
+  // Determine active due date based on joining date cycle
   if (today.getTime() < cycleThisMonth.getTime()) {
-    if (!isPaid && joiningDate.getTime() <= cyclePrevMonth.getTime()) {
+    // Today is before this month's cycle day (e.g. today is Oct 1, cycle is Oct 30)
+    if (!prevCyclePaid) {
+      // The previous cycle was not paid! It completed and is overdue (e.g. B.Yeshwin, due yesterday Sept 30)
       activeDueDate = cyclePrevMonth;
+      cycleStatus = 'OVERDUE';
+    } else if (thisCyclePaid) {
+      activeDueDate = cycleNextMonth;
+      cycleStatus = 'PAID';
     } else {
       activeDueDate = cycleThisMonth;
+      cycleStatus = 'UPCOMING';
     }
   } else if (today.getTime() === cycleThisMonth.getTime()) {
-    activeDueDate = cycleThisMonth;
-  } else {
-    // Today is after this month's cycle day (e.g. Today is Sept 7, cycle day was Sept 5)
-    if (isPaid) {
+    // Due today
+    if (thisCyclePaid) {
       activeDueDate = cycleNextMonth;
+      cycleStatus = 'PAID';
     } else {
       activeDueDate = cycleThisMonth;
+      cycleStatus = 'DUE_TODAY';
+    }
+  } else {
+    // Cycle day in current month has passed
+    if (thisCyclePaid) {
+      activeDueDate = cycleNextMonth;
+      cycleStatus = 'PAID';
+    } else {
+      activeDueDate = cycleThisMonth;
+      cycleStatus = 'OVERDUE';
     }
   }
 
   // Calculate day difference relative to active due date
-  // diffTime = activeDueDate - today:
-  // positive = upcoming in X days
-  // 0 = due today
-  // negative = overdue by X days
   const diffTime = activeDueDate.getTime() - today.getTime();
-  daysDiff = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-  if (isPaid) {
-    cycleStatus = 'PAID';
-  } else if (daysDiff === 0) {
-    cycleStatus = 'DUE_TODAY';
-  } else if (daysDiff < 0) {
-    cycleStatus = 'OVERDUE';
-  } else {
-    cycleStatus = 'UPCOMING';
-  }
+  const daysDiff = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
   const pad = (n) => String(n).padStart(2, '0');
   const dueDateStr = `${activeDueDate.getFullYear()}-${pad(activeDueDate.getMonth() + 1)}-${pad(activeDueDate.getDate())}`;
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const monthYearLabel = `${monthNames[activeDueDate.getMonth()]} ${activeDueDate.getFullYear()}`;
+
+  const isPaid = (cycleStatus === 'PAID');
 
   return {
     studentId: student.id,
