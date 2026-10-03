@@ -25,6 +25,16 @@ import HayagrivaLogo from './HayagrivaLogo';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
 import { USER_ROLES } from '../lib/auth';
 
+function getDayOrdinal(day) {
+  const n = Number(day);
+  if (!n) return `${day}`;
+  const j = n % 10, k = n % 100;
+  if (j === 1 && k !== 11) return `${n}st`;
+  if (j === 2 && k !== 12) return `${n}nd`;
+  if (j === 3 && k !== 13) return `${n}rd`;
+  return `${n}th`;
+}
+
 export default function Dashboard({ 
   data, 
   currentUser,
@@ -461,11 +471,23 @@ export default function Dashboard({
       {!isTeacher && dueOrOverdue.length > 0 && (
         <div className="glass-card fee-cycle-alert-banner">
           <div className="alert-banner-header">
-            <div className="flex items-center gap-2">
-              <Bell size={18} className="text-amber pulse-anim" />
-              <h2 className="card-title text-base">
-                Fees Due Based on Joining Date ({dueOrOverdue.length} Action Needed)
-              </h2>
+            <div className="flex items-center gap-3">
+              <div className="banner-icon-badge">
+                <Bell size={18} className="text-amber pulse-anim" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="card-title text-base" style={{ margin: 0 }}>
+                    Fees Due Based on Joining Date
+                  </h2>
+                  <span className="badge badge-warning text-3xs font-mono font-bold">
+                    {dueOrOverdue.length} Action Needed
+                  </span>
+                </div>
+                <p className="text-3xs text-muted mt-0.5">
+                  Monthly fee cycles recur on the same day students joined. Click below to notify parents on WhatsApp directly.
+                </p>
+              </div>
             </div>
             <button 
               className="btn btn-secondary btn-sm"
@@ -475,45 +497,78 @@ export default function Dashboard({
               <ArrowUpRight size={14} />
             </button>
           </div>
-          <p className="text-xs text-muted mb-3">
-            Monthly fee cycles recur on the same day students joined. Click below to notify parents on WhatsApp directly.
-          </p>
+
           <div className="cycle-alerts-grid">
             {dueOrOverdue.slice(0, 4).map(item => {
               const whatsappUrl = generateFeeReminderWhatsAppUrl(item, 'HAYAGRIVA TUTORIALS');
               const rawClassName = classes.find(c => c.code === item.classCode)?.name || item.classCode;
               const className = (rawClassName || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
+              const cycleOrdinal = getDayOrdinal(item.cycleDay);
+              const initials = (item.studentName || 'S')
+                .split(' ')
+                .map(n => n[0])
+                .filter(Boolean)
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
+
               return (
-                <div key={item.studentId} className="cycle-alert-item">
-                  <div className="cycle-student-meta">
-                    <div className="font-semibold text-sm text-white">{item.studentName}</div>
-                    <div className="text-xs text-muted">
-                      {className} • Cycle: <strong>{item.cycleDay}th</strong>
+                <div key={item.studentId} className="cycle-alert-card">
+                  {/* Left: Avatar + Details */}
+                  <div className="cycle-card-left">
+                    <div className="cycle-avatar-badge" title={item.studentName}>
+                      {initials}
                     </div>
-                    <div className="text-xs text-muted font-mono" title="Parent Contact Number">
-                      📱 {item.parentPhone}
+                    <div className="cycle-student-details">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="cycle-student-title">{item.studentName}</span>
+                        {item.cycleStatus === 'OVERDUE' ? (
+                          <span className="badge badge-danger text-3xs font-mono font-bold">
+                            {Math.abs(item.daysDiff)}d Overdue
+                          </span>
+                        ) : item.cycleStatus === 'DUE_TODAY' ? (
+                          <span className="badge badge-warning text-3xs font-mono font-bold">
+                            Due Today
+                          </span>
+                        ) : (
+                          <span className="badge badge-warning text-3xs font-mono">
+                            Due ({cycleOrdinal})
+                          </span>
+                        )}
+                      </div>
+                      <div className="cycle-meta-sub">
+                        <span>{className}</span>
+                        <span className="cycle-sep">•</span>
+                        <span>Cycle: <strong>{cycleOrdinal} of month</strong></span>
+                        {item.parentPhone && (
+                          <>
+                            <span className="cycle-sep">•</span>
+                            <span className="font-mono text-muted">📱 {item.parentPhone}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="cycle-status-meta">
-                    {item.cycleStatus === 'DUE_TODAY' ? (
-                      <span className="badge badge-warning">Due Today</span>
-                    ) : item.cycleStatus === 'DUE' ? (
-                      <span className="badge badge-warning">Due ({item.cycleDay}th)</span>
-                    ) : (
-                      <span className="badge badge-danger">{Math.abs(item.daysDiff)}d Overdue</span>
-                    )}
-                    <div className="text-rose font-bold text-sm text-right mt-1">₹{item.balance}</div>
+
+                  {/* Right: Balance + Action */}
+                  <div className="cycle-card-right">
+                    <div className="cycle-balance-block">
+                      <span className="cycle-balance-lbl">Balance Due</span>
+                      <span className="cycle-balance-val text-rose font-bold font-mono">
+                        ₹{Number(item.balance || 0).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <a 
+                      href={whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-whatsapp-pill"
+                      title={`Send WhatsApp fee reminder to ${item.parentName || item.studentName} (${item.parentPhone})`}
+                    >
+                      <MessageSquare size={13} />
+                      <span>WhatsApp</span>
+                    </a>
                   </div>
-                  <a 
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-sm btn-success cycle-wa-btn"
-                    title={`Send WhatsApp fee reminder to ${item.parentName} (${item.parentPhone})`}
-                  >
-                    <MessageSquare size={13} />
-                    <span>WhatsApp</span>
-                  </a>
                 </div>
               );
             })}
@@ -1072,6 +1127,17 @@ export default function Dashboard({
           justify-content: space-between;
           margin-bottom: 6px;
         }
+        .banner-icon-badge {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: rgba(245, 158, 11, 0.15);
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
         .text-amber { color: #FBBF24; }
         .pulse-anim {
           animation: bellPulse 2s infinite ease-in-out;
@@ -1086,41 +1152,118 @@ export default function Dashboard({
         }
         .cycle-alerts-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+          margin-top: 14px;
         }
-        .cycle-alert-item {
+        .cycle-alert-card {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 14px;
           padding: 12px 16px;
-          background: rgba(17, 24, 39, 0.85);
-          border: 1px solid rgba(245, 158, 11, 0.25);
+          background: rgba(15, 23, 42, 0.65);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: var(--radius-md);
           transition: all 0.2s ease;
         }
-        .cycle-alert-item:hover {
-          border-color: rgba(245, 158, 11, 0.45);
-          background: rgba(17, 24, 39, 1);
+        .cycle-alert-card:hover {
+          background: rgba(30, 41, 59, 0.75);
+          border-color: rgba(245, 158, 11, 0.35);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
-        .cycle-student-meta {
+        .cycle-card-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+          flex: 1;
+        }
+        .cycle-avatar-badge {
+          width: 38px;
+          height: 38px;
+          border-radius: 10px;
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.35) 100%);
+          border: 1px solid rgba(168, 85, 247, 0.3);
+          color: #E0E7FF;
+          font-weight: 700;
+          font-size: 0.8rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          letter-spacing: 0.02em;
+        }
+        .cycle-student-details {
           display: flex;
           flex-direction: column;
-          gap: 2px;
-          white-space: nowrap;
+          gap: 3px;
+          min-width: 0;
         }
-        .cycle-status-meta {
+        .cycle-student-title {
+          font-weight: 600;
+          font-size: 0.875rem;
+          color: #F8FAFC;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .cycle-meta-sub {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.72rem;
+          color: var(--text-secondary);
+          flex-wrap: wrap;
+        }
+        .cycle-sep {
+          color: rgba(255, 255, 255, 0.25);
+          font-size: 0.7rem;
+        }
+        .cycle-card-right {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          flex-shrink: 0;
+        }
+        .cycle-balance-block {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 2px;
+          gap: 1px;
         }
-        .cycle-wa-btn {
-          display: flex;
+        .cycle-balance-lbl {
+          font-size: 0.62rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--text-muted);
+        }
+        .cycle-balance-val {
+          font-size: 0.95rem;
+          color: #FB7185;
+          letter-spacing: -0.01em;
+        }
+        .btn-whatsapp-pill {
+          display: inline-flex;
           align-items: center;
-          gap: 5px;
-          flex-shrink: 0;
+          gap: 6px;
+          padding: 7px 13px;
+          background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+          color: #FFFFFF;
+          font-size: 0.75rem;
+          font-weight: 600;
+          border-radius: 8px;
+          text-decoration: none;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .btn-whatsapp-pill:hover {
+          background: linear-gradient(135deg, #059669 0%, #047857 100%);
+          color: #FFFFFF;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+          transform: translateY(-1px);
         }
 
         .edit-fees-btn {
@@ -1224,6 +1367,12 @@ export default function Dashboard({
             justify-content: center;
           }
         }
+        @media (max-width: 900px) {
+          .cycle-alerts-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
         @media (max-width: 640px) {
           .dashboard-hero {
             padding: 16px 14px;
@@ -1253,7 +1402,6 @@ export default function Dashboard({
             white-space: normal;
             word-break: break-word;
           }
-        }
           .we-offer-strip {
             padding: 10px 12px;
             flex-direction: column;
@@ -1281,26 +1429,26 @@ export default function Dashboard({
             padding: 14px 12px;
           }
           .cycle-alerts-grid {
-            grid-template-columns: 1fr !important;
+            grid-template-columns: 1fr;
             gap: 10px;
           }
-          .cycle-alert-item {
+          .cycle-alert-card {
             flex-direction: column;
             align-items: stretch;
             gap: 10px;
             padding: 12px;
           }
-          .cycle-student-meta {
-            white-space: normal;
-          }
-          .cycle-status-meta {
-            flex-direction: row;
+          .cycle-card-right {
             justify-content: space-between;
             align-items: center;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
           }
-          .cycle-wa-btn {
-            width: 100%;
-            justify-content: center;
+          .cycle-balance-block {
+            align-items: flex-start;
+          }
+          .btn-whatsapp-pill {
+            padding: 6px 12px;
           }
           .class-bar-row {
             grid-template-columns: 95px 1fr 65px;
