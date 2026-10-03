@@ -20,7 +20,12 @@ import {
   UserCheck,
   AlertTriangle
 } from 'lucide-react';
-import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl, generateFeeReminderMessage } from '../lib/feeCycle';
+import { 
+  calculateStudentFeeCycle, 
+  generateFeeReminderWhatsAppUrl, 
+  generateFeeReminderMessage,
+  computeFinancialSummary
+} from '../lib/feeCycle';
 import { generateNextId } from '../lib/storage';
 import { logger } from '../lib/logger';
 import HayagrivaLogo from './HayagrivaLogo';
@@ -37,7 +42,8 @@ export default function Fees({
 
   const [viewMode, setViewMode] = useState('cycles'); // 'cycles' (Joining Date Reminders) or 'ledger'
   const [cycleFilter, setCycleFilter] = useState('ALL'); // ALL, OVERDUE, DUE_TODAY, UPCOMING, PAID
-  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, PENDING, PARTIAL, PAID
+  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, DEFAULTERS, PARTIAL, PAID
+  const [selectedLedgerMonth, setSelectedLedgerMonth] = useState('CURRENT'); // 'CURRENT' or 'ALL'
   const [classFilter, setClassFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
@@ -53,55 +59,36 @@ export default function Fees({
   const [feeNotes, setFeeNotes] = useState('');
   const [feeErrors, setFeeErrors] = useState({});
 
-  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  // Calculate Fee Cycles based on Joining Date
-  const activeStudents = students.filter(s => s.status === 'ACTIVE');
-
-  // Financial Stats for Current Month
-  const currentMonthFees = fees.filter(f => f.monthYear === currentMonth);
-  const currentMonthReceipts = (receipts || []).filter(r => {
-    if (r.monthYear === currentMonth) return true;
-    if (r.date) {
-      const d = new Date(r.date);
-      return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
-    }
-    return false;
-  });
-  const receiptsCollected = currentMonthReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-  const feeRecordsCollected = currentMonthFees.reduce((sum, f) => sum + Number(f.amountPaid || 0), 0);
-  const totalCollected = receiptsCollected > 0 ? receiptsCollected : feeRecordsCollected;
-
-  const totalBilled = activeStudents.reduce((sum, s) => {
-    const feeRecord = currentMonthFees.find(f => f.studentId === s.id);
-    return sum + (feeRecord ? Number(feeRecord.amountDue) : Number(s.monthlyFee || 0));
-  }, 0);
-  const totalOutstanding = Math.max(totalBilled - totalCollected, 0);
-  const collectionRate = totalBilled > 0 ? Math.round((totalCollected / totalBilled) * 100) : 0;
-
-  const studentFeeCycles = activeStudents.map(student => {
-    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === currentMonth);
-    const studentReceipts = (receipts || [])
-      .filter(r => r.studentId === student.id && r.date)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-    const lastPaymentDate = studentReceipts[0]?.date || feeRecord?.lastPaymentDate || null;
-    return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
-  });
-
-  const dueCycles = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'DUE');
-  const dueTodayCycles = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY');
-  const overdueCycles = studentFeeCycles.filter(c => c.cycleStatus === 'OVERDUE');
-  const upcomingCycles = studentFeeCycles.filter(c => c.cycleStatus === 'UPCOMING' && c.daysDiff <= 5);
+  // Compute Universal Financial Summary (Single Source of Truth)
+  const financialSummary = computeFinancialSummary(students, fees, receipts);
+  const {
+    currentMonth,
+    activeStudents,
+    monthlyBilled: totalBilled,
+    monthlyCollected,
+    monthlyPending: totalOutstanding,
+    collectionRate,
+    allTimeCollected,
+    studentFeeCycles,
+    dueOrOverdue,
+    defaultersCount,
+    overdueCycles,
+    dueCycles,
+    dueTodayCycles,
+    upcomingCycles,
+    paidCycles
+  } = financialSummary;
 
   // Handle student selection in Collect Fee modal
   const handleStudentSelect = (studentId) => {
-    setSelectedStudentId(studentId);
-    const existingFee = fees.find(f => f.studentId === Number(studentId) && f.monthYear === currentMonth);
-    if (existingFee) {
-      setPaymentAmount(existingFee.balance);
+    const sId = Number(studentId);
+    setSelectedStudentId(sId);
+    const cycle = studentFeeCycles.find(c => c.studentId === sId);
+    if (cycle && cycle.balance > 0) {
+      setPaymentAmount(cycle.balance);
     } else {
-      const student = students.find(s => s.id === Number(studentId));
-      setPaymentAmount(student?.monthlyFee || 1000);
+      const student = students.find(s => s.id === sId);
+      setPaymentAmount(student?.monthlyFee || 2000);
     }
   };
 
@@ -231,21 +218,78 @@ export default function Fees({
     return true;
   });
 
+  // Construct Ledger Items (Current Month dynamic ledger vs Historical raw records)
+  const currentMonthLedgerItems = activeStudents.map(student => {
+    const sId = Number(student.id);
+    const cycle = studentFeeCycles.find(c => c.studentId === sId);
+    const feeRecord = fees.find(f => f.studentId === sId && f.monthYear === currentMonth);
+    const studentReceipt = (receipts || []).find(r => {
+      if (Number(r.studentId) !== sId) return false;
+      if (r.monthYear === currentMonth) return true;
+      if (r.date) {
+        const d = new Date(r.date);
+        return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
+      }
+      return false;
+    });
+
+    const amountDue = cycle?.amountDue || Number(student.monthlyFee || 2000);
+    const amountPaid = cycle?.amountPaid || 0;
+    const balance = cycle?.balance !== undefined ? cycle.balance : amountDue;
+    const status = balance === 0 && amountPaid > 0 ? 'PAID' : (amountPaid > 0 ? 'PARTIAL' : 'PENDING');
+
+    return {
+      id: feeRecord?.id || `cur-${sId}`,
+      studentId: sId,
+      student,
+      monthYear: currentMonth,
+      amountDue,
+      amountPaid,
+      balance,
+      status,
+      receipt: studentReceipt,
+      receiptNo: studentReceipt?.receiptNo || feeRecord?.receiptNo || null,
+      cycleDay: cycle?.cycleDay || 1,
+      cycleStatus: cycle?.cycleStatus || 'DUE'
+    };
+  });
+
+  const rawHistoricalLedgerItems = fees.map(f => {
+    const student = students.find(s => s.id === f.studentId);
+    const receipt = receipts.find(r => r.receiptNo === f.receiptNo || (r.studentId === f.studentId && r.monthYear === f.monthYear));
+    const cycleDay = student?.admissionDate ? new Date(student.admissionDate).getDate() : 1;
+    return {
+      id: f.id,
+      studentId: f.studentId,
+      student,
+      monthYear: f.monthYear,
+      amountDue: Number(f.amountDue),
+      amountPaid: Number(f.amountPaid),
+      balance: Number(f.balance),
+      status: f.status,
+      receipt,
+      receiptNo: receipt?.receiptNo || f.receiptNo || null,
+      cycleDay,
+      cycleStatus: f.status === 'PAID' ? 'PAID' : 'DUE'
+    };
+  });
+
+  const activeLedgerItems = selectedLedgerMonth === 'CURRENT' ? currentMonthLedgerItems : rawHistoricalLedgerItems;
+
   // Filter general ledger
-  const filteredFees = fees.filter(fee => {
-    const student = students.find(s => s.id === fee.studentId);
-    if (!student) return false;
+  const filteredFees = activeLedgerItems.filter(item => {
+    if (!item.student) return false;
     if (statusFilter !== 'ALL') {
-      if (statusFilter === 'PENDING' && fee.status !== 'PENDING') return false;
-      if (statusFilter === 'PARTIAL' && fee.status !== 'PARTIAL') return false;
-      if (statusFilter === 'PAID' && fee.status !== 'PAID') return false;
-      if (statusFilter === 'DEFAULTERS' && fee.balance <= 0) return false;
+      if (statusFilter === 'PENDING' && item.status !== 'PENDING') return false;
+      if (statusFilter === 'PARTIAL' && item.status !== 'PARTIAL') return false;
+      if (statusFilter === 'PAID' && item.status !== 'PAID') return false;
+      if (statusFilter === 'DEFAULTERS' && item.balance <= 0) return false;
     }
-    if (classFilter !== 'ALL' && student.classCode !== classFilter) return false;
+    if (classFilter !== 'ALL' && item.student.classCode !== classFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = student.name.toLowerCase().includes(q);
-      const matchRoll = student.admissionNo.toLowerCase().includes(q);
+      const matchName = (item.student.name || '').toLowerCase().includes(q);
+      const matchRoll = (item.student.admissionNo || '').toLowerCase().includes(q);
       return matchName || matchRoll;
     }
     return true;
@@ -256,7 +300,7 @@ export default function Fees({
       {/* Top Header */}
       <div className="fees-header">
         <div>
-          <h1 className="page-title">Tuition Fees & Parent Reminders</h1>
+          <h1 className="page-title">Tuition Fees &amp; Parent Reminders</h1>
           <p className="page-subtitle">
             Fee notification cycles calculated automatically from each student's <strong>joining date</strong>
           </p>
@@ -269,7 +313,7 @@ export default function Fees({
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards: Single Source of Truth */}
       <div className="fee-kpi-grid">
         <div className="glass-card fee-kpi-card">
           <div className="kpi-top">
@@ -282,36 +326,36 @@ export default function Fees({
 
         <div className="glass-card fee-kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Total Collected</span>
+            <span className="kpi-label">Fees Collected ({currentMonth})</span>
             <CheckCircle2 size={18} className="text-emerald" />
           </div>
-          <div className="kpi-value text-emerald">₹{totalCollected.toLocaleString('en-IN')}</div>
-          <div className="text-xs text-emerald font-semibold">{collectionRate}% Recovery Rate</div>
+          <div className="kpi-value text-emerald">₹{monthlyCollected.toLocaleString('en-IN')}</div>
+          <div className="text-xs text-emerald font-semibold">{collectionRate}% Recovery Rate • {paidCycles.length} Cleared</div>
         </div>
 
         <div className="glass-card fee-kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Joining Date Overdue</span>
+            <span className="kpi-label">Pending Dues ({currentMonth})</span>
             <AlertCircle size={18} className="text-rose" />
           </div>
           <div className="kpi-value text-rose">
-            {overdueCycles.length} Students
+            ₹{totalOutstanding.toLocaleString('en-IN')}
           </div>
           <div className="text-xs text-rose font-semibold">
-            ₹{overdueCycles.reduce((sum, c) => sum + c.balance, 0).toLocaleString('en-IN')} pending
+            {defaultersCount} Students Due (₹{dueOrOverdue.reduce((sum, c) => sum + c.balance, 0).toLocaleString('en-IN')})
           </div>
         </div>
 
         <div className="glass-card fee-kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Due (Joining Day)</span>
-            <Bell size={18} className="text-amber" />
+            <span className="kpi-label">Total All-Time Collected</span>
+            <IndianRupee size={18} className="text-sky" />
           </div>
-          <div className="kpi-value text-amber">
-            {dueCycles.length} Students
+          <div className="kpi-value text-sky">
+            ₹{allTimeCollected.toLocaleString('en-IN')}
           </div>
-          <div className="text-xs text-amber font-semibold">
-            {dueTodayCycles.length > 0 ? `${dueTodayCycles.length} Due Today • ${dueCycles.length} Total Due` : `${dueCycles.length} due for payment`}
+          <div className="text-xs text-muted">
+            All-time revenue via Cash, UPI &amp; Bank
           </div>
         </div>
       </div>
@@ -554,29 +598,39 @@ export default function Fees({
                   className={`pill-btn ${statusFilter === 'ALL' ? 'active' : ''}`}
                   onClick={() => setStatusFilter('ALL')}
                 >
-                  All Records ({fees.length})
+                  All ({activeLedgerItems.length})
                 </button>
                 <button 
                   className={`pill-btn ${statusFilter === 'DEFAULTERS' ? 'active' : ''}`}
                   onClick={() => setStatusFilter('DEFAULTERS')}
                 >
-                  Pending Dues ({fees.filter(f => f.balance > 0).length})
+                  Pending Dues ({activeLedgerItems.filter(f => f.balance > 0).length})
                 </button>
                 <button 
                   className={`pill-btn ${statusFilter === 'PARTIAL' ? 'active' : ''}`}
                   onClick={() => setStatusFilter('PARTIAL')}
                 >
-                  Partial Paid
+                  Partial Paid ({activeLedgerItems.filter(f => f.status === 'PARTIAL').length})
                 </button>
                 <button 
                   className={`pill-btn ${statusFilter === 'PAID' ? 'active' : ''}`}
                   onClick={() => setStatusFilter('PAID')}
                 >
-                  Fully Cleared
+                  Fully Cleared ({activeLedgerItems.filter(f => f.status === 'PAID').length})
                 </button>
               </div>
 
-              <div className="class-filter-box">
+              <div className="class-filter-box" style={{ display: 'flex', gap: '8px' }}>
+                <select 
+                  className="form-select select-class-sm"
+                  value={selectedLedgerMonth}
+                  onChange={(e) => setSelectedLedgerMonth(e.target.value)}
+                  title="Choose Billing Period"
+                >
+                  <option value="CURRENT">Current Cycle ({currentMonth})</option>
+                  <option value="ALL">All Database Records ({fees.length})</option>
+                </select>
+
                 <select 
                   className="form-select select-class-sm"
                   value={classFilter}
@@ -628,10 +682,11 @@ export default function Fees({
                   </tr>
                 ) : (
                   filteredFees.map((fee) => {
-                    const student = students.find(s => s.id === fee.studentId);
-                    const className = classes.find(c => c.code === student?.classCode)?.name || 'Class';
-                    const receipt = receipts.find(r => r.receiptNo === fee.receiptNo || (r.studentId === fee.studentId && r.monthYear === fee.monthYear));
-                    const cycleDay = student?.admissionDate ? new Date(student.admissionDate).getDate() : 1;
+                    const student = fee.student || students.find(s => s.id === fee.studentId);
+                    const rawClassName = classes.find(c => c.code === student?.classCode)?.name || student?.classCode || 'Class';
+                    const className = (rawClassName || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
+                    const receipt = fee.receipt || receipts.find(r => r.receiptNo === fee.receiptNo || (r.studentId === fee.studentId && r.monthYear === fee.monthYear));
+                    const cycleDay = fee.cycleDay || (student?.admissionDate ? new Date(student.admissionDate).getDate() : 1);
 
                     return (
                       <tr key={fee.id}>

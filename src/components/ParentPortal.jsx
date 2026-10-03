@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { calculateStudentGoalProgress } from '../lib/storage';
+import { computeFinancialSummary } from '../lib/feeCycle';
 import HayagrivaLogo from './HayagrivaLogo';
 
 export default function ParentPortal({ currentUser, data = {}, onLogout }) {
@@ -287,9 +288,13 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     ? getHomeworkBadge(studentFeedback?.homeworkStatus || currentHomework.weeklyStatus)
     : { label: '⚪ No Active Homework', class: 'badge-secondary' };
 
-  // Student Fees & Ledger
+  // Student Fees & Cycle Status (Unified Financial Single Source of Truth)
+  const studentFinancialSummary = currentStudent 
+    ? computeFinancialSummary([currentStudent], fees, receipts)
+    : null;
+  const currentStudentCycle = studentFinancialSummary?.studentFeeCycles?.[0] || null;
+  const totalDue = currentStudentCycle?.balance ?? 0;
   const studentFees = fees.filter(f => f.studentId === currentStudent?.id);
-  const totalDue = studentFees.reduce((sum, f) => sum + (Number(f.balance) || 0), 0);
   const studentReceipts = receipts.filter(r => r.studentId === currentStudent?.id);
 
   // Announcements
@@ -1332,28 +1337,56 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                 <div>
                   <div className="text-3xs text-muted uppercase font-bold">Current Balance Due</div>
                   <div className={`text-xl font-extrabold ${totalDue > 0 ? 'text-rose' : 'text-emerald'}`}>
-                    ₹{totalDue}
+                    ₹{totalDue.toLocaleString('en-IN')}
                   </div>
+                  {currentStudentCycle && (
+                    <div className="text-3xs text-muted mt-0.5">
+                      {totalDue > 0 
+                        ? `Tuition fee due on ${currentStudentCycle.formattedDueDate}` 
+                        : `Tuition fee cleared for ${currentStudentCycle.monthYearLabel}`}
+                    </div>
+                  )}
                 </div>
-                <span className={`badge ${totalDue > 0 ? 'badge-danger' : 'badge-success'}`}>
-                  {totalDue > 0 ? 'Pending Dues' : 'Full Paid'}
+                <span className={`badge ${totalDue > 0 ? (currentStudentCycle?.cycleStatus === 'OVERDUE' ? 'badge-danger' : 'badge-warning') : 'badge-success'}`}>
+                  {totalDue > 0 ? (currentStudentCycle?.cycleStatus === 'OVERDUE' ? 'Overdue' : 'Due for Payment') : 'Full Paid ✓'}
                 </span>
               </div>
 
-              <div className="text-xs font-bold text-white mb-2">Monthly Fee Ledger:</div>
+              <div className="text-xs font-bold text-white mb-2">Tuition Fee Ledger &amp; Payments:</div>
               <div className="mini-ledger-list">
-                {studentFees.map((fee, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2.5 rounded bg-slate-900/60 border border-slate-800 mb-1.5 text-xs">
+                {currentStudentCycle && (
+                  <div className="flex items-center justify-between p-2.5 rounded bg-slate-900/60 border border-slate-800 mb-1.5 text-xs">
                     <div>
-                      <span className="font-semibold text-white">{fee.monthYear}</span>
-                      <div className="text-3xs text-muted">Status: {fee.status}</div>
+                      <span className="font-semibold text-white">{currentStudentCycle.monthYearLabel}</span>
+                      <div className="text-3xs text-muted">
+                        Cycle: {currentStudentCycle.cycleDay}th of month • Status: {currentStudentCycle.cycleStatus}
+                      </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-emerald">Paid: ₹{fee.amountPaid}</div>
-                      {fee.balance > 0 && <div className="text-3xs text-rose font-bold">Due: ₹{fee.balance}</div>}
+                      <div className="font-bold text-emerald">Paid: ₹{currentStudentCycle.amountPaid}</div>
+                      {currentStudentCycle.balance > 0 && (
+                        <div className="text-3xs text-rose font-bold">Due: ₹{currentStudentCycle.balance}</div>
+                      )}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {studentReceipts.length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-3xs uppercase font-bold text-muted mb-1.5">Official Payment Receipts:</div>
+                    {studentReceipts.map((rec, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded bg-slate-900/40 border border-slate-800/80 mb-1 text-xs">
+                        <div>
+                          <span className="font-medium text-slate-300">Receipt #{rec.receiptNo}</span>
+                          <div className="text-3xs text-muted font-mono">{rec.date} ({rec.mode || 'UPI'})</div>
+                        </div>
+                        <div className="text-right font-bold text-emerald font-mono">
+                          ₹{rec.amount}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -22,7 +22,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
-import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl } from '../lib/feeCycle';
+import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl, computeFinancialSummary } from '../lib/feeCycle';
 import { USER_ROLES } from '../lib/auth';
 
 function getDayOrdinal(day) {
@@ -130,39 +130,21 @@ export default function Dashboard({
     ? Math.round((presentCount / todayAttendance.length) * 100) 
     : 0;
 
-  // Joining date fee cycles & notification calculations (Admin only)
+  // Universal Financial Summary (Admin Only)
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const financialSummary = isTeacher 
+    ? { monthlyBilled: 0, monthlyCollected: 0, monthlyPending: 0, collectionRate: 0, allTimeCollected: 0, studentFeeCycles: [], dueOrOverdue: [], defaultersCount: 0 }
+    : computeFinancialSummary(activeStudents, fees, receipts);
 
-  // Fees calculation for current month (strictly for Admin)
-  const currentMonthFees = fees.filter(f => f.monthYear === currentMonth);
-  const currentMonthReceipts = (receipts || []).filter(r => {
-    if (r.monthYear === currentMonth) return true;
-    if (r.date) {
-      const d = new Date(r.date);
-      return d.getMonth() === new Date().getMonth() && d.getFullYear() === new Date().getFullYear();
-    }
-    return false;
-  });
-  const receiptsCollected = currentMonthReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-  const feeRecordsCollected = currentMonthFees.reduce((sum, f) => sum + (Number(f.amountPaid) || 0), 0);
-  const totalCollected = receiptsCollected > 0 ? receiptsCollected : feeRecordsCollected;
-
-  const totalMonthlyBilled = activeStudents.reduce((sum, s) => {
-    const feeRecord = currentMonthFees.find(f => f.studentId === s.id);
-    return sum + (feeRecord ? Number(feeRecord.amountDue) : Number(s.monthlyFee || 0));
-  }, 0);
-  const totalPending = Math.max(totalMonthlyBilled - totalCollected, 0);
-
-  const studentFeeCycles = isTeacher ? [] : activeStudents.map(student => {
-    const feeRecord = fees.find(f => f.studentId === student.id && f.monthYear === currentMonth);
-    const studentReceipts = (receipts || [])
-      .filter(r => r.studentId === student.id && r.date)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-    const lastPaymentDate = studentReceipts[0]?.date || feeRecord?.lastPaymentDate || null;
-    return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
-  });
-  const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'DUE' || c.cycleStatus === 'OVERDUE');
-  const defaultersCount = dueOrOverdue.length;
+  const {
+    monthlyBilled: totalMonthlyBilled,
+    monthlyCollected: totalCollected,
+    monthlyPending: totalPending,
+    collectionRate,
+    studentFeeCycles,
+    dueOrOverdue,
+    defaultersCount
+  } = financialSummary;
 
   // Class 1 to 10 distribution
   const classCounts = classes.map(cls => {

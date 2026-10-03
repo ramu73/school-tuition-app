@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { logger, LOG_CATEGORIES } from '../lib/logger';
+import { computeFinancialSummary } from '../lib/feeCycle';
 import TutorFeedbackModal from './TutorFeedbackModal';
 
 export default function Students({ 
@@ -31,7 +32,7 @@ export default function Students({
   currentUser,
   prefilledStudentData = null
 }) {
-  const { students = [], batches = [], classes = [], fees = [], exams = [], marks = [], tutorFeedback = [], attendance = [] } = data;
+  const { students = [], batches = [], classes = [], fees = [], exams = [], marks = [], tutorFeedback = [], attendance = [], receipts = [] } = data;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -769,24 +770,68 @@ export default function Students({
             {/* Fee History for this Student */}
             <div className="profile-section-title mt-4">
               <IndianRupee size={15} />
-              <span>Tuition Fee Records</span>
+              <span>Tuition Fee Status &amp; Records</span>
             </div>
-            <div className="mini-ledger-table">
-              {fees.filter(f => f.studentId === selectedStudent.id).map(fee => (
-                <div key={fee.id} className="ledger-row">
-                  <div>
-                    <span className="font-semibold">{fee.monthYear}</span>
-                    <div className="text-xs text-muted">Status: {fee.status}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div className="font-semibold text-emerald">Paid: ₹{fee.amountPaid}</div>
-                    {fee.balance > 0 && (
-                      <div className="text-xs text-danger">Due: ₹{fee.balance}</div>
-                    )}
-                  </div>
+            {(() => {
+              const selSummary = selectedStudent ? computeFinancialSummary([selectedStudent], fees, receipts) : null;
+              const selCycle = selSummary?.studentFeeCycles?.[0] || null;
+              const selReceipts = receipts.filter(r => r.studentId === selectedStudent?.id);
+
+              return (
+                <div className="mini-ledger-table">
+                  {selCycle && (
+                    <div className="ledger-row" style={{ background: selCycle.balance > 0 ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)', border: selCycle.balance > 0 ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(16, 185, 129, 0.25)' }}>
+                      <div>
+                        <div className="font-semibold flex items-center gap-1.5">
+                          <span>{selCycle.monthYearLabel}</span>
+                          <span className={`badge ${selCycle.balance > 0 ? (selCycle.cycleStatus === 'OVERDUE' ? 'badge-danger' : 'badge-warning') : 'badge-success'} text-3xs font-mono`}>
+                            {selCycle.cycleStatus}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted">
+                          Due Date: {selCycle.formattedDueDate} (Cycle: {selCycle.cycleDay}th)
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="font-semibold text-emerald">Paid: ₹{selCycle.amountPaid}</div>
+                        {selCycle.balance > 0 ? (
+                          <div className="text-xs text-danger font-bold">Due: ₹{selCycle.balance}</div>
+                        ) : (
+                          <div className="text-3xs text-emerald font-bold">Cleared ✓</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {fees.filter(f => f.studentId === selectedStudent.id).map(fee => (
+                    <div key={fee.id} className="ledger-row">
+                      <div>
+                        <span className="font-semibold">{fee.monthYear}</span>
+                        <div className="text-xs text-muted">Status: {fee.status}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="font-semibold text-emerald">Paid: ₹{fee.amountPaid}</div>
+                        {fee.balance > 0 && (
+                          <div className="text-xs text-danger">Due: ₹{fee.balance}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {selReceipts.length > 0 && (
+                    <div className="p-2 border-t border-slate-800">
+                      <div className="text-3xs uppercase font-bold text-muted mb-1">Receipts:</div>
+                      {selReceipts.map(r => (
+                        <div key={r.id} className="flex items-center justify-between text-xs py-1 text-slate-300">
+                          <span className="font-mono">#{r.receiptNo} ({r.date})</span>
+                          <span className="font-bold text-emerald">₹{r.amount}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
 
             {/* Academic Performance */}
             <div className="profile-section-title mt-4">

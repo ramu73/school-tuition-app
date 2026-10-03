@@ -230,7 +230,10 @@ export async function fetchTuitionDataFromSupabase() {
         studentName: student?.name || 'Student',
         classCode: student?.classCode || 'CLASS_10',
         amount: Number(r.amount_paid),
-        monthYear: '',
+        monthYear: r.payment_date ? (() => {
+          const d = new Date(r.payment_date);
+          return !isNaN(d.getTime()) ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '';
+        })() : '',
         date: r.payment_date,
         mode: r.payment_mode,
         transactionRef: r.transaction_ref || '',
