@@ -70,7 +70,7 @@ export default function Fees({
   });
   const receiptsCollected = currentMonthReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const feeRecordsCollected = currentMonthFees.reduce((sum, f) => sum + Number(f.amountPaid || 0), 0);
-  const totalCollected = Math.max(feeRecordsCollected, receiptsCollected);
+  const totalCollected = receiptsCollected > 0 ? receiptsCollected : feeRecordsCollected;
 
   const totalBilled = activeStudents.reduce((sum, s) => {
     const feeRecord = currentMonthFees.find(f => f.studentId === s.id);
@@ -88,6 +88,7 @@ export default function Fees({
     return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
   });
 
+  const dueCycles = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'DUE');
   const dueTodayCycles = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY');
   const overdueCycles = studentFeeCycles.filter(c => c.cycleStatus === 'OVERDUE');
   const upcomingCycles = studentFeeCycles.filter(c => c.cycleStatus === 'UPCOMING' && c.daysDiff <= 5);
@@ -215,7 +216,7 @@ export default function Fees({
   const filteredCycles = studentFeeCycles.filter(item => {
     if (classFilter !== 'ALL' && item.classCode !== classFilter) return false;
     if (cycleFilter !== 'ALL') {
-      if (cycleFilter === 'DUE_TODAY' && item.cycleStatus !== 'DUE_TODAY') return false;
+      if ((cycleFilter === 'DUE' || cycleFilter === 'DUE_TODAY') && (item.cycleStatus !== 'DUE_TODAY' && item.cycleStatus !== 'DUE')) return false;
       if (cycleFilter === 'OVERDUE' && item.cycleStatus !== 'OVERDUE') return false;
       if (cycleFilter === 'UPCOMING' && (item.cycleStatus !== 'UPCOMING' || item.daysDiff > 5)) return false;
       if (cycleFilter === 'PAID' && item.cycleStatus !== 'PAID') return false;
@@ -303,14 +304,14 @@ export default function Fees({
 
         <div className="glass-card fee-kpi-card">
           <div className="kpi-top">
-            <span className="kpi-label">Due Today (Joining Day)</span>
+            <span className="kpi-label">Due (Joining Day)</span>
             <Bell size={18} className="text-amber" />
           </div>
           <div className="kpi-value text-amber">
-            {dueTodayCycles.length} Students
+            {dueCycles.length} Students
           </div>
           <div className="text-xs text-amber font-semibold">
-            {dueTodayCycles.length > 0 ? 'Send today\'s reminder' : 'All clear for today'}
+            {dueTodayCycles.length > 0 ? `${dueTodayCycles.length} Due Today • ${dueCycles.length} Total Due` : `${dueCycles.length} due for payment`}
           </div>
         </div>
       </div>
@@ -324,8 +325,8 @@ export default function Fees({
           >
             <Bell size={16} />
             <span>Joining Date Fee Reminders (WhatsApp)</span>
-            {(dueTodayCycles.length > 0 || overdueCycles.length > 0) && (
-              <span className="tab-alert-badge">{dueTodayCycles.length + overdueCycles.length}</span>
+            {(dueCycles.length > 0 || overdueCycles.length > 0) && (
+              <span className="tab-alert-badge">{dueCycles.length + overdueCycles.length}</span>
             )}
           </button>
           <button 
@@ -359,11 +360,11 @@ export default function Fees({
                   <span>Overdue ({overdueCycles.length})</span>
                 </button>
                 <button 
-                  className={`pill-btn pill-warning ${cycleFilter === 'DUE_TODAY' ? 'active' : ''}`}
-                  onClick={() => setCycleFilter('DUE_TODAY')}
+                  className={`pill-btn pill-warning ${cycleFilter === 'DUE' ? 'active' : ''}`}
+                  onClick={() => setCycleFilter('DUE')}
                 >
                   <Bell size={13} />
-                  <span>Due Today ({dueTodayCycles.length})</span>
+                  <span>Due ({dueCycles.length})</span>
                 </button>
                 <button 
                   className={`pill-btn ${cycleFilter === 'UPCOMING' ? 'active' : ''}`}
@@ -471,6 +472,9 @@ export default function Fees({
                           )}
                           {item.cycleStatus === 'DUE_TODAY' && (
                             <span className="badge badge-warning pulse-badge">Due Today ({item.cycleDay}th)</span>
+                          )}
+                          {item.cycleStatus === 'DUE' && (
+                            <span className="badge badge-warning">Due ({item.cycleDay}th)</span>
                           )}
                           {item.cycleStatus === 'OVERDUE' && (
                             <span className="badge badge-danger">

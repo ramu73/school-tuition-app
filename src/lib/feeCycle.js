@@ -4,7 +4,7 @@
 // ==========================================================================
 
 export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new Date(), lastPaymentDate = null) {
-  const joiningDateStr = (student.admissionDate || '2026-01-01').split('T')[0];
+  const joiningDateStr = (student.admissionDate || student.joiningDate || '2026-01-01').split('T')[0];
   // Parse date safely without timezone offset issues
   const [jYear, jMonth, jDay] = joiningDateStr.split('-').map(Number);
   const joiningDate = new Date(jYear, (jMonth || 1) - 1, jDay || 1);
@@ -85,13 +85,13 @@ export function calculateStudentFeeCycle(student, feeRecord, referenceDate = new
       cycleStatus = 'DUE_TODAY';
     }
   } else {
-    // Cycle day in current month has passed
+    // Cycle day in current month has passed (e.g. today is Oct 3, cycle was Oct 1 or Oct 2)
     if (thisCyclePaid) {
       activeDueDate = cycleNextMonth;
       cycleStatus = 'PAID';
     } else {
       activeDueDate = cycleThisMonth;
-      cycleStatus = 'OVERDUE';
+      cycleStatus = 'DUE'; // Current month due (e.g. Oct 1 or Oct 2), NOT overdue!
     }
   }
 

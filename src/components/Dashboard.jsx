@@ -118,7 +118,7 @@ export default function Dashboard({
   const presentCount = todayAttendance.filter(a => a.status === 'PRESENT').length;
   const attendanceRate = todayAttendance.length > 0 
     ? Math.round((presentCount / todayAttendance.length) * 100) 
-    : 92; // fallback realistic rate if none marked yet today
+    : 0;
 
   // Joining date fee cycles & notification calculations (Admin only)
   const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -135,7 +135,7 @@ export default function Dashboard({
   });
   const receiptsCollected = currentMonthReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   const feeRecordsCollected = currentMonthFees.reduce((sum, f) => sum + (Number(f.amountPaid) || 0), 0);
-  const totalCollected = Math.max(feeRecordsCollected, receiptsCollected);
+  const totalCollected = receiptsCollected > 0 ? receiptsCollected : feeRecordsCollected;
 
   const totalMonthlyBilled = activeStudents.reduce((sum, s) => {
     const feeRecord = currentMonthFees.find(f => f.studentId === s.id);
@@ -151,7 +151,7 @@ export default function Dashboard({
     const lastPaymentDate = studentReceipts[0]?.date || feeRecord?.lastPaymentDate || null;
     return calculateStudentFeeCycle(student, feeRecord, new Date(), lastPaymentDate);
   });
-  const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'OVERDUE');
+  const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'DUE' || c.cycleStatus === 'OVERDUE');
   const defaultersCount = dueOrOverdue.length;
 
   // Class 1 to 10 distribution
@@ -368,9 +368,9 @@ export default function Dashboard({
               <CheckCircle size={20} />
             </div>
           </div>
-          <div className="kpi-value">{attendanceRate}%</div>
+          <div className="kpi-value">{todayAttendance.length > 0 ? `${attendanceRate}%` : 'Not Marked'}</div>
           <div className="kpi-footer">
-            <span className="kpi-tag tag-success">{presentCount || 10} Present</span>
+            <span className="kpi-tag tag-success">{presentCount} Present</span>
             {todayAbsenteesCount > 0 ? (
               <span className="kpi-tag tag-danger" style={{ background: 'rgba(244, 63, 94, 0.2)', color: '#FB7185', border: '1px solid rgba(244, 63, 94, 0.4)', fontWeight: 600 }}>
                 🚨 {todayAbsenteesCount} Absent Today →
@@ -497,6 +497,8 @@ export default function Dashboard({
                   <div className="cycle-status-meta">
                     {item.cycleStatus === 'DUE_TODAY' ? (
                       <span className="badge badge-warning">Due Today</span>
+                    ) : item.cycleStatus === 'DUE' ? (
+                      <span className="badge badge-warning">Due ({item.cycleDay}th)</span>
                     ) : (
                       <span className="badge badge-danger">{Math.abs(item.daysDiff)}d Overdue</span>
                     )}

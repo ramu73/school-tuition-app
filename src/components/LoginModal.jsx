@@ -381,7 +381,7 @@ export default function LoginModal({ onLoginSuccess, students = [], onClose, ini
                   {fieldErrors.parentIdentifier}
                 </span>
               )}
-              <p className="field-hint">E.g. 9848266892 or HGT26-025</p>
+              <p className="field-hint">Enter registered 10-digit mobile number or student admission number</p>
             </div>
           ) : (
             <>

@@ -56,7 +56,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   });
 
   const [selectedStudentId, setSelectedStudentId] = useState(
-    myChildren[0]?.id || currentUser?.studentId || (students[0]?.id || 1)
+    myChildren[0]?.id || currentUser?.studentId || null
   );
 
   const [activePortalSection, setActivePortalSection] = useState('overview'); // overview, attendance, exams, homework, feedback, progress
@@ -105,7 +105,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     }
   };
 
-  const currentStudent = students.find(s => s.id === Number(selectedStudentId)) || myChildren[0] || students[0];
+  const currentStudent = myChildren.find(s => s.id === Number(selectedStudentId)) || myChildren[0] || (currentUser?.studentId ? students.find(s => s.id === currentUser.studentId) : null);
   const studentClass = classes.find(c => c.code === currentStudent?.classCode);
   const studentBatch = batches.find(b => b.id === currentStudent?.batchId);
 
@@ -114,7 +114,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const presentDays = studentAttendance.filter(a => a.status === 'PRESENT').length;
   const absentDays = studentAttendance.filter(a => a.status === 'ABSENT').length;
   const totalMarkedDays = studentAttendance.length;
-  const attendanceRate = totalMarkedDays > 0 ? Math.round((presentDays / totalMarkedDays) * 100) : 94;
+  const attendanceRate = totalMarkedDays > 0 ? Math.round((presentDays / totalMarkedDays) * 100) : null;
   const recentAttendance = [...studentAttendance].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10);
 
   // Calendar calculations for selected month
@@ -151,7 +151,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const monthTotalCount = currentMonthRecords.length;
   const monthPercentage = monthTotalCount > 0 
     ? Math.round((monthPresentCount / monthTotalCount) * 100) 
-    : 100;
+    : null;
 
   const monthAbsenceList = currentMonthRecords
     .filter(a => a.status === 'ABSENT')
@@ -174,55 +174,27 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const passedTests = studentMarks.filter(m => m.marksObtained >= m.passingMarks).length;
   const avgPercentage = testsCount > 0 
     ? Math.round(studentMarks.reduce((sum, m) => sum + (m.marksObtained / m.totalMarks) * 100, 0) / testsCount)
-    : 78;
+    : null;
 
   const latestTest = studentMarks.length > 0 ? studentMarks[studentMarks.length - 1] : null;
-  const latestPct = latestTest ? Math.round((latestTest.marksObtained / latestTest.totalMarks) * 100) : 84;
+  const latestPct = latestTest ? Math.round((latestTest.marksObtained / latestTest.totalMarks) * 100) : null;
   const prevTest = studentMarks.length >= 2 ? studentMarks[studentMarks.length - 2] : null;
   const prevPct = prevTest ? Math.round((prevTest.marksObtained / prevTest.totalMarks) * 100) : null;
-  const scoreDiff = prevPct !== null ? (latestPct - prevPct) : null;
+  const scoreDiff = (latestPct !== null && prevPct !== null) ? (latestPct - prevPct) : null;
 
   // Tutor Feedback & Child Improvement Plan
-  const studentFeedback = tutorFeedback.find(f => f.studentId === currentStudent?.id) || {
-    monthYear: 'March 2026',
-    strength: 'Concepts',
-    improvementArea: 'Accuracy',
-    nextStep: 'Practice 5 problems',
-    academicPerformance: 'Good',
-    conceptUnderstanding: 'Good',
-    homeworkStatus: 'Regularly Completed',
-    classParticipation: 'Active',
-    regularity: 'Very Regular',
-    monthlyProgress: 'Improving',
-    focusArea: 'Problem Solving',
-    autoMessage: `🌱 Child Improvement Plan: ${currentStudent?.name || 'Your child'} understands core concepts very well and shows strong curiosity. The primary focus this month is improving calculation accuracy and minimizing avoidable test mistakes. We recommend practicing 5 targeted problems daily, which will solidify understanding.`,
-    tutorRemark: 'Very attentive during class lessons. Keeps pace with exercises.',
-    goal: {
-      subject: 'Mathematics',
-      currentScore: 78,
-      targetScore: 85,
-      metric: 'accuracy',
-      description: 'Improve Maths accuracy from 78% → 85%',
-      status: 'IN_PROGRESS'
-    },
-    createdBy: studentBatch?.tutor || 'Faculty'
-  };
+  const studentFeedback = tutorFeedback.find(f => f.studentId === currentStudent?.id) || null;
 
   // Goal comparison status
-  const evaluatedGoal = calculateStudentGoalProgress(studentFeedback.goal, marks.filter(m => m.studentId === currentStudent?.id), exams);
+  const evaluatedGoal = studentFeedback?.goal ? calculateStudentGoalProgress(studentFeedback.goal, marks.filter(m => m.studentId === currentStudent?.id), exams) : null;
 
   // Homework & Topic Records
   const studentHomework = homework.filter(h => h.batchId === currentStudent?.batchId || h.classCode === currentStudent?.classCode);
-  const currentHomework = studentHomework[0] || {
-    subject: 'Mathematics',
-    topic: 'Linear Equations in Two Variables (Elimination Method)',
-    homeworkTask: 'Complete Exercise 3.3 Questions 1 to 4 in homework notebook.',
-    weeklyStatus: studentFeedback.homeworkStatus || 'Regularly Completed',
-    date: new Date().toISOString().split('T')[0]
-  };
+  const currentHomework = studentHomework[0] || null;
 
   // Weekly Homework Status Helper
   const getHomeworkBadge = (status = '') => {
+    if (!status) return { label: '⚪ No Status', class: 'badge-secondary' };
     const s = status.toLowerCase();
     if (s.includes('regular') || s.includes('complete')) {
       return { label: '🟢 Regularly Completed', class: 'badge-hw-green' };
@@ -236,7 +208,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     return { label: '🔴 Needs Improvement', class: 'badge-hw-red' };
   };
 
-  const homeworkBadge = getHomeworkBadge(studentFeedback.homeworkStatus || currentHomework.weeklyStatus);
+  const homeworkBadge = currentHomework 
+    ? getHomeworkBadge(studentFeedback?.homeworkStatus || currentHomework.weeklyStatus)
+    : { label: '⚪ No Active Homework', class: 'badge-secondary' };
 
   // Student Fees & Ledger
   const studentFees = fees.filter(f => f.studentId === currentStudent?.id);
@@ -328,25 +302,25 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <span className="badge badge-class">{studentClass?.name || 'Class 10'}</span>
             </div>
             <div className="student-meta-row">
-              <span><strong>Admission No:</strong> {currentStudent?.admissionNo}</span>
+              <span><strong>Admission No:</strong> {currentStudent?.admissionNo || 'N/A'}</span>
               <span>•</span>
-              <span><strong>School:</strong> {currentStudent?.school || 'High School'}</span>
+              <span><strong>School:</strong> {currentStudent?.school || 'N/A'}</span>
               <span>•</span>
-              <span><strong>Agreed Fee:</strong> ₹{currentStudent?.monthlyFee}/mo</span>
+              <span><strong>Agreed Fee:</strong> ₹{currentStudent?.monthlyFee || 0}/mo</span>
             </div>
           </div>
         </div>
 
         <div className="tuition-batch-info-box">
           <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Assigned Batch & Faculty</div>
-          <div className="batch-name-val">{studentBatch?.name || 'Standard Tuition Batch'}</div>
+          <div className="batch-name-val">{studentBatch?.name || 'Classroom Batch'}</div>
           <div className="batch-timing-val">
             <Clock size={13} />
-            <span>{studentBatch?.timing || '05:30 PM - 07:30 PM'}</span>
+            <span>{studentBatch?.timing || 'Tuition Hours'}</span>
           </div>
           <div className="batch-tutor-val">
             <User size={13} />
-            <span>Faculty: {studentBatch?.tutor || 'Mr. R. Sharma'}</span>
+            <span>Faculty: {studentBatch?.tutor || 'Hayagriva Faculty'}</span>
           </div>
         </div>
       </div>
@@ -355,7 +329,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       <div className="quick-overview-bar glass-card">
         <div className="overview-title-row">
           <span className="overview-label">⚡ Quick Overview</span>
-          <span className="overview-sub text-muted text-3xs font-mono">{studentFeedback.monthYear}</span>
+          {studentFeedback?.monthYear && (
+            <span className="overview-sub text-muted text-3xs font-mono">{studentFeedback.monthYear}</span>
+          )}
         </div>
 
         <div className="overview-kpis-grid">
@@ -366,8 +342,12 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             </div>
             <div>
               <div className="overview-kpi-lbl">Attendance</div>
-              <div className="overview-kpi-val text-emerald">{attendanceRate}%</div>
-              <div className="overview-kpi-note">{presentDays} Present • {absentDays} Absent</div>
+              <div className="overview-kpi-val text-emerald">
+                {attendanceRate !== null ? `${attendanceRate}%` : 'N/A'}
+              </div>
+              <div className="overview-kpi-note">
+                {totalMarkedDays > 0 ? `${presentDays} Present • ${absentDays} Absent` : 'No attendance recorded yet'}
+              </div>
             </div>
           </div>
 
@@ -378,14 +358,20 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             </div>
             <div>
               <div className="overview-kpi-lbl">Latest Test</div>
-              <div className="overview-kpi-val text-primary">{latestPct}%</div>
+              <div className="overview-kpi-val text-primary">
+                {latestPct !== null ? `${latestPct}%` : 'N/A'}
+              </div>
               <div className="overview-kpi-note">
-                {scoreDiff !== null ? (
-                  <span className={scoreDiff >= 0 ? 'text-emerald' : 'text-rose'}>
-                    {scoreDiff >= 0 ? `+${scoreDiff}% vs previous` : `${scoreDiff}% vs previous`}
-                  </span>
+                {latestTest ? (
+                  scoreDiff !== null ? (
+                    <span className={scoreDiff >= 0 ? 'text-emerald' : 'text-rose'}>
+                      {scoreDiff >= 0 ? `+${scoreDiff}% vs previous` : `${scoreDiff}% vs previous`}
+                    </span>
+                  ) : (
+                    <span>{latestTest?.subject || 'Unit Test'}</span>
+                  )
                 ) : (
-                  <span>{latestTest?.subject || 'Unit Test'}</span>
+                  <span>No tests recorded yet</span>
                 )}
               </div>
             </div>
@@ -401,7 +387,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <div className="overview-kpi-val text-white text-xs mt-1">
                 <span className={`badge ${homeworkBadge.class}`}>{homeworkBadge.label}</span>
               </div>
-              <div className="overview-kpi-note text-3xs mt-1">Consistency Tracked</div>
+              <div className="overview-kpi-note text-3xs mt-1">
+                {currentHomework ? 'Consistency Tracked' : 'No active homework'}
+              </div>
             </div>
           </div>
 
@@ -412,10 +400,21 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             </div>
             <div>
               <div className="overview-kpi-lbl">Tutor Feedback</div>
-              <div className="overview-kpi-val text-white text-xs mt-1 font-bold">
-                🌟 {studentFeedback.monthlyProgress || 'Good Progress'}
-              </div>
-              <div className="overview-kpi-note text-3xs mt-1">Focus: {studentFeedback.focusArea || studentFeedback.improvementArea}</div>
+              {studentFeedback ? (
+                <>
+                  <div className="overview-kpi-val text-white text-xs mt-1 font-bold">
+                    🌟 {studentFeedback.monthlyProgress || 'Good Progress'}
+                  </div>
+                  <div className="overview-kpi-note text-3xs mt-1">Focus: {studentFeedback.focusArea || studentFeedback.improvementArea}</div>
+                </>
+              ) : (
+                <>
+                  <div className="overview-kpi-val text-muted text-xs mt-1">
+                    Pending
+                  </div>
+                  <div className="overview-kpi-note text-3xs mt-1">Awaiting evaluation</div>
+                </>
+              )}
             </div>
           </div>
 
@@ -426,10 +425,21 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             </div>
             <div>
               <div className="overview-kpi-lbl">Monthly Progress</div>
-              <div className="overview-kpi-val text-emerald text-xs mt-1 font-bold">
-                🚀 {studentFeedback.monthlyProgress || 'Improving'}
-              </div>
-              <div className="overview-kpi-note text-3xs mt-1">Steady Academic Growth</div>
+              {studentFeedback ? (
+                <>
+                  <div className="overview-kpi-val text-emerald text-xs mt-1 font-bold">
+                    🚀 {studentFeedback.monthlyProgress || 'Improving'}
+                  </div>
+                  <div className="overview-kpi-note text-3xs mt-1">Steady Academic Growth</div>
+                </>
+              ) : (
+                <>
+                  <div className="overview-kpi-val text-muted text-xs mt-1">
+                    Ongoing
+                  </div>
+                  <div className="overview-kpi-note text-3xs mt-1">Monthly cycle active</div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -475,128 +485,142 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               </div>
               <h3 className="section-title">Tutor Feedback &amp; Child Improvement System</h3>
             </div>
-            <span className="badge badge-primary font-mono text-xs">{studentFeedback.monthYear} Evaluation</span>
-          </div>
-
-          {/* 3 Pillars Summary */}
-          <div className="three-pillars-grid mb-4">
-            <div className="pillar-box pillar-strength">
-              <div className="pillar-top-row">
-                <span className="pillar-step-badge step-emerald">1</span>
-                <span className="pillar-tag">STRENGTH (DOING WELL)</span>
-              </div>
-              <div className="pillar-val">
-                <span className="pillar-emoji">🌟</span>
-                <span>{studentFeedback.strength}</span>
-              </div>
-              <div className="pillar-sub">Active competence recognized by tutor</div>
-            </div>
-
-            <div className="pillar-box pillar-improvement">
-              <div className="pillar-top-row">
-                <span className="pillar-step-badge step-amber">2</span>
-                <span className="pillar-tag">IMPROVEMENT AREA (FOCUS)</span>
-              </div>
-              <div className="pillar-val">
-                <span className="pillar-emoji">🎯</span>
-                <span>{studentFeedback.improvementArea}</span>
-              </div>
-              <div className="pillar-sub">Targeted skill growth for upcoming month</div>
-            </div>
-
-            <div className="pillar-box pillar-action">
-              <div className="pillar-top-row">
-                <span className="pillar-step-badge step-sky">3</span>
-                <span className="pillar-tag">RECOMMENDED ACTION (NEXT STEP)</span>
-              </div>
-              <div className="pillar-val">
-                <span className="pillar-emoji">📖</span>
-                <span>{studentFeedback.nextStep}</span>
-              </div>
-              <div className="pillar-sub">Daily home routine for measurable boost</div>
-            </div>
-          </div>
-
-          {/* 🤖 Auto-Generated Parent Message Box */}
-          <div className="auto-parent-msg-box mb-4">
-            <div className="advice-header-row">
-              <div className="advice-icon-wrap">
-                <MessageSquare size={16} className="text-primary" />
-              </div>
-              <div>
-                <span className="advice-title">Personalized Tutor Advice for Parents</span>
-                <span className="advice-sub">Auto-synthesized guidance for home reinforcement</span>
-              </div>
-            </div>
-
-            <div className="parent-advice-content">
-              <p className="parent-advice-text">
-                {studentFeedback.autoMessage}
-              </p>
-            </div>
-
-            {studentFeedback.tutorRemark && (
-              <div className="faculty-remark-card">
-                <span className="remark-badge">Faculty Remark:</span>
-                <span className="remark-quote">"{studentFeedback.tutorRemark}"</span>
-              </div>
+            {studentFeedback?.monthYear && (
+              <span className="badge badge-primary font-mono text-xs">{studentFeedback.monthYear} Evaluation</span>
             )}
           </div>
 
-          {/* ⭐ "This Month's Goal" Tracker */}
-          {studentFeedback.goal && (
-            <div className="monthly-goal-box">
-              <div className="goal-header-row">
-                <div className="goal-title-group">
-                  <div className="goal-icon-wrap">
-                    <Target size={16} className="text-amber" />
+          {!studentFeedback ? (
+            <div className="empty-state-box" style={{ padding: '36px 20px', textAlign: 'center' }}>
+              <Sparkles size={36} className="text-amber" style={{ opacity: 0.6, margin: '0 auto 12px' }} />
+              <h4 style={{ color: 'white', fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>No Tutor Feedback Filed Yet</h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', maxWidth: '460px', margin: '0 auto', lineHeight: '1.6' }}>
+                Your child's faculty evaluation and individualized improvement plan will be published here once the tutor records the monthly assessment.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* 3 Pillars Summary */}
+              <div className="three-pillars-grid mb-4">
+                <div className="pillar-box pillar-strength">
+                  <div className="pillar-top-row">
+                    <span className="pillar-step-badge step-emerald">1</span>
+                    <span className="pillar-tag">STRENGTH (DOING WELL)</span>
+                  </div>
+                  <div className="pillar-val">
+                    <span className="pillar-emoji">🌟</span>
+                    <span>{studentFeedback.strength}</span>
+                  </div>
+                  <div className="pillar-sub">Active competence recognized by tutor</div>
+                </div>
+
+                <div className="pillar-box pillar-improvement">
+                  <div className="pillar-top-row">
+                    <span className="pillar-step-badge step-amber">2</span>
+                    <span className="pillar-tag">IMPROVEMENT AREA (FOCUS)</span>
+                  </div>
+                  <div className="pillar-val">
+                    <span className="pillar-emoji">🎯</span>
+                    <span>{studentFeedback.improvementArea}</span>
+                  </div>
+                  <div className="pillar-sub">Targeted skill growth for upcoming month</div>
+                </div>
+
+                <div className="pillar-box pillar-action">
+                  <div className="pillar-top-row">
+                    <span className="pillar-step-badge step-sky">3</span>
+                    <span className="pillar-tag">RECOMMENDED ACTION (NEXT STEP)</span>
+                  </div>
+                  <div className="pillar-val">
+                    <span className="pillar-emoji">📖</span>
+                    <span>{studentFeedback.nextStep}</span>
+                  </div>
+                  <div className="pillar-sub">Daily home routine for measurable boost</div>
+                </div>
+              </div>
+
+              {/* 🤖 Auto-Generated Parent Message Box */}
+              <div className="auto-parent-msg-box mb-4">
+                <div className="advice-header-row">
+                  <div className="advice-icon-wrap">
+                    <MessageSquare size={16} className="text-primary" />
                   </div>
                   <div>
-                    <span className="goal-heading-text">This Month's Academic Goal</span>
-                    <span className="goal-heading-sub">Targeted milestone tracked by upcoming tests</span>
+                    <span className="advice-title">Personalized Tutor Advice for Parents</span>
+                    <span className="advice-sub">Auto-synthesized guidance for home reinforcement</span>
                   </div>
                 </div>
-                {evaluatedGoal?.achieved ? (
-                  <span className="badge badge-success text-xs font-bold">
-                    🎉 Goal Achieved ({evaluatedGoal.currentProgress}%)
-                  </span>
-                ) : (
-                  <span className="badge badge-warning text-xs font-mono">
-                    Target in Progress
-                  </span>
+
+                <div className="parent-advice-content">
+                  <p className="parent-advice-text">
+                    {studentFeedback.autoMessage}
+                  </p>
+                </div>
+
+                {studentFeedback.tutorRemark && (
+                  <div className="faculty-remark-card">
+                    <span className="remark-badge">Faculty Remark:</span>
+                    <span className="remark-quote">"{studentFeedback.tutorRemark}"</span>
+                  </div>
                 )}
               </div>
 
-              <div className="goal-content-grid">
-                <div className="goal-desc-col">
-                  <div className="goal-target-phrase">
-                    {studentFeedback.goal.description || `Improve ${studentFeedback.goal.subject} from ${studentFeedback.goal.currentScore}% → ${studentFeedback.goal.targetScore}%`}
+              {/* ⭐ "This Month's Goal" Tracker */}
+              {studentFeedback.goal && (
+                <div className="monthly-goal-box">
+                  <div className="goal-header-row">
+                    <div className="goal-title-group">
+                      <div className="goal-icon-wrap">
+                        <Target size={16} className="text-amber" />
+                      </div>
+                      <div>
+                        <span className="goal-heading-text">This Month's Academic Goal</span>
+                        <span className="goal-heading-sub">Targeted milestone tracked by upcoming tests</span>
+                      </div>
+                    </div>
+                    {evaluatedGoal?.achieved ? (
+                      <span className="badge badge-success text-xs font-bold">
+                        🎉 Goal Achieved ({evaluatedGoal.currentProgress}%)
+                      </span>
+                    ) : (
+                      <span className="badge badge-warning text-xs font-mono">
+                        Target in Progress
+                      </span>
+                    )}
                   </div>
-                  <div className="goal-note-text">
-                    System tracks next test marks automatically to measure completion.
-                  </div>
-                </div>
 
-                <div className="goal-metric-col">
-                  <div className="goal-metric-badges">
-                    <div className="metric-pill pill-current">
-                      <span className="metric-label">Current:</span>
-                      <span className="metric-value">{evaluatedGoal?.currentProgress || studentFeedback.goal.currentScore}%</span>
+                  <div className="goal-content-grid">
+                    <div className="goal-desc-col">
+                      <div className="goal-target-phrase">
+                        {studentFeedback.goal.description || `Improve ${studentFeedback.goal.subject} from ${studentFeedback.goal.currentScore}% → ${studentFeedback.goal.targetScore}%`}
+                      </div>
+                      <div className="goal-note-text">
+                        System tracks next test marks automatically to measure completion.
+                      </div>
                     </div>
-                    <div className="metric-pill pill-target">
-                      <span className="metric-label">Target:</span>
-                      <span className="metric-value">{studentFeedback.goal.targetScore}%</span>
+
+                    <div className="goal-metric-col">
+                      <div className="goal-metric-badges">
+                        <div className="metric-pill pill-current">
+                          <span className="metric-label">Current:</span>
+                          <span className="metric-value">{evaluatedGoal?.currentProgress || studentFeedback.goal.currentScore}%</span>
+                        </div>
+                        <div className="metric-pill pill-target">
+                          <span className="metric-label">Target:</span>
+                          <span className="metric-value">{studentFeedback.goal.targetScore}%</span>
+                        </div>
+                      </div>
+                      <div className="goal-progress-bar-bg">
+                        <div 
+                          className={`goal-progress-bar-fill ${evaluatedGoal?.achieved ? 'fill-achieved' : ''}`}
+                          style={{ width: `${Math.min(100, Math.round(((evaluatedGoal?.currentProgress || studentFeedback.goal.currentScore) / studentFeedback.goal.targetScore) * 100))}%` }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="goal-progress-bar-bg">
-                    <div 
-                      className={`goal-progress-bar-fill ${evaluatedGoal?.achieved ? 'fill-achieved' : ''}`}
-                      style={{ width: `${Math.min(100, Math.round(((evaluatedGoal?.currentProgress || studentFeedback.goal.currentScore) / studentFeedback.goal.targetScore) * 100))}%` }}
-                    />
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -679,39 +703,49 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             <span className={`badge ${homeworkBadge.class}`}>{homeworkBadge.label}</span>
           </div>
 
-          <div className="homework-layout-grid">
-            {/* Today's Ongoing Lesson & Task */}
-            <div className="homework-item-card p-3 rounded-lg" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid var(--border-subtle)' }}>
-              <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Classroom Topic Taught</div>
-              <div className="text-sm font-bold text-white mb-2">{currentHomework.subject}: {currentHomework.topic}</div>
-
-              <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Homework Given</div>
-              <p className="text-xs text-secondary leading-relaxed mb-3">
-                {currentHomework.homeworkTask}
+          {!currentHomework ? (
+            <div className="empty-state-box" style={{ padding: '36px 20px', textAlign: 'center' }}>
+              <CheckSquare size={36} className="text-emerald" style={{ opacity: 0.6, margin: '0 auto 12px' }} />
+              <h4 style={{ color: 'white', fontSize: '1rem', fontWeight: 700, marginBottom: '6px' }}>No Active Homework Assigned</h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', maxWidth: '460px', margin: '0 auto', lineHeight: '1.6' }}>
+                There are no active homework assignments for this batch at this time. Classroom lesson tasks and updates will appear here when posted by faculty.
               </p>
+            </div>
+          ) : (
+            <div className="homework-layout-grid">
+              {/* Today's Ongoing Lesson & Task */}
+              <div className="homework-item-card p-3 rounded-lg" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid var(--border-subtle)' }}>
+                <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Classroom Topic Taught</div>
+                <div className="text-sm font-bold text-white mb-2">{currentHomework.subject}: {currentHomework.topic}</div>
 
-              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
-                <span className="text-muted">Due Date: <strong>{currentHomework.dueDate || 'Next Class'}</strong></span>
-                <span className="badge badge-success text-3xs font-semibold">Active Homework</span>
+                <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Homework Given</div>
+                <p className="text-xs text-secondary leading-relaxed mb-3">
+                  {currentHomework.homeworkTask}
+                </p>
+
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800">
+                  <span className="text-muted">Due Date: <strong>{currentHomework.dueDate || 'Next Class'}</strong></span>
+                  <span className="badge badge-success text-3xs font-semibold">Active Homework</span>
+                </div>
+              </div>
+
+              {/* Weekly Consistency & Standards Note */}
+              <div className="homework-consistency-box p-3 rounded-lg" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid var(--border-subtle)' }}>
+                <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Weekly Homework Status</div>
+                <div className="hw-status-prominent mb-2">
+                  <span className={`badge ${homeworkBadge.class}`} style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
+                    {homeworkBadge.label}
+                  </span>
+                </div>
+                <div className="hw-guidance-quote text-xs text-amber-200 bg-amber-950/20 p-2.5 rounded border border-amber-900/30 mb-2">
+                  💬 <em>"Homework completion needs regular consistency to retain class lessons."</em>
+                </div>
+                <div className="text-3xs text-muted">
+                  Tip: Completing homework on the same evening takes only 25 minutes and avoids backlog!
+                </div>
               </div>
             </div>
-
-            {/* Weekly Consistency & Standards Note */}
-            <div className="homework-consistency-box p-3 rounded-lg" style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid var(--border-subtle)' }}>
-              <div className="text-3xs text-muted uppercase tracking-wider mb-1 font-bold">Weekly Homework Status</div>
-              <div className="hw-status-prominent mb-2">
-                <span className={`badge ${homeworkBadge.class}`} style={{ fontSize: '0.8rem', padding: '6px 12px' }}>
-                  {homeworkBadge.label}
-                </span>
-              </div>
-              <div className="hw-guidance-quote text-xs text-amber-200 bg-amber-950/20 p-2.5 rounded border border-amber-900/30 mb-2">
-                💬 <em>"Homework completion needs regular consistency to retain class lessons."</em>
-              </div>
-              <div className="text-3xs text-muted">
-                Tip: Completing homework on the same evening takes only 25 minutes and avoids backlog!
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -751,7 +785,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                 </button>
               </div>
               <span className={`badge ${monthAbsentCount > 0 ? 'badge-warning' : 'badge-success'} font-mono text-xs`}>
-                {monthTotalCount > 0 ? `${monthPercentage}% ${monthNames[calMonth]}` : `${attendanceRate}% Overall`}
+                {monthTotalCount > 0 ? `${monthPercentage}% ${monthNames[calMonth]}` : (attendanceRate !== null ? `${attendanceRate}% Overall` : 'No Records')}
               </span>
             </div>
           </div>
@@ -816,7 +850,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             </div>
             <div className="cal-metric-box">
               <span className="cal-metric-lbl">Monthly Ratio</span>
-              <span className="cal-metric-num text-sky">{monthTotalCount > 0 ? `${monthPercentage}%` : '100%'}</span>
+              <span className="cal-metric-num text-sky">{monthTotalCount > 0 ? `${monthPercentage}%` : '—'}</span>
             </div>
           </div>
 
@@ -1013,17 +1047,33 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             <div className="progress-summary-row">
               <div className="summary-col-label">📅 Attendance</div>
               <div className="summary-col-status">
-                <span className="font-bold text-emerald">{attendanceRate}%</span> ({presentDays} Present)
+                {attendanceRate !== null ? (
+                  <>
+                    <span className="font-bold text-emerald">{attendanceRate}%</span> ({presentDays} Present)
+                  </>
+                ) : (
+                  <span className="text-muted text-xs">No records yet</span>
+                )}
               </div>
-              <div className="summary-col-verdict text-muted text-xs">Very regular attendance</div>
+              <div className="summary-col-verdict text-muted text-xs">
+                {attendanceRate !== null ? (attendanceRate >= 85 ? 'Very regular attendance' : 'Needs improved consistency') : 'Pending roll call'}
+              </div>
             </div>
 
             <div className="progress-summary-row">
               <div className="summary-col-label">📊 Exam Performance</div>
               <div className="summary-col-status">
-                <span className="font-bold text-primary">{avgPercentage}%</span> Average ({passedTests}/{testsCount} Passed)
+                {avgPercentage !== null ? (
+                  <>
+                    <span className="font-bold text-primary">{avgPercentage}%</span> Average ({passedTests}/{testsCount} Passed)
+                  </>
+                ) : (
+                  <span className="text-muted text-xs">No tests recorded yet</span>
+                )}
               </div>
-              <div className="summary-col-verdict text-muted text-xs">Consistent test marks</div>
+              <div className="summary-col-verdict text-muted text-xs">
+                {avgPercentage !== null ? 'Consistent test marks' : 'Pending exams'}
+              </div>
             </div>
 
             <div className="progress-summary-row">
@@ -1031,15 +1081,23 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <div className="summary-col-status">
                 <span className={`badge ${homeworkBadge.class}`}>{homeworkBadge.label}</span>
               </div>
-              <div className="summary-col-verdict text-muted text-xs">Daily tasks submitted</div>
+              <div className="summary-col-verdict text-muted text-xs">
+                {currentHomework ? 'Daily tasks submitted' : 'No active homework'}
+              </div>
             </div>
 
             <div className="progress-summary-row">
               <div className="summary-col-label">👩‍🏫 Tutor Feedback</div>
               <div className="summary-col-status font-semibold text-white">
-                🌟 {studentFeedback.strength} & Focus on {studentFeedback.improvementArea}
+                {studentFeedback ? (
+                  `🌟 ${studentFeedback.strength} & Focus on ${studentFeedback.improvementArea}`
+                ) : (
+                  <span className="text-muted text-xs font-normal">Awaiting monthly evaluation</span>
+                )}
               </div>
-              <div className="summary-col-verdict text-muted text-xs">Actionable plan active</div>
+              <div className="summary-col-verdict text-muted text-xs">
+                {studentFeedback ? 'Actionable plan active' : 'Evaluation pending'}
+              </div>
             </div>
 
             <div className="progress-summary-row overall-verdict-row">
