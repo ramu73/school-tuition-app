@@ -109,13 +109,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const studentClass = classes.find(c => c.code === currentStudent?.classCode);
   const studentBatch = batches.find(b => b.id === currentStudent?.batchId);
 
-  // Student Attendance
-  const studentAttendance = attendance.filter(a => a.studentId === currentStudent?.id);
-  const presentDays = studentAttendance.filter(a => a.status === 'PRESENT').length;
-  const absentDays = studentAttendance.filter(a => a.status === 'ABSENT').length;
-  const totalMarkedDays = studentAttendance.length;
-  const attendanceRate = totalMarkedDays > 0 ? Math.round((presentDays / totalMarkedDays) * 100) : null;
-  const recentAttendance = [...studentAttendance].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 10);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const admissionDateStr = (currentStudent?.admissionDate || currentStudent?.joiningDate || '').split('T')[0];
 
   // Calendar calculations for selected month
   const calYear = calDate.getFullYear();
@@ -127,35 +122,115 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const calMonthLabel = `${monthNames[calMonth]} ${calYear}`;
   const daysInCalMonth = new Date(calYear, calMonth + 1, 0).getDate();
   const startDayOfWeek = new Date(calYear, calMonth, 1).getDay(); // 0 = Sunday
-  const todayStr = new Date().toISOString().split('T')[0];
 
-  const studentMonthAttendanceMap = useMemo(() => {
+  // Fast map for student attendance records
+  const studentAttendanceMap = useMemo(() => {
     const map = new Map();
-    studentAttendance.forEach(a => {
-      if (a.date) {
+    (attendance || []).forEach(a => {
+      if (a.studentId === currentStudent?.id && a.date) {
         map.set(a.date, a);
       }
     });
     return map;
-  }, [studentAttendance]);
+  }, [attendance, currentStudent?.id]);
 
-  const currentMonthRecords = studentAttendance.filter(a => {
-    if (!a.date) return false;
-    const parts = a.date.split('-');
-    if (parts.length < 2) return false;
-    return Number(parts[0]) === calYear && Number(parts[1]) === (calMonth + 1);
-  });
+  // Selected Month Attendance Calculations
+  // In Hayagriva Tutorials, classes run Mon–Sat and students are PRESENT by default unless marked ABSENT
+  const {
+    monthPresentCount,
+    monthAbsentCount,
+    monthTotalCount,
+    monthPercentage,
+    monthAbsenceList
+  } = useMemo(() => {
+    let classDays = 0;
+    let absCount = 0;
+    const absList = [];
 
-  const monthPresentCount = currentMonthRecords.filter(a => a.status === 'PRESENT').length;
-  const monthAbsentCount = currentMonthRecords.filter(a => a.status === 'ABSENT').length;
-  const monthTotalCount = currentMonthRecords.length;
-  const monthPercentage = monthTotalCount > 0 
-    ? Math.round((monthPresentCount / monthTotalCount) * 100) 
-    : null;
+    for (let day = 1; day <= daysInCalMonth; day++) {
+      const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayOfWeek = new Date(calYear, calMonth, day).getDay();
+      const isSunday = dayOfWeek === 0;
+      const isFuture = dateStr > todayStr;
+      const isBeforeAdmission = Boolean(admissionDateStr && dateStr < admissionDateStr);
 
-  const monthAbsenceList = currentMonthRecords
-    .filter(a => a.status === 'ABSENT')
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      if (!isSunday && !isFuture && !isBeforeAdmission) {
+        classDays++;
+        const rec = studentAttendanceMap.get(dateStr);
+        if (rec && rec.status === 'ABSENT') {
+          absCount++;
+          absList.push(rec);
+        }
+      }
+    }
+
+    const presCount = Math.max(0, classDays - absCount);
+    const pct = classDays > 0 ? Math.round((presCount / classDays) * 100) : null;
+    absList.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    return {
+      monthPresentCount: presCount,
+      monthAbsentCount: absCount,
+      monthTotalCount: classDays,
+      monthPercentage: pct,
+      monthAbsenceList: absList
+    };
+  }, [calYear, calMonth, daysInCalMonth, todayStr, admissionDateStr, studentAttendanceMap]);
+
+  // All-time attendance & recent attendance roll call history
+  const { presentDays, absentDays, totalMarkedDays, attendanceRate, recentAttendance } = useMemo(() => {
+    const termStartDate = '2026-09-01';
+    const effectiveStartDate = admissionDateStr && admissionDateStr > termStartDate ? admissionDateStr : termStartDate;
+
+    let totalWorkDays = 0;
+    let totalAbs = 0;
+
+    const curr = new Date(effectiveStartDate + 'T00:00:00');
+    const end = new Date(todayStr + 'T00:00:00');
+
+    while (curr <= end) {
+      const dayOfWeek = curr.getDay();
+      if (dayOfWeek !== 0) { // Mon-Sat
+        totalWorkDays++;
+        const dStr = curr.toISOString().split('T')[0];
+        const rec = studentAttendanceMap.get(dStr);
+        if (rec && rec.status === 'ABSENT') {
+          totalAbs++;
+        }
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    const totalPres = Math.max(0, totalWorkDays - totalAbs);
+    const rate = totalWorkDays > 0 ? Math.round((totalPres / totalWorkDays) * 100) : null;
+
+    // Build recent attendance list (last 12 working days from today backwards)
+    const recent = [];
+    const checkDate = new Date(todayStr + 'T00:00:00');
+    let daysChecked = 0;
+    while (daysChecked < 30 && recent.length < 12) {
+      const dayOfWeek = checkDate.getDay();
+      const dStr = checkDate.toISOString().split('T')[0];
+      if (dayOfWeek !== 0 && (!admissionDateStr || dStr >= admissionDateStr) && dStr >= termStartDate) {
+        const rec = studentAttendanceMap.get(dStr);
+        recent.push({
+          date: dStr,
+          status: rec?.status === 'ABSENT' ? 'ABSENT' : 'PRESENT',
+          remarks: rec?.remarks || ''
+        });
+      }
+      checkDate.setDate(checkDate.getDate() - 1);
+      daysChecked++;
+    }
+
+    return {
+      presentDays: totalPres,
+      absentDays: totalAbs,
+      totalMarkedDays: totalWorkDays,
+      attendanceRate: rate,
+      recentAttendance: recent
+    };
+  }, [admissionDateStr, todayStr, studentAttendanceMap]);
 
   // Student Exam Marks & Trends
   const studentMarks = marks.filter(m => m.studentId === currentStudent?.id).map(m => {
@@ -914,16 +989,23 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                   const isSunday = dayOfWeek === 0;
                   const isToday = dateStr === todayStr;
                   const isFuture = dateStr > todayStr;
-                  const record = studentMonthAttendanceMap.get(dateStr);
+                  const isBeforeAdmission = Boolean(admissionDateStr && dateStr < admissionDateStr);
+                  const record = studentAttendanceMap.get(dateStr);
                   const isAbsent = record && record.status === 'ABSENT';
-                  const isPresent = record && record.status === 'PRESENT';
+                  const isHoliday = record && (record.status === 'HOLIDAY' || record.status === 'NO_CLASS');
+                  
+                  // In Hayagriva Tutorials, students are PRESENT by default on all scheduled class days (Mon-Sat)
+                  const isPresent = !isAbsent && !isHoliday && (
+                    (record && (record.status === 'PRESENT' || record.status === 'LATE')) ||
+                    (!isSunday && !isFuture && !isBeforeAdmission)
+                  );
 
                   let cellClass = 'cal-cell';
                   if (isAbsent) cellClass += ' cell-absent';
                   else if (isPresent) cellClass += ' cell-present';
                   else if (isSunday) cellClass += ' cell-weekend';
                   else if (isFuture) cellClass += ' cell-future';
-                  else cellClass += ' cell-no-session';
+                  else cellClass += ' cell-future';
 
                   if (isToday) cellClass += ' cell-today';
 
@@ -952,10 +1034,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                           </div>
                         ) : isSunday ? (
                           <span className="cell-dim-label">Weekend</span>
-                        ) : isFuture ? (
-                          <span className="cell-dim-label">—</span>
                         ) : (
-                          <span className="cell-dim-label">No Class</span>
+                          <span className="cell-dim-label">—</span>
                         )}
                       </div>
                     </div>
@@ -967,7 +1047,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <div className="cal-legend-bar mt-3">
                 <div className="legend-item">
                   <span className="legend-dot dot-present" />
-                  <span>Present</span>
+                  <span>Present (Default on Class Days)</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-dot dot-absent" />
