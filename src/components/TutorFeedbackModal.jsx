@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sparkles, 
   X, 
@@ -69,7 +69,28 @@ export default function TutorFeedbackModal({
   const isTeacher = currentUser?.role === 'TEACHER';
   const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const studentClass = classes.find(c => c.code === student.classCode);
-  const classSubjects = studentClass?.subjects || ['Mathematics', 'Science', 'English'];
+  const classSubjects = useMemo(() => {
+    const raw = studentClass?.subjects && studentClass.subjects.length > 0
+      ? studentClass.subjects
+      : ['Mathematics', 'English', 'Science', 'Social Studies', 'Telugu', 'Hindi', 'Computer'];
+    
+    const list = [];
+    raw.forEach(s => {
+      if (s === 'Telugu / Hindi') {
+        list.push('Telugu', 'Hindi');
+      } else if (s === 'Language II') {
+        list.push('Telugu', 'Hindi');
+      } else {
+        list.push(s);
+      }
+    });
+
+    ['Telugu', 'Hindi', 'Computer'].forEach(s => {
+      if (!list.includes(s)) list.push(s);
+    });
+
+    return Array.from(new Set(list));
+  }, [studentClass]);
 
   // Latest test score percentage for goal auto-recommendation
   const latestMark = studentMarks.length > 0 ? studentMarks[studentMarks.length - 1] : null;
@@ -362,12 +383,25 @@ ${tutorRemark ? `💬 *Tutor Remark:* "${tutorRemark}"\n` : ''}
                 <label className="text-3xs text-muted mb-1 block">Target Subject</label>
                 <select 
                   className="form-select form-select-sm text-xs"
-                  value={goalSubject}
-                  onChange={(e) => setGoalSubject(e.target.value)}
+                  value={classSubjects.includes(goalSubject) ? goalSubject : (goalSubject ? '__CUSTOM__' : classSubjects[0])}
+                  onChange={(e) => {
+                    if (e.target.value === '__CUSTOM__') {
+                      const custom = window.prompt(`Enter custom target subject for ${student.name}:`, !classSubjects.includes(goalSubject) && goalSubject ? goalSubject : '');
+                      if (custom && custom.trim()) {
+                        setGoalSubject(custom.trim());
+                      }
+                    } else {
+                      setGoalSubject(e.target.value);
+                    }
+                  }}
                 >
                   {classSubjects.map((sub, i) => (
                     <option key={i} value={sub}>{sub}</option>
                   ))}
+                  {!classSubjects.includes(goalSubject) && goalSubject && (
+                    <option value={goalSubject}>{goalSubject} (Custom)</option>
+                  )}
+                  <option value="__CUSTOM__">✏️ Other / Custom Subject...</option>
                 </select>
               </div>
 

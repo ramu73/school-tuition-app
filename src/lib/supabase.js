@@ -92,7 +92,7 @@ export async function fetchTuitionDataFromSupabase() {
             name: cleanName || c.display_name || 'Class 10',
             category: c.category,
             defaultFee: Number(c.default_monthly_fee),
-            subjects: INITIAL_CLASSES.find(ic => ic.code === c.code)?.subjects || ['English', 'Mathematics', 'Science']
+            subjects: INITIAL_CLASSES.find(ic => ic.code === c.code)?.subjects || ['Mathematics', 'English', 'Science', 'Social Studies', 'Telugu', 'Hindi', 'Computer']
           };
         })
       : INITIAL_CLASSES;

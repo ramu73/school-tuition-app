@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import html2canvas from 'html2canvas';
 import { 
   Award, 
@@ -109,11 +109,30 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     }
   }, [selectedClass, exams]);
 
-  // Subjects available for current class
+  // Subjects available for current class (normalizing legacy names and ensuring Telugu, Hindi, Computer are present)
   const currentClassObj = classes.find(c => c.code === (currentExam?.classCode || selectedClass));
-  const availableClassSubjects = currentClassObj?.subjects && currentClassObj.subjects.length > 0
-    ? currentClassObj.subjects
-    : ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'General Science', 'Social Studies', 'English', 'Telugu', 'Hindi'];
+  const availableClassSubjects = useMemo(() => {
+    const raw = currentClassObj?.subjects && currentClassObj.subjects.length > 0
+      ? currentClassObj.subjects
+      : ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'General Science', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer'];
+
+    const list = [];
+    raw.forEach(s => {
+      if (s === 'Telugu / Hindi') {
+        list.push('Telugu', 'Hindi');
+      } else if (s === 'Language II') {
+        list.push('Telugu', 'Hindi');
+      } else {
+        list.push(s);
+      }
+    });
+
+    ['Telugu', 'Hindi', 'Computer'].forEach(s => {
+      if (!list.includes(s)) list.push(s);
+    });
+
+    return Array.from(new Set(list));
+  }, [currentClassObj]);
 
   // Eligible students for the current exam's class (scoped to teacher batches if teacher)
   const examStudents = currentExam 
@@ -928,16 +947,31 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 <div className="form-group">
                   <label className="form-label">Default Subject *</label>
-                  <input 
-                    type="text"
-                    className={`form-input ${examErrors.subject ? 'input-error' : ''}`}
-                    placeholder="e.g. Mathematics / Science / English"
-                    value={newExamData.subject}
+                  <select 
+                    className={`form-select ${examErrors.subject ? 'input-error' : ''}`}
+                    value={availableClassSubjects.includes(newExamData.subject) ? newExamData.subject : (newExamData.subject ? '__CUSTOM__' : '')}
                     onChange={(e) => {
-                      setNewExamData({ ...newExamData, subject: e.target.value });
-                      if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+                      if (e.target.value === '__CUSTOM__') {
+                        const custom = window.prompt('Enter custom subject name for this test:', newExamData.subject && !availableClassSubjects.includes(newExamData.subject) ? newExamData.subject : '');
+                        if (custom && custom.trim()) {
+                          setNewExamData({ ...newExamData, subject: custom.trim() });
+                          if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+                        }
+                      } else {
+                        setNewExamData({ ...newExamData, subject: e.target.value });
+                        if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+                      }
                     }}
-                  />
+                  >
+                    <option value="">-- Select Subject --</option>
+                    {availableClassSubjects.map((sub, idx) => (
+                      <option key={idx} value={sub}>{sub}</option>
+                    ))}
+                    {!availableClassSubjects.includes(newExamData.subject) && newExamData.subject && (
+                      <option value={newExamData.subject}>{newExamData.subject} (Custom)</option>
+                    )}
+                    <option value="__CUSTOM__">✏️ Other / Custom Subject...</option>
+                  </select>
                   {examErrors.subject && (
                     <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
                       {examErrors.subject}

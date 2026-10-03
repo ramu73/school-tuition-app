@@ -6,18 +6,33 @@
 const STORAGE_KEY = 'vidyatrack_tuition_data_v1';
 const SUPABASE_CONFIG_KEY = 'vidyatrack_supabase_config_v1';
 
-// Pre-seeded Classes 1 to 10
+export const STANDARD_TUITION_SUBJECTS = [
+  'Mathematics',
+  'Physics',
+  'Chemistry',
+  'Biology',
+  'General Science',
+  'Social Studies',
+  'English',
+  'Telugu',
+  'Hindi',
+  'Computer',
+  'Environmental Studies',
+  'Sanskrit'
+];
+
+// Pre-seeded Classes 1 to 10 with comprehensive subject curricula
 export const INITIAL_CLASSES = [
-  { id: 1, code: 'CLASS_1', name: 'Class 1', category: 'Primary', defaultFee: 500, subjects: ['English', 'Mathematics', 'Environmental Studies', 'Telugu / Hindi'] },
-  { id: 2, code: 'CLASS_2', name: 'Class 2', category: 'Primary', defaultFee: 550, subjects: ['English', 'Mathematics', 'Environmental Studies', 'Telugu / Hindi'] },
-  { id: 3, code: 'CLASS_3', name: 'Class 3', category: 'Primary', defaultFee: 600, subjects: ['English', 'Mathematics', 'Science', 'Social Studies', 'Language II'] },
-  { id: 4, code: 'CLASS_4', name: 'Class 4', category: 'Primary', defaultFee: 650, subjects: ['English', 'Mathematics', 'Science', 'Social Studies', 'Language II'] },
-  { id: 5, code: 'CLASS_5', name: 'Class 5', category: 'Primary', defaultFee: 700, subjects: ['English', 'Mathematics', 'General Science', 'Social Studies', 'Language II'] },
-  { id: 6, code: 'CLASS_6', name: 'Class 6', category: 'Middle', defaultFee: 800, subjects: ['Mathematics', 'General Science', 'Social Studies', 'English', 'Language II'] },
-  { id: 7, code: 'CLASS_7', name: 'Class 7', category: 'Middle', defaultFee: 850, subjects: ['Mathematics', 'General Science', 'Social Studies', 'English', 'Language II'] },
-  { id: 8, code: 'CLASS_8', name: 'Class 8', category: 'Middle', defaultFee: 900, subjects: ['Mathematics', 'Physical Science', 'Biological Science', 'Social Studies', 'English'] },
-  { id: 9, code: 'CLASS_9', name: 'Class 9', category: 'High School', defaultFee: 1100, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English'] },
-  { id: 10, code: 'CLASS_10', name: 'Class 10', category: 'High School', defaultFee: 1250, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English'] }
+  { id: 1, code: 'CLASS_1', name: 'Class 1', category: 'Primary', defaultFee: 500, subjects: ['Mathematics', 'English', 'Environmental Studies', 'Telugu', 'Hindi', 'Computer', 'General Science', 'Social Studies'] },
+  { id: 2, code: 'CLASS_2', name: 'Class 2', category: 'Primary', defaultFee: 550, subjects: ['Mathematics', 'English', 'Environmental Studies', 'Telugu', 'Hindi', 'Computer', 'General Science', 'Social Studies'] },
+  { id: 3, code: 'CLASS_3', name: 'Class 3', category: 'Primary', defaultFee: 600, subjects: ['Mathematics', 'English', 'Science', 'Social Studies', 'Telugu', 'Hindi', 'Computer', 'Environmental Studies'] },
+  { id: 4, code: 'CLASS_4', name: 'Class 4', category: 'Primary', defaultFee: 650, subjects: ['Mathematics', 'English', 'Science', 'Social Studies', 'Telugu', 'Hindi', 'Computer', 'Environmental Studies'] },
+  { id: 5, code: 'CLASS_5', name: 'Class 5', category: 'Primary', defaultFee: 700, subjects: ['Mathematics', 'English', 'General Science', 'Social Studies', 'Telugu', 'Hindi', 'Computer', 'Environmental Studies'] },
+  { id: 6, code: 'CLASS_6', name: 'Class 6', category: 'Middle', defaultFee: 800, subjects: ['Mathematics', 'General Science', 'Physical Science', 'Biological Science', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer', 'Sanskrit'] },
+  { id: 7, code: 'CLASS_7', name: 'Class 7', category: 'Middle', defaultFee: 850, subjects: ['Mathematics', 'General Science', 'Physical Science', 'Biological Science', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer', 'Sanskrit'] },
+  { id: 8, code: 'CLASS_8', name: 'Class 8', category: 'Middle', defaultFee: 900, subjects: ['Mathematics', 'Physical Science', 'Biological Science', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer', 'Sanskrit'] },
+  { id: 9, code: 'CLASS_9', name: 'Class 9', category: 'High School', defaultFee: 1100, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer', 'Sanskrit'] },
+  { id: 10, code: 'CLASS_10', name: 'Class 10', category: 'High School', defaultFee: 1250, subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer', 'Sanskrit'] }
 ];
 
 export const INITIAL_BATCHES = [];
@@ -164,13 +179,22 @@ export function getStoredData() {
       if (Array.isArray(parsed.classes)) {
         let changed = false;
         parsed.classes = parsed.classes.map(c => {
+          const initClass = INITIAL_CLASSES.find(ic => ic.code === c.code);
+          let subjects = c.subjects;
+          if (initClass && (!c.subjects || c.subjects.includes('Telugu / Hindi') || c.subjects.includes('Language II') || !c.subjects.includes('Telugu') || !c.subjects.includes('Hindi') || !c.subjects.includes('Computer'))) {
+            subjects = initClass.subjects;
+            changed = true;
+          }
           if (c.code === 'CLASS_10' && (c.name?.includes('SSC') || c.name?.includes('CBSE'))) {
             changed = true;
-            return { ...c, name: 'Class 10' };
+            return { ...c, name: 'Class 10', subjects };
           }
           if (c.name && c.name.includes('(SSC/CBSE)')) {
             changed = true;
-            return { ...c, name: c.name.replace(/\s*\(SSC\/CBSE\)/gi, '').trim() };
+            return { ...c, name: c.name.replace(/\s*\(SSC\/CBSE\)/gi, '').trim(), subjects };
+          }
+          if (changed && subjects !== c.subjects) {
+            return { ...c, subjects };
           }
           return c;
         });
