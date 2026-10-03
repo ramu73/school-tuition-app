@@ -404,6 +404,13 @@ export default function App() {
           saveStoredData(refreshed);
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_receipts' }, async () => {
+        const refreshed = await fetchTuitionDataFromSupabase();
+        if (refreshed) {
+          setData(refreshed);
+          saveStoredData(refreshed);
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, async () => {
         const refreshed = await fetchTuitionDataFromSupabase();
         if (refreshed) {
