@@ -145,9 +145,7 @@ export default function LandingPage({
         'Personalized 1-on-1 mentoring & continuous doubt clarification',
         'Continuous teacher-parent communication regarding growth'
       ],
-      quote: '"We don\'t just teach the syllabus — we build lifelong academic confidence."',
-      highlightStat: '10+ Yrs',
-      highlightLabel: 'Average Faculty Experience'
+      quote: '"We don\'t just teach the syllabus — we build lifelong academic confidence."'
     },
     {
       id: 'attention',
@@ -824,10 +822,12 @@ export default function LandingPage({
                   <div className="feature-image-overlay" />
                   
                   {/* Floating Stat Badge */}
-                  <div className="feature-floating-stat glass-card">
-                    <div className="stat-large">{featureShowcaseTabs[activeFeatureTab].highlightStat}</div>
-                    <div className="stat-desc">{featureShowcaseTabs[activeFeatureTab].highlightLabel}</div>
-                  </div>
+                  {featureShowcaseTabs[activeFeatureTab].highlightStat && (
+                    <div className="feature-floating-stat glass-card">
+                      <div className="stat-large">{featureShowcaseTabs[activeFeatureTab].highlightStat}</div>
+                      <div className="stat-desc">{featureShowcaseTabs[activeFeatureTab].highlightLabel}</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
