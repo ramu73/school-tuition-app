@@ -938,12 +938,13 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             <div className="parent-calendar-container">
               {/* Calendar Controls */}
               <div className="cal-controls-row mb-3">
-                <div className="flex items-center gap-2">
+                <div className="cal-month-nav-group">
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm cal-nav-btn"
                     onClick={() => setCalDate(new Date(calYear, calMonth - 1, 1))}
                     title="Previous Month"
+                    aria-label="Previous Month"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -955,6 +956,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                     className="btn btn-secondary btn-sm cal-nav-btn"
                     onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
                     title="Next Month"
+                    aria-label="Next Month"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -962,9 +964,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
 
                 <button
                   type="button"
-                  className="btn btn-secondary btn-xs"
+                  className="btn btn-secondary btn-xs cal-today-btn"
                   onClick={() => setCalDate(new Date())}
-                  style={{ fontSize: '0.72rem', padding: '3px 9px' }}
                 >
                   Current Month
                 </button>
@@ -1026,7 +1027,10 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                       <div className="cell-status-content">
                         {isAbsent ? (
                           <div className="absent-marker-box">
-                            <span className="badge-absent-glow">✕ ABSENT</span>
+                            <span className="status-pill-absent" title={record?.remarks || 'Absent'}>
+                              <span className="status-icon">✕</span>
+                              <span className="status-text">Absent</span>
+                            </span>
                             {record?.remarks && (
                               <span className="cell-remark-text" title={record.remarks}>
                                 {record.remarks}
@@ -1035,13 +1039,20 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                           </div>
                         ) : isPresent ? (
                           <div className="present-marker-box">
-                            <span className="badge-present-subtle">✓ Present</span>
+                            <span className="status-pill-present" title="Present (Class Attended)">
+                              <span className="status-icon">✓</span>
+                              <span className="status-text">Present</span>
+                            </span>
+                          </div>
+                        ) : isHoliday ? (
+                          <div className="holiday-marker-box">
+                            <span className="status-pill-holiday" title="Holiday / No Class">
+                              <span className="status-text">Holiday</span>
+                            </span>
                           </div>
                         ) : isSunday ? (
-                          <span className="cell-dim-label">Weekend</span>
-                        ) : (
-                          <span className="cell-dim-label">—</span>
-                        )}
+                          <span className="cell-dim-label">Sun</span>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -1052,15 +1063,15 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <div className="cal-legend-bar mt-3">
                 <div className="legend-item">
                   <span className="legend-dot dot-present" />
-                  <span>Present (Default on Class Days)</span>
+                  <span>Present (Class Attended)</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-dot dot-absent" />
-                  <span className="font-bold text-rose">Absent (Highlighted in Red)</span>
+                  <span className="font-bold text-rose">Absent (Missed Class)</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-dot dot-weekend" />
-                  <span>Sunday / Weekend</span>
+                  <span>Sunday / Off</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-dot dot-today" />
@@ -2173,163 +2184,264 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
 
         /* Calendar Layout */
         .parent-calendar-container {
-          background: rgba(11, 15, 25, 0.6);
-          border: 1px solid var(--border-subtle);
+          background: rgba(11, 15, 25, 0.75);
+          border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: var(--radius-md);
-          padding: 16px;
+          padding: 18px 16px;
+          width: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
         }
         .cal-controls-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-bottom: 12px;
+        }
+        .cal-month-nav-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
         .cal-current-month-heading {
           font-family: var(--font-heading);
-          font-size: 1.1rem;
+          font-size: 1.125rem;
           font-weight: 800;
           color: #FFF;
-          min-width: 160px;
+          min-width: 140px;
           text-align: center;
+          letter-spacing: -0.01em;
         }
         .cal-nav-btn {
-          padding: 4px 10px !important;
+          width: 32px;
+          height: 32px;
+          display: inline-flex !important;
+          align-items: center;
+          justify-content: center;
+          padding: 0 !important;
+          border-radius: var(--radius-sm);
+          background: rgba(255, 255, 255, 0.06) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          color: #F8FAFC !important;
+          cursor: pointer;
+          transition: all 0.15s ease;
         }
+        .cal-nav-btn:hover {
+          background: rgba(255, 255, 255, 0.14) !important;
+          border-color: rgba(255, 255, 255, 0.25) !important;
+        }
+        .cal-today-btn {
+          font-size: 0.72rem !important;
+          font-weight: 700 !important;
+          padding: 5px 12px !important;
+          border-radius: 9999px !important;
+          background: rgba(99, 102, 241, 0.15) !important;
+          border: 1px solid rgba(99, 102, 241, 0.35) !important;
+          color: #A5B4FC !important;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .cal-today-btn:hover {
+          background: rgba(99, 102, 241, 0.3) !important;
+          color: #FFF !important;
+        }
+
         .cal-week-grid {
           display: grid;
-          grid-template-columns: repeat(7, 1fr);
+          grid-template-columns: repeat(7, minmax(0, 1fr));
           gap: 6px;
           margin-bottom: 6px;
+          width: 100%;
+          box-sizing: border-box;
         }
         .cal-week-head {
           text-align: center;
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           font-weight: 700;
-          color: var(--text-muted);
+          color: #94A3B8;
           padding: 4px 0;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.04em;
         }
         .text-rose-head { color: #FB7185 !important; }
 
         .cal-days-grid {
           display: grid;
-          grid-template-columns: repeat(7, 1fr);
+          grid-template-columns: repeat(7, minmax(0, 1fr));
           gap: 6px;
+          width: 100%;
+          box-sizing: border-box;
         }
         .cal-cell {
-          min-height: 72px;
-          background: rgba(15, 23, 42, 0.45);
+          min-height: 62px;
+          min-width: 0;
+          background: rgba(15, 23, 42, 0.5);
           border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 8px;
-          padding: 6px 7px;
+          border-radius: 7px;
+          padding: 6px 5px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          transition: all 0.2s ease;
-        }
-        @media (max-width: 600px) {
-          .cal-cell { min-height: 56px; padding: 4px; }
+          box-sizing: border-box;
+          overflow: hidden;
+          transition: all 0.15s ease;
         }
         .cal-cell-empty {
           background: transparent;
           border-color: transparent;
+          min-height: 0;
         }
         .cell-top-bar {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 2px;
+          width: 100%;
         }
         .cell-day-number {
-          font-size: 0.8rem;
+          font-size: 0.78rem;
           font-weight: 700;
           color: #CBD5E1;
+          line-height: 1;
         }
         .today-pill {
-          background: var(--primary-500);
+          background: #6366F1;
           color: #FFF;
-          width: 22px;
-          height: 22px;
+          width: 20px;
+          height: 20px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           border-radius: 50%;
-          font-size: 0.72rem;
-          box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+          font-size: 0.7rem;
+          font-weight: 800;
+          box-shadow: 0 0 8px rgba(99, 102, 241, 0.6);
         }
         .today-badge {
-          font-size: 0.6rem;
-          color: #A5B4FC;
+          font-size: 0.55rem;
+          color: #818CF8;
           font-weight: 700;
           text-transform: uppercase;
+          letter-spacing: 0.02em;
         }
 
-        /* Absent Cell Highlight (HIGH VISIBILITY) */
+        .cell-status-content {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          justify-content: center;
+          width: 100%;
+          min-width: 0;
+        }
+
+        /* Absent Cell Highlight */
         .cell-absent {
-          background: rgba(244, 63, 94, 0.18) !important;
+          background: rgba(244, 63, 94, 0.14) !important;
           border: 1.5px solid #F43F5E !important;
-          box-shadow: 0 0 12px rgba(244, 63, 94, 0.3) !important;
+          box-shadow: 0 0 10px rgba(244, 63, 94, 0.25) !important;
         }
         .absent-marker-box {
           display: flex;
           flex-direction: column;
           gap: 2px;
-          margin-top: 2px;
+          width: 100%;
+          min-width: 0;
         }
-        .badge-absent-glow {
+        .status-pill-absent {
           background: #F43F5E;
+          border: 1px solid #FDA4AF;
           color: #FFFFFF;
-          font-size: 0.65rem;
+          font-size: 0.62rem;
           font-weight: 800;
-          padding: 2px 5px;
+          padding: 2px 4px;
           border-radius: 4px;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
           text-align: center;
-          letter-spacing: 0.02em;
-          box-shadow: 0 2px 6px rgba(244, 63, 94, 0.5);
+          box-shadow: 0 2px 6px rgba(244, 63, 94, 0.4);
+          width: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
+          white-space: nowrap;
         }
         .cell-remark-text {
-          font-size: 0.62rem;
-          color: #FECDD3;
+          font-size: 0.58rem;
+          color: #FDA4AF;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           font-style: italic;
+          text-align: center;
         }
 
         /* Present Cell */
         .cell-present {
-          background: rgba(16, 185, 129, 0.09) !important;
-          border: 1px solid rgba(16, 185, 129, 0.3) !important;
+          background: rgba(16, 185, 129, 0.07) !important;
+          border: 1px solid rgba(16, 185, 129, 0.25) !important;
         }
         .present-marker-box {
-          margin-top: 2px;
+          width: 100%;
+          min-width: 0;
         }
-        .badge-present-subtle {
-          background: rgba(16, 185, 129, 0.2);
+        .status-pill-present {
+          background: rgba(16, 185, 129, 0.15);
+          border: 1px solid rgba(16, 185, 129, 0.35);
           color: #34D399;
-          font-size: 0.65rem;
+          font-size: 0.62rem;
           font-weight: 700;
-          padding: 2px 5px;
+          padding: 2px 4px;
           border-radius: 4px;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          width: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
+          white-space: nowrap;
         }
 
-        /* Weekend / Future / No Session */
+        /* Holiday Cell */
+        .holiday-marker-box {
+          width: 100%;
+          min-width: 0;
+        }
+        .status-pill-holiday {
+          background: rgba(245, 158, 11, 0.15);
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          color: #FBBF24;
+          font-size: 0.6rem;
+          font-weight: 700;
+          padding: 2px 4px;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          box-sizing: border-box;
+          overflow: hidden;
+          white-space: nowrap;
+        }
+
+        /* Weekend / Future */
         .cell-weekend {
-          background: rgba(15, 23, 42, 0.25);
-          opacity: 0.65;
+          background: rgba(15, 23, 42, 0.22);
+          opacity: 0.55;
         }
         .cell-future {
-          background: rgba(15, 23, 42, 0.15);
-          opacity: 0.4;
+          background: rgba(15, 23, 42, 0.12);
+          opacity: 0.35;
           border-style: dashed;
         }
-        .cell-no-session {
-          background: rgba(15, 23, 42, 0.25);
-        }
         .cell-dim-label {
-          font-size: 0.62rem;
-          color: var(--text-muted);
+          font-size: 0.6rem;
+          color: #64748B;
+          text-align: center;
+          font-weight: 600;
         }
 
         /* Calendar Legend */
@@ -2337,9 +2449,10 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           display: flex;
           align-items: center;
           flex-wrap: wrap;
-          gap: 16px;
+          gap: 14px;
           padding-top: 10px;
-          border-top: 1px solid var(--border-subtle);
+          margin-top: 10px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
           font-size: 0.72rem;
           color: var(--text-secondary);
         }
@@ -2349,14 +2462,14 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           gap: 6px;
         }
         .legend-dot {
-          width: 10px;
-          height: 10px;
+          width: 9px;
+          height: 9px;
           border-radius: 3px;
         }
         .dot-present { background: #10B981; }
         .dot-absent { background: #F43F5E; box-shadow: 0 0 6px rgba(244, 63, 94, 0.6); }
-        .dot-weekend { background: rgba(255, 255, 255, 0.2); }
-        .dot-today { background: var(--primary-500); }
+        .dot-weekend { background: rgba(255, 255, 255, 0.25); }
+        .dot-today { background: #6366F1; }
 
         .attendance-grid-layout {
           display: grid;
@@ -2519,6 +2632,26 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           .bottom-menu-btn { padding: 6px 12px; font-size: 0.75rem; }
           .scorecard-details { grid-template-columns: 1fr; }
           .scorecard-marks-highlight { flex-direction: column; text-align: center; }
+
+          /* Calendar mobile optimization: prevent any horizontal blowout / Saturday clipping */
+          .portal-section-card { padding: 14px 8px !important; margin-bottom: 16px !important; }
+          .parent-calendar-container { padding: 10px 5px !important; border-radius: 8px !important; }
+          .cal-week-grid, .cal-days-grid { gap: 3px !important; }
+          .cal-cell { min-height: 48px !important; padding: 3px 2px !important; border-radius: 5px !important; }
+          .cell-day-number { font-size: 0.68rem !important; }
+          .today-pill { width: 16px !important; height: 16px !important; font-size: 0.6rem !important; }
+          .today-badge { display: none !important; }
+          .status-pill-present .status-text,
+          .status-pill-absent .status-text,
+          .status-pill-holiday .status-text { display: none !important; }
+          .status-pill-present,
+          .status-pill-absent,
+          .status-pill-holiday { padding: 1px 2px !important; justify-content: center !important; }
+          .status-icon { font-size: 0.65rem !important; line-height: 1 !important; }
+          .cal-current-month-heading { font-size: 0.95rem !important; min-width: 110px !important; }
+          .cal-nav-btn { width: 28px !important; height: 28px !important; }
+          .cal-today-btn { padding: 3px 8px !important; font-size: 0.65rem !important; }
+          .cal-legend-bar { gap: 8px 12px !important; font-size: 0.66rem !important; }
         }
       `}</style>
     </div>
