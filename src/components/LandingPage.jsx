@@ -248,8 +248,7 @@ export default function LandingPage({
             <a href="#strategy" className="nav-item">One Day One Subject</a>
             <a href="#why-choose" className="nav-item">Why Choose Us</a>
             <a href="#classes" className="nav-item">Classes 1 - 10</a>
-            <a href="#part-time-job" className="nav-item">Part Time Job</a>
-            <a href="#contact" className="nav-item">Contact</a>
+            <a href="#contact" className="nav-item">Contact &amp; Location</a>
           </nav>
 
           <div className="landing-nav-actions">
@@ -336,20 +335,6 @@ export default function LandingPage({
               <ChevronRight size={14} className="text-muted" />
             </a>
             <a 
-              href="#part-time-job" 
-              className="mobile-nav-link"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                handleOpenTeacher();
-              }}
-            >
-              <span className="flex items-center gap-2">
-                <Briefcase size={16} className="text-sky" />
-                <span>Part Time Job</span>
-              </span>
-              <ChevronRight size={14} className="text-muted" />
-            </a>
-            <a 
               href="#contact" 
               className="mobile-nav-link"
               onClick={() => setMobileMenuOpen(false)}
@@ -417,22 +402,13 @@ export default function LandingPage({
               </p>
 
               <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
-                <button
-                  type="button"
-                  onClick={handleOpenDemo}
-                  className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta cta-glow-btn"
-                >
-                  <Sparkles size={18} />
-                  <span>Enroll Your Child</span>
-                  <ArrowRight size={16} />
-                </button>
-
                 <a
                   href="#classes"
-                  className="btn btn-secondary btn-lg flex items-center gap-2"
+                  className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta cta-glow-btn"
                 >
-                  <BookOpen size={16} />
-                  <span>Classes 1 to 10</span>
+                  <BookOpen size={18} />
+                  <span>Explore Classes 1 to 10</span>
+                  <ArrowRight size={16} />
                 </a>
 
                 <a
@@ -443,7 +419,7 @@ export default function LandingPage({
                   title="Direct WhatsApp Chat"
                 >
                   <MessageCircle size={18} />
-                  <span>WhatsApp: 9848266892</span>
+                  <span>WhatsApp Inquiry: 9848266892</span>
                 </a>
               </div>
 
@@ -565,15 +541,14 @@ export default function LandingPage({
 
 
             <div className="mobile-hero-cta-cluster flex flex-col gap-2.5 mb-3">
-              <button
-                type="button"
-                onClick={handleOpenDemo}
+              <a
+                href="#classes"
                 className="btn btn-primary w-full flex items-center justify-center gap-2 py-3 cta-glow-btn font-bold text-sm"
               >
-                <Sparkles size={16} />
-                <span>Enroll Your Child</span>
+                <BookOpen size={16} />
+                <span>Explore Classes 1 to 10</span>
                 <ArrowRight size={15} />
-              </button>
+              </a>
 
               <a
                 href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
@@ -700,14 +675,14 @@ export default function LandingPage({
                   <p className="quote-sub">Building Strong Foundations for Brighter Futures — Hayagriva Tutorials, Hyderabad</p>
                 </div>
               </div>
-              <button 
-                type="button" 
-                className="btn btn-primary btn-md cta-glow-btn"
-                onClick={handleOpenDemo}
-              >
-                <Sparkles size={16} />
-                <span>Enroll Your Child Now</span>
-              </button>
+              <div className="quote-accreditation-badge flex items-center gap-2.5">
+                <span className="badge badge-warning text-xs font-bold py-1.5 px-3">
+                  ★ Admissions Open 2026–2027
+                </span>
+                <span className="text-xs text-secondary font-medium hidden sm:inline">
+                  Limited to 25 Students / Batch
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1038,7 +1013,7 @@ export default function LandingPage({
       {/* ============================================================== */}
       {/* 8. PART TIME JOB SECTION */}
       {/* ============================================================== */}
-      <section className="careers-section" id="part-time-job">
+      <section className="careers-section" id="faculty-careers">
         <div className="section-container">
           <div className="careers-banner-card glass-card">
             <div className="careers-grid">
@@ -1048,17 +1023,17 @@ export default function LandingPage({
                     <Briefcase size={18} className="text-primary" />
                   </div>
                   <span className="badge badge-primary text-xs font-bold uppercase">
-                    Part Time Teaching Jobs 2026
+                    Faculty Opportunities 2026–2027
                   </span>
                 </div>
 
                 <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-3">
-                  Looking for a Part Time Job? <br />
-                  <span className="text-gradient-primary">Teach at Hayagriva Tutorials</span>
+                  Teach with Us • <br />
+                  <span className="text-gradient-primary">Faculty Mentorship Openings</span>
                 </h2>
 
                 <p className="text-sm text-secondary leading-relaxed mb-6">
-                  We are hiring passionate tutors for <strong>part-time morning and evening teaching slots</strong> for Classes 1 to 10 across Mathematics, Physical Science, Biological Science, Social Studies, and Languages. Enjoy disciplined batches, automated teaching tools, and prompt remuneration.
+                  We welcome passionate educators for <strong>part-time morning (6:00–8:30 AM) and evening (5:00–8:30 PM) teaching slots</strong> for Classes 1 to 10 across Mathematics, Science, Social Studies, and Languages. Enjoy disciplined batches, max 25 students, and prompt remuneration.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -1068,12 +1043,12 @@ export default function LandingPage({
                     onClick={handleOpenTeacher}
                   >
                     <Briefcase size={16} />
-                    <span>Apply for Part Time Job</span>
+                    <span>Apply for Teaching Position</span>
                     <ArrowRight size={14} />
                   </button>
 
                   <a
-                    href="https://wa.me/919848266892?text=Hello%20Director,%20I%20am%20interested%20in%20a%20part%20time%20teaching%20job%20at%20Hayagriva%20Tutorials."
+                    href="https://wa.me/919848266892?text=Hello%20Director,%20I%20am%20interested%20in%20a%20faculty%20teaching%20position%20at%20Hayagriva%20Tutorials."
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-secondary btn-md flex items-center justify-center gap-2 w-full sm:w-auto text-emerald"
@@ -1087,7 +1062,7 @@ export default function LandingPage({
               <div className="careers-perks-box glass-card p-4">
                 <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Star size={16} className="text-amber" />
-                  Why Teachers Love Part-Time at Hayagriva:
+                  Why Tutors Love Teaching at Hayagriva:
                 </h4>
 
                 <div className="space-y-2.5 text-xs text-secondary">
@@ -1265,7 +1240,7 @@ export default function LandingPage({
 
             {/* Column 4: Quick Portals & Opportunities */}
             <div className="footer-col">
-              <h4 className="footer-col-title">Opportunities &amp; Staff</h4>
+              <h4 className="footer-col-title">Faculty &amp; Portals</h4>
               <div className="footer-buttons-stack">
                 <button 
                   type="button" 
@@ -1273,7 +1248,7 @@ export default function LandingPage({
                   onClick={handleOpenTeacher}
                 >
                   <Briefcase size={14} />
-                  <span>Apply: Part Time Job</span>
+                  <span>Apply as Faculty / Tutor</span>
                 </button>
                 <a 
                   href="#contact" 
@@ -1305,21 +1280,17 @@ export default function LandingPage({
 
             <div className="footer-bottom-links">
               <a 
-                href="#part-time-job" 
+                href="#faculty-careers" 
                 className="footer-bottom-link-btn"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleOpenTeacher();
-                }}
               >
-                Part Time Job
+                Careers
               </a>
               <span className="footer-dot-separator">•</span>
               <a 
                 href="#contact" 
                 className="footer-bottom-link-btn"
               >
-                Contact
+                Contact &amp; Location
               </a>
               <span className="footer-dot-separator">•</span>
               <button 
