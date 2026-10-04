@@ -20,7 +20,10 @@ import {
   ChevronDown,
   Shield,
   Info,
-  Sparkles
+  Sparkles,
+  Menu,
+  X,
+  ChevronRight
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -38,6 +41,7 @@ export default function Navbar({
   onLogout 
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
   // Close profile dropdown when clicking outside
@@ -54,6 +58,29 @@ export default function Navbar({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [profileMenuOpen]);
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
+
+  // Close sidebar on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sidebarOpen]);
 
   const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
@@ -73,17 +100,29 @@ export default function Navbar({
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
-        {/* Brand Logo & Name (Left) */}
-        <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
-          <div className="brand-logo-box">
-            <HayagrivaLogo size={36} showGlow={true} />
-          </div>
-          <div className="brand-text">
-            <div className="brand-title">
-              <span>HAYAGRIVA TUTORIALS</span>
-              <span className="brand-tag">Class 1 to X</span>
+        {/* Brand Logo & Name (Left) + Mobile Sidebar Hamburger Toggle */}
+        <div className="navbar-brand-group">
+          <button 
+            type="button" 
+            className="mobile-sidebar-toggle-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open Navigation Sidebar"
+            title="Open navigation menu"
+          >
+            <Menu size={20} />
+          </button>
+
+          <div className="navbar-brand" onClick={() => currentUser?.role !== USER_ROLES.PARENT && setActiveTab('dashboard')}>
+            <div className="brand-logo-box">
+              <HayagrivaLogo size={36} showGlow={true} />
             </div>
-            <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
+            <div className="brand-text">
+              <div className="brand-title">
+                <span>HAYAGRIVA TUTORIALS</span>
+                <span className="brand-tag">Class 1 to X</span>
+              </div>
+              <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
+            </div>
           </div>
         </div>
 
@@ -269,6 +308,159 @@ export default function Navbar({
         </div>
       </div>
 
+      {/* Mobile Off-Canvas Navigation Sidebar & Backdrop Overlay */}
+      <div 
+        className={`mobile-sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden={!sidebarOpen}
+      />
+
+      <aside 
+        className={`mobile-nav-sidebar ${sidebarOpen ? 'open' : ''}`}
+        aria-label="Mobile Navigation Sidebar"
+        aria-hidden={!sidebarOpen}
+      >
+        {/* Sidebar Header */}
+        <div className="sidebar-drawer-header">
+          <div className="sidebar-drawer-brand">
+            <HayagrivaLogo size={32} showGlow={true} />
+            <div className="sidebar-drawer-title-wrap">
+              <div className="sidebar-drawer-title">HAYAGRIVA TUTORIALS</div>
+              <div className="sidebar-drawer-subtitle">Academy Portal • Class 1–X</div>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            className="sidebar-close-btn"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close navigation sidebar"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* User Profile Card */}
+        {currentUser && (
+          <div className="sidebar-user-card">
+            <div className="sidebar-user-avatar">
+              {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={20} className="text-primary" />}
+              {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={20} className="text-emerald" />}
+              {currentUser.role === USER_ROLES.PARENT && <Users size={20} className="text-amber" />}
+            </div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{currentUser.name}</div>
+              <div className="sidebar-user-meta">
+                <span className={`user-role-tag role-${currentUser.role?.toLowerCase()}`}>
+                  {currentUser.role}
+                </span>
+                <span className="sidebar-live-pill">
+                  <Radio size={10} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
+                  <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Realtime Cloud') : 'Local'}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Navigation Tab Links */}
+        <div className="sidebar-nav-container">
+          <div className="sidebar-section-label">Academy Navigation</div>
+          <nav className="sidebar-nav-list" role="tablist">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSidebarOpen(false);
+                  }}
+                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <div className="sidebar-item-left">
+                    <span className="sidebar-item-icon-wrap">
+                      <Icon size={18} />
+                    </span>
+                    <span className="sidebar-item-label">{item.label}</span>
+                  </div>
+                  {isActive ? (
+                    <span className="sidebar-active-pill">Active</span>
+                  ) : (
+                    <ChevronRight size={15} className="sidebar-item-arrow" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Admin Management Shortcuts */}
+          {currentUser?.role === USER_ROLES.ADMIN && (
+            <>
+              <div className="sidebar-section-label mt-4">Management &amp; Controls</div>
+              <div className="sidebar-admin-tools">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    onOpenInquiries();
+                  }}
+                  className="sidebar-tool-btn"
+                >
+                  <div className="sidebar-item-left">
+                    <span className="sidebar-item-icon-wrap text-amber">
+                      <Sparkles size={17} />
+                    </span>
+                    <span className="sidebar-item-label">Website Leads &amp; Demos</span>
+                  </div>
+                  {inquiriesCount > 0 ? (
+                    <span className="sidebar-leads-badge">{inquiriesCount} new</span>
+                  ) : (
+                    <ChevronRight size={15} className="sidebar-item-arrow" />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    onOpenSettings();
+                  }}
+                  className="sidebar-tool-btn"
+                >
+                  <div className="sidebar-item-left">
+                    <span className="sidebar-item-icon-wrap">
+                      <Settings size={17} />
+                    </span>
+                    <span className="sidebar-item-label">System &amp; DB Settings</span>
+                  </div>
+                  <ChevronRight size={15} className="sidebar-item-arrow" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="sidebar-drawer-footer">
+          <button
+            type="button"
+            className="sidebar-logout-btn"
+            onClick={() => {
+              setSidebarOpen(false);
+              onLogout();
+            }}
+          >
+            <LogOut size={16} />
+            <span>Sign Out ({currentUser?.name?.split(' ')[0] || 'User'})</span>
+          </button>
+          <div className="sidebar-footer-note">
+            Classes 1 to 10 Tuition Academy • Hayagriva
+          </div>
+        </div>
+      </aside>
+
       <style>{`
         .navbar-container {
           background: rgba(17, 24, 39, 0.94);
@@ -294,6 +486,16 @@ export default function Navbar({
           width: 100%;
           min-width: 0;
         }
+        .navbar-brand-group {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+          order: 1;
+        }
+        .mobile-sidebar-toggle-btn {
+          display: none;
+        }
         .navbar-brand {
           display: flex;
           align-items: center;
@@ -301,7 +503,6 @@ export default function Navbar({
           cursor: pointer;
           user-select: none;
           flex-shrink: 0;
-          order: 1;
         }
         .brand-logo-box {
           display: flex;
@@ -621,20 +822,310 @@ export default function Navbar({
           background: rgba(244, 63, 94, 0.1);
         }
 
+        /* ============================================================== */
+        /* MOBILE OFF-CANVAS SIDEBAR & OVERLAY                            */
+        /* ============================================================== */
+        .mobile-sidebar-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(7, 11, 20, 0.76);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          z-index: 9998;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.28s ease;
+        }
+        .mobile-sidebar-overlay.open {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .mobile-nav-sidebar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: 300px;
+          max-width: 86vw;
+          background: #0B1120;
+          background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%);
+          border-right: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 10px 0 40px rgba(0, 0, 0, 0.75);
+          z-index: 9999;
+          transform: translateX(-100%);
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .mobile-nav-sidebar.open {
+          transform: translateX(0);
+        }
+
+        .sidebar-drawer-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 16px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .sidebar-drawer-brand {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .sidebar-drawer-title-wrap {
+          display: flex;
+          flex-direction: column;
+        }
+        .sidebar-drawer-title {
+          font-size: 0.92rem;
+          font-weight: 800;
+          letter-spacing: 0.03em;
+          color: #F8FAFC;
+          font-family: var(--font-heading);
+          white-space: nowrap;
+        }
+        .sidebar-drawer-subtitle {
+          font-size: 0.68rem;
+          color: #94A3B8;
+        }
+        .sidebar-close-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #94A3B8;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+        .sidebar-close-btn:hover {
+          background: rgba(239, 68, 68, 0.15);
+          border-color: rgba(239, 68, 68, 0.4);
+          color: #F87171;
+        }
+
+        .sidebar-user-card {
+          margin: 12px 14px 4px 14px;
+          padding: 12px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .sidebar-user-avatar {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .sidebar-user-info {
+          min-width: 0;
+          flex: 1;
+        }
+        .sidebar-user-name {
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: #F8FAFC;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .sidebar-user-meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+          flex-wrap: wrap;
+        }
+        .sidebar-live-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.65rem;
+          color: #94A3B8;
+        }
+
+        .sidebar-nav-container {
+          flex: 1;
+          overflow-y: auto;
+          padding: 14px;
+          -webkit-overflow-scrolling: touch;
+        }
+        .sidebar-section-label {
+          font-size: 0.675rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: #64748B;
+          margin-bottom: 8px;
+          padding-left: 6px;
+        }
+        .sidebar-nav-list,
+        .sidebar-admin-tools {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .sidebar-nav-item,
+        .sidebar-tool-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 12px;
+          border-radius: 8px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: #94A3B8;
+          cursor: pointer;
+          font-size: 0.825rem;
+          font-weight: 500;
+          transition: all 0.18s ease;
+          text-align: left;
+        }
+        .sidebar-nav-item:hover,
+        .sidebar-tool-btn:hover {
+          background: rgba(255, 255, 255, 0.05);
+          color: #F8FAFC;
+          border-color: rgba(255, 255, 255, 0.08);
+        }
+        .sidebar-nav-item.active {
+          background: rgba(99, 102, 241, 0.16);
+          border-color: rgba(99, 102, 241, 0.4);
+          color: #A5B4FC;
+          font-weight: 600;
+          box-shadow: 0 0 16px rgba(99, 102, 241, 0.12);
+        }
+        .sidebar-item-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .sidebar-item-icon-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .sidebar-nav-item.active .sidebar-item-icon-wrap {
+          color: #818CF8;
+        }
+        .sidebar-item-label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .sidebar-active-pill {
+          font-size: 0.65rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          background: rgba(99, 102, 241, 0.3);
+          color: #C7D2FE;
+          padding: 2px 7px;
+          border-radius: 9999px;
+        }
+        .sidebar-item-arrow {
+          color: #475569;
+        }
+        .sidebar-leads-badge {
+          background: #F43F5E;
+          color: #FFF;
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 9999px;
+          box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
+        }
+
+        .sidebar-drawer-footer {
+          padding: 14px 16px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .sidebar-logout-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 10px;
+          border-radius: 8px;
+          background: rgba(244, 63, 94, 0.1);
+          border: 1px solid rgba(244, 63, 94, 0.3);
+          color: #FB7185;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .sidebar-logout-btn:hover {
+          background: rgba(244, 63, 94, 0.2);
+          border-color: rgba(244, 63, 94, 0.5);
+          color: #FDA4AF;
+        }
+        .sidebar-footer-note {
+          text-align: center;
+          font-size: 0.65rem;
+          color: #64748B;
+          margin-top: 8px;
+        }
+
         /* Mobile & Tablet Responsive Layout */
         @media (max-width: 960px) {
           .navbar-inner {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            grid-template-areas:
-              "brand actions"
-              "links links";
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 10px !important;
+            padding: 8px 12px !important;
+          }
+          .mobile-sidebar-toggle-btn {
+            display: flex !important;
             align-items: center;
-            gap: 6px 10px;
-            padding: 8px 12px;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #E2E8F0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+          }
+          .mobile-sidebar-toggle-btn:hover,
+          .mobile-sidebar-toggle-btn:active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.5);
+            color: #A5B4FC;
+          }
+          /* Eliminate horizontal scrolling navigation row completely on mobile */
+          .navbar-links {
+            display: none !important;
+          }
+          .navbar-brand-group {
+            min-width: 0;
+            gap: 8px;
           }
           .navbar-brand {
-            grid-area: brand;
             min-width: 0;
             gap: 8px;
           }
@@ -642,7 +1133,7 @@ export default function Navbar({
             flex-shrink: 0;
           }
           .brand-title {
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -654,35 +1145,29 @@ export default function Navbar({
             display: none;
           }
           .navbar-actions {
-            grid-area: actions;
             display: flex;
             align-items: center;
             gap: 6px;
             flex-shrink: 0;
-            justify-self: end;
-          }
-          .navbar-links {
-            grid-area: links;
-            width: 100%;
-            padding: 4px 0 2px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            overflow-x: auto;
           }
           .btn-label-text { display: none; }
           .user-badge-name { display: none; }
           .db-settings-btn, .logout-nav-btn {
             padding: 6px 8px;
           }
-          .nav-tab-btn {
-            padding: 6px 10px;
-            font-size: 0.775rem;
-          }
         }
 
         @media (max-width: 480px) {
           .navbar-inner {
-            padding: 6px 10px;
-            gap: 4px 6px;
+            padding: 6px 10px !important;
+            gap: 6px !important;
+          }
+          .mobile-sidebar-toggle-btn {
+            width: 34px;
+            height: 34px;
+          }
+          .navbar-brand-group {
+            gap: 6px;
           }
           .navbar-brand {
             gap: 6px;
