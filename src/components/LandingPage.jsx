@@ -1208,11 +1208,10 @@ export default function LandingPage({
             <div className="footer-col">
               <h4 className="footer-col-title">Academic Wings</h4>
               <ul className="footer-links-list">
-                <li><a href="#batches" className="footer-nav-link"><span className="footer-link-bullet">›</span> Primary Wing (Classes 1–5)</a></li>
-                <li><a href="#batches" className="footer-nav-link"><span className="footer-link-bullet">›</span> Middle Wing (Classes 6–8)</a></li>
-                <li><a href="#batches" className="footer-nav-link"><span className="footer-link-bullet">›</span> High School (Classes 9–10 SSC &amp; CBSE)</a></li>
-                <li><a href="#features" className="footer-nav-link"><span className="footer-link-bullet">›</span> Special Focus on Mathematics</a></li>
-                <li><a href="#features" className="footer-nav-link"><span className="footer-link-bullet">›</span> Concept-Based Science Lab</a></li>
+                <li><a href="#classes" className="footer-nav-link"><span className="footer-link-bullet">›</span> Primary Wing (Classes 1–5)</a></li>
+                <li><a href="#classes" className="footer-nav-link"><span className="footer-link-bullet">›</span> Middle Wing (Classes 6–8)</a></li>
+                <li><a href="#classes" className="footer-nav-link"><span className="footer-link-bullet">›</span> High School (Classes 9–10 SSC &amp; CBSE)</a></li>
+                <li><a href="#strategy" className="footer-nav-link"><span className="footer-link-bullet">›</span> Special Focus on Mathematics</a></li>
               </ul>
             </div>
 
@@ -1238,7 +1237,7 @@ export default function LandingPage({
                 </li>
                 <li className="footer-perk-item">
                   <CheckCircle2 size={13} className="footer-icon-emerald" />
-                  <span>Air-Conditioned &amp; CCTV Secured</span>
+                  <span>24/7 CCTV Camera Monitored</span>
                 </li>
               </ul>
             </div>
