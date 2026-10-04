@@ -72,7 +72,7 @@ export default function LandingPage({
       category: 'REVOLUTIONARY FRAMEWORK',
       title: 'The "One Day, One Subject" Rule',
       subtitle: '1.5 to 2 Hours Deep Immersion Every Evening',
-      description: 'Zero cognitive fatigue. 100% concept retention by dedicating each weekday to one subject deeply with 1-on-1 doubt clearing.',
+      description: 'Zero cognitive fatigue. 100% concept retention: Mon (English), Tue (General Science), Wed (Telugu), Thu (Social), Fri (Mathematics) & Sat (Weekly Test).',
       badgeText: '🎯 100% Retention',
       badgeColor: 'emerald',
       metricNumber: '25 Max',
@@ -244,8 +244,8 @@ export default function LandingPage({
 
           <nav className="landing-nav-links">
             <a href="#showcase" className="nav-item">Academy Showcase</a>
-            <a href="#we-offer" className="nav-item highlight-nav">We Offer</a>
-            <a href="#strategy" className="nav-item">One Day One Subject</a>
+            <a href="#strategy" className="nav-item highlight-nav">One Day One Subject</a>
+            <a href="#we-offer" className="nav-item">We Offer</a>
             <a href="#why-choose" className="nav-item">Why Choose Us</a>
             <a href="#classes" className="nav-item">Classes 1 - 10</a>
             <a href="#contact" className="nav-item">Contact &amp; Location</a>
@@ -300,22 +300,22 @@ export default function LandingPage({
               <ChevronRight size={14} className="text-muted" />
             </a>
             <a 
-              href="#we-offer" 
+              href="#strategy" 
               className="mobile-nav-link strategy-highlight"
               onClick={() => setMobileMenuOpen(false)}
             >
               <span className="flex items-center gap-2">
                 <Zap size={16} className="text-amber" />
-                <span>5 Core Offerings</span>
+                <span>One Day, One Subject Timetable</span>
               </span>
-              <span className="badge badge-warning text-3xs">Pillars</span>
+              <span className="badge badge-warning text-3xs">Daily Focus</span>
             </a>
             <a 
-              href="#strategy" 
+              href="#we-offer" 
               className="mobile-nav-link"
               onClick={() => setMobileMenuOpen(false)}
             >
-              <span>One Day, One Subject Strategy</span>
+              <span>5 Core Offerings</span>
               <ChevronRight size={14} className="text-muted" />
             </a>
             <a 
@@ -435,8 +435,17 @@ export default function LandingPage({
                 </div>
                 <div className="trust-badge-item">
                   <Award size={16} className="text-amber" />
-                  <span>Weekly Slip Tests</span>
+                  <span>Saturday Weekly Tests</span>
                 </div>
+                <a 
+                  href="#strategy" 
+                  className="trust-badge-item" 
+                  style={{ background: 'rgba(245, 158, 11, 0.12)', borderColor: 'rgba(245, 158, 11, 0.35)', color: '#FCD34D', textDecoration: 'none' }}
+                  title="View Weekly Subject Rotation"
+                >
+                  <Calendar size={15} className="text-amber" />
+                  <span>Mon (Eng) • Tue (Sci) • Wed (Tel) • Thu (Soc) • Fri (Math) • Sat (Test)</span>
+                </a>
               </div>
             </div>
           </div>
@@ -564,14 +573,101 @@ export default function LandingPage({
             <div className="mobile-trust-chips-row">
               <div className="mobile-chip">✓ Classes 1–10</div>
               <div className="mobile-chip">📹 CCTV Monitored</div>
-              <div className="mobile-chip">🏆 Weekly Tests</div>
+              <div className="mobile-chip">🏆 Saturday Weekly Tests</div>
+              <a href="#strategy" className="mobile-chip" style={{ color: '#FCD34D', textDecoration: 'none' }}>
+                📅 Mon–Sat Subject Rotation
+              </a>
             </div>
           </div>
         </div>
       </section>
 
       {/* ============================================================== */}
-      {/* 3. "WE OFFER" 5 CORE PILLARS (DIRECT FROM OFFICIAL BROCHURE) */}
+      {/* 3. "ONE DAY, ONE SUBJECT" WEEKLY TIMETABLE MATRIX */}
+      {/* ============================================================== */}
+      <section className="weekly-timetable-section" id="strategy">
+        <div className="section-container">
+          <div className="section-header-center text-center mb-8">
+            <span className="section-pill-tag bg-amber-soft text-amber">
+              <Zap size={13} className="inline mr-1 text-amber-400" />
+              Signature Academic Framework
+            </span>
+            <h2 className="section-heading-lg">
+              The <span className="text-gradient-gold">"One Day, One Subject"</span> Weekly Rotation
+            </h2>
+            <p className="section-sub-text">
+              Why rush through 4 subjects in 2 hours superficially when your child can master 1 subject deeply every evening?
+            </p>
+          </div>
+
+          <div className="timetable-master-card glass-card">
+            <div className="timetable-header flex items-center justify-between flex-wrap gap-3 mb-5">
+              <div>
+                <span className="badge badge-primary text-3xs font-mono uppercase mb-1">Standard Timetable (Classes 1 to 10)</span>
+                <h4 className="text-base md:text-lg font-bold text-white">Focused Subject Rotation Strategy</h4>
+              </div>
+              <div className="timetable-timings-pill flex items-center gap-2">
+                <Clock size={14} className="text-amber" />
+                <span>Morning: 6:00–8:30 AM | Evening: 5:00–8:30 PM</span>
+              </div>
+            </div>
+
+            <div className="timetable-days-grid">
+              <div className="schedule-day-box day-mon">
+                <div className="day-name">MONDAY</div>
+                <div className="subject-icon">📚</div>
+                <div className="subject-name">English</div>
+                <p className="subject-desc">Grammar rules, prose &amp; poetry comprehension, vocabulary building &amp; error-free writing</p>
+              </div>
+
+              <div className="schedule-day-box day-tue">
+                <div className="day-name">TUESDAY</div>
+                <div className="subject-icon">🔬</div>
+                <div className="subject-name">General Science</div>
+                <p className="subject-desc">Physics principles, Chemistry reactions &amp; Biology life processes with visual concept clarity</p>
+              </div>
+
+              <div className="schedule-day-box day-wed">
+                <div className="day-name">WEDNESDAY</div>
+                <div className="subject-icon">✍️</div>
+                <div className="subject-name">Telugu</div>
+                <p className="subject-desc">Telugu Vyakaranam (grammar), sandhulu, samasalu, poem recitation &amp; neat presentation</p>
+              </div>
+
+              <div className="schedule-day-box day-thu">
+                <div className="day-name">THURSDAY</div>
+                <div className="subject-icon">🌍</div>
+                <div className="subject-name">Social Studies</div>
+                <p className="subject-desc">History timelines, Geography map pointing, Civics, Economics &amp; structured point-wise answers</p>
+              </div>
+
+              <div className="schedule-day-box day-fri">
+                <div className="day-name">FRIDAY</div>
+                <div className="subject-icon">📐</div>
+                <div className="subject-name">Mathematics</div>
+                <p className="subject-desc">Foundational arithmetic, Pre-Algebra, Geometry theorems, formula mastery &amp; problem sets</p>
+              </div>
+
+              <div className="schedule-day-box day-sat highlight-test">
+                <div className="day-name text-amber-400">SATURDAY</div>
+                <div className="subject-icon">📝</div>
+                <div className="subject-name text-amber-300">Weekly Test</div>
+                <p className="subject-desc">Comprehensive weekly slip test evaluating Monday–Friday topics with instant WhatsApp report</p>
+              </div>
+
+              <div className="schedule-day-box day-sun highlight-doubt">
+                <div className="day-name text-emerald-400">SUNDAY</div>
+                <div className="subject-icon">🎯</div>
+                <div className="subject-name text-emerald-300">Doubt Clarification</div>
+                <p className="subject-desc">1-on-1 personalized mentoring for slow learners, revision of weak topics &amp; board exam prep</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================== */}
+      {/* 4. "WE OFFER" 5 CORE PILLARS (DIRECT FROM OFFICIAL BROCHURE) */}
       {/* ============================================================== */}
       <section className="we-offer-master-section" id="we-offer">
         <div className="section-container">
@@ -775,89 +871,7 @@ export default function LandingPage({
         </div>
       </section>
 
-      {/* ============================================================== */}
-      {/* 5. "ONE DAY, ONE SUBJECT" WEEKLY TIMETABLE MATRIX */}
-      {/* ============================================================== */}
-      <section className="weekly-timetable-section" id="strategy">
-        <div className="section-container">
-          <div className="section-header-center text-center mb-8">
-            <span className="section-pill-tag bg-amber-soft text-amber">
-              <Zap size={13} className="inline mr-1 text-amber-400" />
-              Signature Academic Framework
-            </span>
-            <h2 className="section-heading-lg">
-              The <span className="text-gradient-gold">"One Day, One Subject"</span> Weekly Rotation
-            </h2>
-            <p className="section-sub-text">
-              Why rush through 4 subjects in 2 hours superficially when your child can master 1 subject deeply every evening?
-            </p>
-          </div>
 
-          <div className="timetable-master-card glass-card">
-            <div className="timetable-header flex items-center justify-between flex-wrap gap-3 mb-5">
-              <div>
-                <span className="badge badge-primary text-3xs font-mono uppercase mb-1">Standard Timetable (Classes 1 to 10)</span>
-                <h4 className="text-base md:text-lg font-bold text-white">Focused Subject Rotation Strategy</h4>
-              </div>
-              <div className="timetable-timings-pill flex items-center gap-2">
-                <Clock size={14} className="text-amber" />
-                <span>Morning: 6:00–8:30 AM | Evening: 5:00–8:30 PM</span>
-              </div>
-            </div>
-
-            <div className="timetable-days-grid">
-              <div className="schedule-day-box day-mon">
-                <div className="day-name">MONDAY</div>
-                <div className="subject-icon">📐</div>
-                <div className="subject-name">Mathematics</div>
-                <p className="subject-desc">Concept building, formula proofs, Pre-Algebra, speed arithmetic &amp; textbook problem sets</p>
-              </div>
-
-              <div className="schedule-day-box day-tue">
-                <div className="day-name">TUESDAY</div>
-                <div className="subject-icon">⚡</div>
-                <div className="subject-name">Physical Science</div>
-                <p className="subject-desc">Physics laws, numericals, Chemistry chemical equations, derivations &amp; reasoning</p>
-              </div>
-
-              <div className="schedule-day-box day-wed">
-                <div className="day-name">WEDNESDAY</div>
-                <div className="subject-icon">🔬</div>
-                <div className="subject-name">Biological Science</div>
-                <p className="subject-desc">Life processes, Botany &amp; Zoology, organ diagrams &amp; technical terminology</p>
-              </div>
-
-              <div className="schedule-day-box day-thu">
-                <div className="day-name">THURSDAY</div>
-                <div className="subject-icon">🌍</div>
-                <div className="subject-name">Social Studies</div>
-                <p className="subject-desc">History timelines, Geography map pointing, Civics, Economics &amp; point-wise answers</p>
-              </div>
-
-              <div className="schedule-day-box day-fri">
-                <div className="day-name">FRIDAY</div>
-                <div className="subject-icon">📖</div>
-                <div className="subject-name">Languages &amp; Grammar</div>
-                <p className="subject-desc">English grammar rules, comprehension, handwriting &amp; Second Language (Telugu/Hindi)</p>
-              </div>
-
-              <div className="schedule-day-box day-sat highlight-test">
-                <div className="day-name text-amber-400">SATURDAY</div>
-                <div className="subject-icon">📝</div>
-                <div className="subject-name text-amber-300">Weekly Slip Test</div>
-                <p className="subject-desc">Evaluation of the week's covered topics with instant percentage &amp; WhatsApp reports</p>
-              </div>
-
-              <div className="schedule-day-box day-sun highlight-doubt">
-                <div className="day-name text-emerald-400">SUNDAY</div>
-                <div className="subject-icon">🎯</div>
-                <div className="subject-name text-emerald-300">Doubt Clarification</div>
-                <p className="subject-desc">1-on-1 tutoring for slow learners, revision of weak topics &amp; board exam prep</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* ============================================================== */}
       {/* 6. CLASSES 1 TO 10 CURRICULUM WINGS */}
