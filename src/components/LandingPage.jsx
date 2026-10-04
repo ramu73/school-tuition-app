@@ -874,7 +874,7 @@ export default function LandingPage({
             <span className="section-pill-tag">Comprehensive Programs</span>
             <h2 className="section-heading-lg">Coaching for Classes 1 to 10</h2>
             <p className="section-sub-text">
-              Structured curriculum designed for State Board (SSC) and CBSE syllabi with evening batch options (4:00–6:00 PM &amp; 6:00–8:00 PM).
+              Structured coaching for State Board (SSC) and CBSE students with two convenient evening batches (4:00–6:00 PM &amp; 6:00–8:00 PM).
             </p>
           </div>
 
