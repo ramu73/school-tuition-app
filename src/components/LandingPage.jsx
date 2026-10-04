@@ -152,9 +152,9 @@ export default function LandingPage({
       tag: 'Personal Mentoring',
       image: '/showcase/math-coaching.jpg',
       heading: 'Understanding Each Child\'s Unique Learning Pace',
-      desc: 'No student gets left behind in large, chaotic rooms. We strictly cap class size at max 25 students, ensuring every child receives direct attention from the tutor.',
+      desc: 'No student gets left behind in large, chaotic rooms. We strictly cap class size at max 20 students, ensuring every child receives direct attention from the tutor.',
       benefits: [
-        'Strict batch limit of max 25 students for personalized care',
+        'Strict batch limit of max 20 students for personalized care',
         'Active monitoring of every student\'s classroom notebook',
         'Personalized Child Improvement Plans generated monthly',
         'Identifies strengths and resolves specific weak areas early'
@@ -766,7 +766,7 @@ export default function LandingPage({
                   ★ Admissions Open 2026–2027
                 </span>
                 <span className="text-xs text-secondary font-medium hidden sm:inline">
-                  Limited to 25 Students / Batch
+                  Limited to 20 Students / Batch
                 </span>
               </div>
             </div>
@@ -1039,7 +1039,7 @@ export default function LandingPage({
                 </h2>
 
                 <p className="text-sm text-secondary leading-relaxed mb-6">
-                  We welcome passionate educators for <strong>part-time evening teaching slots (4:00 PM – 6:00 PM &amp; 6:00 PM – 8:00 PM)</strong> for Classes 1 to 10 across Mathematics, Science, Social Studies, and Languages. Enjoy disciplined batches, max 25 students, and prompt remuneration.
+                  We welcome passionate educators for <strong>part-time evening teaching slots (4:00 PM – 6:00 PM &amp; 6:00 PM – 8:00 PM)</strong> for Classes 1 to 10 across Mathematics, Science, Social Studies, and Languages. Enjoy disciplined batches, max 20 students, and prompt remuneration.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -1075,7 +1075,7 @@ export default function LandingPage({
                   <div className="flex items-start gap-2">
                     <div className="perk-check">✓</div>
                     <div>
-                      <strong className="text-white">Strict Batch Limit:</strong> Max 25 students per class.
+                      <strong className="text-white">Strict Batch Limit:</strong> Max 20 students per class.
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
@@ -1087,7 +1087,7 @@ export default function LandingPage({
                   <div className="flex items-start gap-2">
                     <div className="perk-check">✓</div>
                     <div>
-                      <strong className="text-white">Flexible Schedules:</strong> Morning or evening batch slots.
+                      <strong className="text-white">Flexible Schedules:</strong> Evening batch slots (4–6 PM &amp; 6–8 PM).
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
@@ -1225,7 +1225,7 @@ export default function LandingPage({
                 </li>
                 <li className="footer-perk-item">
                   <CheckCircle2 size={13} className="footer-icon-emerald" />
-                  <span>Strict Limit: Max 25 Students/Batch</span>
+                  <span>Strict Limit: Max 20 Students/Batch</span>
                 </li>
                 <li className="footer-perk-item">
                   <CheckCircle2 size={13} className="footer-icon-emerald" />
