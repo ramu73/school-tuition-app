@@ -248,29 +248,33 @@ export default function LandingPage({
             <a href="#strategy" className="nav-item">One Day One Subject</a>
             <a href="#why-choose" className="nav-item">Why Choose Us</a>
             <a href="#classes" className="nav-item">Classes 1 - 10</a>
+            <a href="#part-time-job" className="nav-item">Part Time Job</a>
             <a href="#contact" className="nav-item">Contact</a>
           </nav>
 
           <div className="landing-nav-actions">
-            {/* Desktop Only Login Button */}
+            {/* The Dedicated Single Place for Parental Login */}
             <button
               type="button"
-              className="btn btn-secondary btn-sm nav-login-btn desktop-only-btn flex items-center gap-1.5"
+              className="nav-action-parental-login"
               onClick={handleOpenParentLogin}
-              title="Parent / Student Portal Login"
+              title="Parental Login"
             >
-              <LogIn size={15} className="text-primary" />
-              <span>Portal Login</span>
+              <UserCheck size={14} className="text-emerald" />
+              <span className="nav-btn-text-full">Parental Login</span>
+              <span className="nav-btn-text-short">Parent</span>
             </button>
 
-            {/* Compact High-Impact Demo Button */}
+            {/* The Dedicated Single Place for Book Free Demo */}
             <button
               type="button"
-              className="btn btn-primary btn-sm nav-demo-btn flex items-center gap-1.5 cta-glow-btn"
+              className="nav-action-demo-btn cta-glow-btn"
               onClick={handleOpenDemo}
+              title="Book Free Demo"
             >
-              <Sparkles size={14} />
-              <span>Free Demo</span>
+              <Sparkles size={13} />
+              <span className="nav-btn-text-full">Book Free Demo</span>
+              <span className="nav-btn-text-short">Free Demo</span>
             </button>
 
             {/* Mobile Hamburger Toggle */}
@@ -332,7 +336,7 @@ export default function LandingPage({
               <ChevronRight size={14} className="text-muted" />
             </a>
             <a 
-              href="#careers" 
+              href="#part-time-job" 
               className="mobile-nav-link"
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -341,7 +345,7 @@ export default function LandingPage({
             >
               <span className="flex items-center gap-2">
                 <Briefcase size={16} className="text-sky" />
-                <span>Faculty Careers</span>
+                <span>Part Time Job</span>
               </span>
               <ChevronRight size={14} className="text-muted" />
             </a>
@@ -363,8 +367,8 @@ export default function LandingPage({
                   handleOpenParentLogin();
                 }}
               >
-                <LogIn size={14} className="text-primary" />
-                <span>Portal Login</span>
+                <UserCheck size={14} className="text-emerald" />
+                <span>Parental Login</span>
               </button>
 
               <button
@@ -376,7 +380,7 @@ export default function LandingPage({
                 }}
               >
                 <Sparkles size={14} />
-                <span>Book Demo</span>
+                <span>Book Free Demo</span>
               </button>
             </div>
           </div>
@@ -413,24 +417,14 @@ export default function LandingPage({
               </p>
 
               <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta"
-                  onClick={handleOpenDemo}
+                <a
+                  href="#classes"
+                  className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta cta-glow-btn"
                 >
-                  <Sparkles size={18} />
-                  <span>Book Free 2-Day Trial Demo</span>
+                  <BookOpen size={18} />
+                  <span>Explore Classes 1 to 10</span>
                   <ArrowRight size={16} />
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-lg flex items-center gap-2"
-                  onClick={handleOpenParentLogin}
-                >
-                  <UserCheck size={18} className="text-emerald" />
-                  <span>Parent Portal Login</span>
-                </button>
+                </a>
 
                 <a
                   href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
@@ -560,25 +554,6 @@ export default function LandingPage({
               Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics</strong>, our signature <strong>"One Day, One Subject"</strong> framework, and <strong>weekly WhatsApp reports</strong>.
             </p>
 
-            <div className="mobile-actions-grid">
-              <button
-                type="button"
-                className="btn btn-primary btn-md flex items-center justify-center gap-2 cta-glow-btn w-full"
-                onClick={handleOpenDemo}
-              >
-                <Sparkles size={16} />
-                <span>Book Free Demo</span>
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-secondary btn-md flex items-center justify-center gap-2 w-full"
-                onClick={handleOpenParentLogin}
-              >
-                <UserCheck size={16} className="text-emerald" />
-                <span>Parent Portal</span>
-              </button>
-            </div>
 
             <a
               href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
@@ -798,25 +773,6 @@ export default function LandingPage({
                   <p className="quote-italic">{featureShowcaseTabs[activeFeatureTab].quote}</p>
                 </div>
 
-                <div className="feature-cta-row flex items-center gap-3 mt-5">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-md cta-glow-btn flex items-center gap-2"
-                    onClick={handleOpenDemo}
-                  >
-                    <Sparkles size={16} />
-                    <span>Free Demo</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-md flex items-center gap-2"
-                    onClick={handleOpenParentLogin}
-                  >
-                    <UserCheck size={16} className="text-emerald" />
-                    <span>Parent Portal</span>
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -934,13 +890,10 @@ export default function LandingPage({
                 <li><CheckCircle2 size={15} className="text-emerald" /> English Grammar, Reading &amp; Handwriting</li>
                 <li><CheckCircle2 size={15} className="text-emerald" /> Hindi &amp; Telugu Language Foundations</li>
               </ul>
-              <button 
-                type="button" 
-                className="btn btn-secondary w-full text-xs mt-4"
-                onClick={handleOpenDemo}
-              >
-                Book Class 1-5 Demo
-              </button>
+              <div className="tier-tag-pill mt-4">
+                <CheckCircle2 size={13} className="text-emerald" />
+                <span>State Board &amp; CBSE Aligned</span>
+              </div>
             </div>
 
             {/* Middle Wing */}
@@ -956,13 +909,10 @@ export default function LandingPage({
                 <li><CheckCircle2 size={15} className="text-emerald" /> Social Studies &amp; Conceptual Geography</li>
                 <li><CheckCircle2 size={15} className="text-emerald" /> Saturday Chapter Slip Tests</li>
               </ul>
-              <button 
-                type="button" 
-                className="btn btn-secondary w-full text-xs mt-4"
-                onClick={handleOpenDemo}
-              >
-                Book Class 6-8 Demo
-              </button>
+              <div className="tier-tag-pill mt-4">
+                <CheckCircle2 size={13} className="text-emerald" />
+                <span>Concept Immersion &amp; Weekly Tests</span>
+              </div>
             </div>
 
             {/* High School Board */}
@@ -979,13 +929,10 @@ export default function LandingPage({
                 <li><CheckCircle2 size={15} className="text-emerald" /> 10+ Pre-Final Mock Exams &amp; Model Papers</li>
                 <li><CheckCircle2 size={15} className="text-emerald" /> Time-Management &amp; Answer Presentation</li>
               </ul>
-              <button 
-                type="button" 
-                className="btn btn-primary w-full text-xs mt-4 cta-glow-btn"
-                onClick={handleOpenDemo}
-              >
-                Book Class 9-10 Demo
-              </button>
+              <div className="tier-tag-pill mt-4 tier-tag-highlight">
+                <CheckCircle2 size={13} className="text-emerald" />
+                <span>Intensive Board Prep &amp; Pre-Final Mocks</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1068,9 +1015,9 @@ export default function LandingPage({
       </section>
 
       {/* ============================================================== */}
-      {/* 8. FACULTY CAREERS SECTION */}
+      {/* 8. PART TIME JOB SECTION */}
       {/* ============================================================== */}
-      <section className="careers-section" id="careers">
+      <section className="careers-section" id="part-time-job">
         <div className="section-container">
           <div className="careers-banner-card glass-card">
             <div className="careers-grid">
@@ -1080,17 +1027,17 @@ export default function LandingPage({
                     <Briefcase size={18} className="text-primary" />
                   </div>
                   <span className="badge badge-primary text-xs font-bold uppercase">
-                    Faculty Recruitment 2026
+                    Part Time Teaching Jobs 2026
                   </span>
                 </div>
 
                 <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-3">
-                  Passionate About Teaching? <br />
-                  <span className="text-gradient-primary">Join the Hayagriva Faculty Team</span>
+                  Looking for a Part Time Job? <br />
+                  <span className="text-gradient-primary">Teach at Hayagriva Tutorials</span>
                 </h2>
 
                 <p className="text-sm text-secondary leading-relaxed mb-6">
-                  We are looking for dedicated tutors for <strong>Classes 1 to 10</strong> across Mathematics, Physical Science, Biological Science, Social Studies, and Languages. Enjoy a disciplined teaching culture with prompt remuneration.
+                  We are hiring passionate tutors for <strong>part-time morning and evening teaching slots</strong> for Classes 1 to 10 across Mathematics, Physical Science, Biological Science, Social Studies, and Languages. Enjoy disciplined batches, automated teaching tools, and prompt remuneration.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -1100,12 +1047,12 @@ export default function LandingPage({
                     onClick={handleOpenTeacher}
                   >
                     <Briefcase size={16} />
-                    <span>Submit Application</span>
+                    <span>Apply for Part Time Job</span>
                     <ArrowRight size={14} />
                   </button>
 
                   <a
-                    href="https://wa.me/919848266892?text=Hello%20Director,%20I%20am%20interested%20in%20joining%20Hayagriva%20Tutorials%20as%20Faculty."
+                    href="https://wa.me/919848266892?text=Hello%20Director,%20I%20am%20interested%20in%20a%20part%20time%20teaching%20job%20at%20Hayagriva%20Tutorials."
                     target="_blank"
                     rel="noreferrer"
                     className="btn btn-secondary btn-md flex items-center justify-center gap-2 w-full sm:w-auto text-emerald"
@@ -1119,7 +1066,7 @@ export default function LandingPage({
               <div className="careers-perks-box glass-card p-4">
                 <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Star size={16} className="text-amber" />
-                  Why Tutors Love Working With Us:
+                  Why Teachers Love Part-Time at Hayagriva:
                 </h4>
 
                 <div className="space-y-2.5 text-xs text-secondary">
@@ -1295,34 +1242,25 @@ export default function LandingPage({
               </ul>
             </div>
 
-            {/* Column 4: Quick Portals & Actions */}
+            {/* Column 4: Quick Portals & Opportunities */}
             <div className="footer-col">
-              <h4 className="footer-col-title">Portals &amp; Inquiries</h4>
+              <h4 className="footer-col-title">Opportunities &amp; Staff</h4>
               <div className="footer-buttons-stack">
                 <button 
                   type="button" 
                   className="footer-btn-primary" 
-                  onClick={handleOpenParentLogin}
-                >
-                  <Users size={14} />
-                  <span>Parent Portal Login</span>
-                </button>
-                <button 
-                  type="button" 
-                  className="footer-btn-secondary" 
-                  onClick={handleOpenDemo}
-                >
-                  <Sparkles size={14} />
-                  <span>Book Free Demo Class</span>
-                </button>
-                <button 
-                  type="button" 
-                  className="footer-btn-ghost" 
                   onClick={handleOpenTeacher}
                 >
                   <Briefcase size={14} />
-                  <span>Faculty Careers</span>
+                  <span>Apply: Part Time Job</span>
                 </button>
+                <a 
+                  href="#contact" 
+                  className="footer-btn-secondary"
+                >
+                  <MapPin size={14} />
+                  <span>Academy Location</span>
+                </a>
                 {onOpenLogin && (
                   <button 
                     type="button" 
@@ -1345,29 +1283,16 @@ export default function LandingPage({
             </div>
 
             <div className="footer-bottom-links">
-              <button 
-                type="button" 
-                className="footer-bottom-link-btn" 
-                onClick={handleOpenParentLogin}
+              <a 
+                href="#part-time-job" 
+                className="footer-bottom-link-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleOpenTeacher();
+                }}
               >
-                Parent Portal
-              </button>
-              <span className="footer-dot-separator">•</span>
-              <button 
-                type="button" 
-                className="footer-bottom-link-btn" 
-                onClick={handleOpenDemo}
-              >
-                Free Demo
-              </button>
-              <span className="footer-dot-separator">•</span>
-              <button 
-                type="button" 
-                className="footer-bottom-link-btn" 
-                onClick={handleOpenTeacher}
-              >
-                Careers
-              </button>
+                Part Time Job
+              </a>
               <span className="footer-dot-separator">•</span>
               <a 
                 href="#contact" 
@@ -1427,24 +1352,25 @@ export default function LandingPage({
         .landing-nav-container {
           max-width: 1240px;
           margin: 0 auto;
-          padding: 0 14px;
+          padding: 0 16px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 10px;
+          width: 100%;
         }
         .landing-brand-wrap {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
           text-decoration: none;
-          min-width: 0;
-          flex-shrink: 1;
+          flex-shrink: 0;
+          min-width: max-content;
         }
         .landing-brand-text {
           display: flex;
           flex-direction: column;
-          min-width: 0;
+          flex-shrink: 0;
         }
         .brand-title-row {
           display: flex;
@@ -1509,20 +1435,126 @@ export default function LandingPage({
         .landing-nav-actions {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 7px;
           flex-shrink: 0;
         }
-        .nav-login-btn {
+        .nav-action-parental-login {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 13px;
+          border-radius: 8px;
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.32);
+          color: #E2E8F0;
           font-size: 0.78rem;
-          padding: 6px 12px;
-          border-radius: 8px;
-        }
-        .nav-demo-btn {
-          font-size: 0.76rem;
-          padding: 6px 12px;
-          border-radius: 8px;
-          font-weight: 700;
+          font-weight: 650;
+          cursor: pointer;
+          transition: all 0.2s ease;
           white-space: nowrap;
+        }
+        .nav-action-parental-login:hover {
+          background: rgba(16, 185, 129, 0.18);
+          border-color: rgba(16, 185, 129, 0.55);
+          color: #FFFFFF;
+          transform: translateY(-1px);
+        }
+        .nav-action-demo-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 13px;
+          border-radius: 8px;
+          background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
+          color: #FFFFFF;
+          font-size: 0.78rem;
+          font-weight: 750;
+          cursor: pointer;
+          white-space: nowrap;
+          border: none;
+          box-shadow: 0 0 16px rgba(79, 70, 229, 0.45);
+          transition: all 0.2s ease;
+        }
+        .nav-action-demo-btn:hover {
+          background: linear-gradient(135deg, #4338CA 0%, #4F46E5 100%);
+          transform: translateY(-1px);
+          box-shadow: 0 0 22px rgba(99, 102, 241, 0.65);
+        }
+
+        .nav-btn-text-full {
+          display: inline;
+        }
+        .nav-btn-text-short {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .landing-brand-wrap {
+            gap: 6px;
+          }
+          .landing-brand-wrap svg {
+            width: 28px !important;
+            height: 28px !important;
+          }
+          .landing-nav-container {
+            padding: 0 10px;
+            gap: 6px;
+          }
+          .landing-nav-actions {
+            gap: 5px;
+          }
+          .nav-btn-text-full {
+            display: none;
+          }
+          .nav-btn-text-short {
+            display: inline;
+          }
+          .nav-action-parental-login {
+            padding: 5px 8px;
+            font-size: 0.72rem;
+            gap: 4px;
+          }
+          .nav-action-demo-btn {
+            padding: 5px 9px;
+            font-size: 0.72rem;
+            gap: 4px;
+          }
+          .mobile-menu-toggle-btn {
+            width: 32px;
+            height: 32px;
+          }
+        }
+        @media (max-width: 380px) {
+          .nav-action-parental-login span {
+            display: none;
+          }
+          .nav-action-parental-login {
+            padding: 5px 6px;
+          }
+          .nav-action-demo-btn {
+            padding: 5px 7px;
+            font-size: 0.68rem;
+          }
+        }
+
+        .tier-tag-pill {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          font-size: 0.74rem;
+          color: #CBD5E1;
+          font-weight: 600;
+          text-align: center;
+        }
+        .tier-tag-highlight {
+          background: rgba(99, 102, 241, 0.12);
+          border-color: rgba(99, 102, 241, 0.3);
+          color: #A5B4FC;
         }
         .cta-glow-btn {
           background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
