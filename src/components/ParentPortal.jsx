@@ -69,6 +69,29 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const [activeScorecard, setActiveScorecard] = useState(null);
   const [downloadingScorecard, setDownloadingScorecard] = useState(false);
 
+  // Sync section switches and modal events triggered by the mobile sidebar drawer
+  useEffect(() => {
+    const handleSwitch = (e) => {
+      if (e.detail) {
+        setActivePortalSection(e.detail);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+    const handleContactTutor = () => {
+      setContactModalOpen(true);
+    };
+    window.addEventListener('switch-parent-section', handleSwitch);
+    window.addEventListener('open-parent-contact', handleContactTutor);
+    return () => {
+      window.removeEventListener('switch-parent-section', handleSwitch);
+      window.removeEventListener('open-parent-contact', handleContactTutor);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('parent-section-changed', { detail: activePortalSection }));
+  }, [activePortalSection]);
+
   const handleDownloadParentScorecard = async () => {
     const cardEl = document.getElementById('parent-scorecard-card');
     if (!cardEl) return;

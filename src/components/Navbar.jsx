@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -23,7 +24,8 @@ import {
   Sparkles,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Phone
 } from 'lucide-react';
 
 import HayagrivaLogo from './HayagrivaLogo';
@@ -42,7 +44,28 @@ export default function Navbar({
 }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [parentActiveSection, setParentActiveSection] = useState('overview');
   const profileMenuRef = useRef(null);
+
+  // Synchronize active section with ParentPortal when parent navigates
+  useEffect(() => {
+    const handleSectionChange = (e) => {
+      if (e.detail) {
+        setParentActiveSection(e.detail);
+      }
+    };
+    window.addEventListener('parent-section-changed', handleSectionChange);
+    return () => window.removeEventListener('parent-section-changed', handleSectionChange);
+  }, []);
+
+  const parentNavSections = [
+    { id: 'overview', label: 'All Sections / Overview', icon: LayoutDashboard },
+    { id: 'attendance', label: '1. Attendance & Calendar', icon: CalendarDays },
+    { id: 'exams', label: '2. Exam Results & Scorecards', icon: BookOpen },
+    { id: 'homework', label: '3. Homework & Learning', icon: CheckSquare },
+    { id: 'feedback', label: '4. Tutor Feedback & Plan', icon: Sparkles },
+    { id: 'progress', label: '5. Monthly Progress Report', icon: CheckCircle2 }
+  ];
 
   // Close profile dropdown when clicking outside
   useEffect(() => {
@@ -98,7 +121,8 @@ export default function Navbar({
     : allNavItems.filter(item => item.roles.includes(currentUser?.role || USER_ROLES.ADMIN));
 
   return (
-    <header className="navbar-container">
+    <>
+      <header className="navbar-container">
       <div className="navbar-inner">
         {/* Brand Logo & Name (Left) + Mobile Sidebar Hamburger Toggle */}
         <div className="navbar-brand-group">
@@ -307,159 +331,223 @@ export default function Navbar({
           </button>
         </div>
       </div>
+    </header>
 
-      {/* Mobile Off-Canvas Navigation Sidebar & Backdrop Overlay */}
-      <div 
-        className={`mobile-sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-        aria-hidden={!sidebarOpen}
-      />
+    {/* Mobile Off-Canvas Navigation Sidebar & Backdrop Overlay (Rendered directly to document.body via Portal to prevent containing block trap) */}
+    {typeof document !== 'undefined' && createPortal(
+      <>
+        <div 
+          className={`mobile-sidebar-overlay ${sidebarOpen ? 'open' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden={!sidebarOpen}
+        />
 
-      <aside 
-        className={`mobile-nav-sidebar ${sidebarOpen ? 'open' : ''}`}
-        aria-label="Mobile Navigation Sidebar"
-        aria-hidden={!sidebarOpen}
-      >
-        {/* Sidebar Header */}
-        <div className="sidebar-drawer-header">
-          <div className="sidebar-drawer-brand">
-            <HayagrivaLogo size={32} showGlow={true} />
-            <div className="sidebar-drawer-title-wrap">
-              <div className="sidebar-drawer-title">HAYAGRIVA TUTORIALS</div>
-              <div className="sidebar-drawer-subtitle">Academy Portal • Class 1–X</div>
-            </div>
-          </div>
-          <button 
-            type="button" 
-            className="sidebar-close-btn"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close navigation sidebar"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* User Profile Card */}
-        {currentUser && (
-          <div className="sidebar-user-card">
-            <div className="sidebar-user-avatar">
-              {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={20} className="text-primary" />}
-              {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={20} className="text-emerald" />}
-              {currentUser.role === USER_ROLES.PARENT && <Users size={20} className="text-amber" />}
-            </div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{currentUser.name}</div>
-              <div className="sidebar-user-meta">
-                <span className={`user-role-tag role-${currentUser.role?.toLowerCase()}`}>
-                  {currentUser.role}
-                </span>
-                <span className="sidebar-live-pill">
-                  <Radio size={10} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
-                  <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Realtime Cloud') : 'Local'}</span>
-                </span>
+        <aside 
+          className={`mobile-nav-sidebar ${sidebarOpen ? 'open' : ''}`}
+          aria-label="Mobile Navigation Sidebar"
+          aria-hidden={!sidebarOpen}
+        >
+          {/* Sidebar Header */}
+          <div className="sidebar-drawer-header">
+            <div className="sidebar-drawer-brand">
+              <HayagrivaLogo size={32} showGlow={true} />
+              <div className="sidebar-drawer-title-wrap">
+                <div className="sidebar-drawer-title">HAYAGRIVA TUTORIALS</div>
+                <div className="sidebar-drawer-subtitle">Academy Portal • Class 1–X</div>
               </div>
             </div>
+            <button 
+              type="button" 
+              className="sidebar-close-btn"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close navigation sidebar"
+            >
+              <X size={18} />
+            </button>
           </div>
-        )}
 
-        {/* Main Navigation Tab Links */}
-        <div className="sidebar-nav-container">
-          <div className="sidebar-section-label">Academy Navigation</div>
-          <nav className="sidebar-nav-list" role="tablist">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    setSidebarOpen(false);
-                  }}
-                  className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <div className="sidebar-item-left">
-                    <span className="sidebar-item-icon-wrap">
-                      <Icon size={18} />
-                    </span>
-                    <span className="sidebar-item-label">{item.label}</span>
-                  </div>
-                  {isActive ? (
-                    <span className="sidebar-active-pill">Active</span>
-                  ) : (
-                    <ChevronRight size={15} className="sidebar-item-arrow" />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Admin Management Shortcuts */}
-          {currentUser?.role === USER_ROLES.ADMIN && (
-            <>
-              <div className="sidebar-section-label mt-4">Management &amp; Controls</div>
-              <div className="sidebar-admin-tools">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    onOpenInquiries();
-                  }}
-                  className="sidebar-tool-btn"
-                >
-                  <div className="sidebar-item-left">
-                    <span className="sidebar-item-icon-wrap text-amber">
-                      <Sparkles size={17} />
-                    </span>
-                    <span className="sidebar-item-label">Website Leads &amp; Demos</span>
-                  </div>
-                  {inquiriesCount > 0 ? (
-                    <span className="sidebar-leads-badge">{inquiriesCount} new</span>
-                  ) : (
-                    <ChevronRight size={15} className="sidebar-item-arrow" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    onOpenSettings();
-                  }}
-                  className="sidebar-tool-btn"
-                >
-                  <div className="sidebar-item-left">
-                    <span className="sidebar-item-icon-wrap">
-                      <Settings size={17} />
-                    </span>
-                    <span className="sidebar-item-label">System &amp; DB Settings</span>
-                  </div>
-                  <ChevronRight size={15} className="sidebar-item-arrow" />
-                </button>
+          {/* User Profile Card */}
+          {currentUser && (
+            <div className="sidebar-user-card">
+              <div className="sidebar-user-avatar">
+                {currentUser.role === USER_ROLES.ADMIN && <ShieldCheck size={20} className="text-primary" />}
+                {currentUser.role === USER_ROLES.TEACHER && <GraduationCap size={20} className="text-emerald" />}
+                {currentUser.role === USER_ROLES.PARENT && <Users size={20} className="text-amber" />}
               </div>
-            </>
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{currentUser.name}</div>
+                <div className="sidebar-user-meta">
+                  <span className={`user-role-tag role-${currentUser.role?.toLowerCase()}`}>
+                    {currentUser.role}
+                  </span>
+                  <span className="sidebar-live-pill">
+                    <Radio size={10} className={isSyncing ? "animate-pulse" : "pulse-dot"} />
+                    <span>{isSupabaseLive ? (isSyncing ? 'Syncing...' : 'Realtime Cloud') : 'Local'}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Sidebar Footer */}
-        <div className="sidebar-drawer-footer">
-          <button
-            type="button"
-            className="sidebar-logout-btn"
-            onClick={() => {
-              setSidebarOpen(false);
-              onLogout();
-            }}
-          >
-            <LogOut size={16} />
-            <span>Sign Out ({currentUser?.name?.split(' ')[0] || 'User'})</span>
-          </button>
-          <div className="sidebar-footer-note">
-            Classes 1 to 10 Tuition Academy • Hayagriva
+          {/* Navigation Tab Links & Parent Portal Section Switcher */}
+          <div className="sidebar-nav-container">
+            {currentUser?.role === USER_ROLES.PARENT ? (
+              <>
+                <div className="sidebar-section-label">Parent Portal Sections</div>
+                <nav className="sidebar-nav-list" role="tablist">
+                  {parentNavSections.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = parentActiveSection === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setParentActiveSection(item.id);
+                          setSidebarOpen(false);
+                          window.dispatchEvent(new CustomEvent('switch-parent-section', { detail: item.id }));
+                        }}
+                        className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                      >
+                        <div className="sidebar-item-left">
+                          <span className="sidebar-item-icon-wrap">
+                            <Icon size={18} />
+                          </span>
+                          <span className="sidebar-item-label">{item.label}</span>
+                        </div>
+                        {isActive ? (
+                          <span className="sidebar-active-pill">Viewing</span>
+                        ) : (
+                          <ChevronRight size={15} className="sidebar-item-arrow" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                <div className="sidebar-section-label mt-4">Direct Communications</div>
+                <div className="sidebar-admin-tools">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-parent-contact'));
+                    }}
+                    className="sidebar-tool-btn"
+                  >
+                    <div className="sidebar-item-left">
+                      <span className="sidebar-item-icon-wrap text-emerald">
+                        <Phone size={17} />
+                      </span>
+                      <span className="sidebar-item-label">Contact Academy Tutor</span>
+                    </div>
+                    <ChevronRight size={15} className="sidebar-item-arrow" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="sidebar-section-label">Academy Navigation</div>
+                <nav className="sidebar-nav-list" role="tablist">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setSidebarOpen(false);
+                        }}
+                        className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                      >
+                        <div className="sidebar-item-left">
+                          <span className="sidebar-item-icon-wrap">
+                            <Icon size={18} />
+                          </span>
+                          <span className="sidebar-item-label">{item.label}</span>
+                        </div>
+                        {isActive ? (
+                          <span className="sidebar-active-pill">Active</span>
+                        ) : (
+                          <ChevronRight size={15} className="sidebar-item-arrow" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                {/* Admin Management Shortcuts */}
+                {currentUser?.role === USER_ROLES.ADMIN && (
+                  <>
+                    <div className="sidebar-section-label mt-4">Management &amp; Controls</div>
+                    <div className="sidebar-admin-tools">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSidebarOpen(false);
+                          onOpenInquiries();
+                        }}
+                        className="sidebar-tool-btn"
+                      >
+                        <div className="sidebar-item-left">
+                          <span className="sidebar-item-icon-wrap text-amber">
+                            <Sparkles size={17} />
+                          </span>
+                          <span className="sidebar-item-label">Website Leads &amp; Demos</span>
+                        </div>
+                        {inquiriesCount > 0 ? (
+                          <span className="sidebar-leads-badge">{inquiriesCount} new</span>
+                        ) : (
+                          <ChevronRight size={15} className="sidebar-item-arrow" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSidebarOpen(false);
+                          onOpenSettings();
+                        }}
+                        className="sidebar-tool-btn"
+                      >
+                        <div className="sidebar-item-left">
+                          <span className="sidebar-item-icon-wrap">
+                            <Settings size={17} />
+                          </span>
+                          <span className="sidebar-item-label">System &amp; DB Settings</span>
+                        </div>
+                        <ChevronRight size={15} className="sidebar-item-arrow" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
-        </div>
-      </aside>
+
+          {/* Sidebar Footer */}
+          <div className="sidebar-drawer-footer">
+            <button
+              type="button"
+              className="sidebar-logout-btn"
+              onClick={() => {
+                setSidebarOpen(false);
+                onLogout();
+              }}
+            >
+              <LogOut size={16} />
+              <span>Sign Out ({currentUser?.name?.split(' ')[0] || 'User'})</span>
+            </button>
+            <div className="sidebar-footer-note">
+              Classes 1 to 10 Tuition Academy • Hayagriva
+            </div>
+          </div>
+        </aside>
+      </>,
+      document.body
+    )}
 
       <style>{`
         .navbar-container {
@@ -827,11 +915,17 @@ export default function Navbar({
         /* ============================================================== */
         .mobile-sidebar-overlay {
           position: fixed;
-          inset: 0;
-          background: rgba(7, 11, 20, 0.76);
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          height: 100vh;
+          height: 100dvh;
+          background: rgba(7, 11, 20, 0.82);
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
-          z-index: 9998;
+          z-index: 99998;
           opacity: 0;
           pointer-events: none;
           transition: opacity 0.28s ease;
@@ -846,13 +940,15 @@ export default function Navbar({
           top: 0;
           left: 0;
           bottom: 0;
-          width: 300px;
+          width: 310px;
           max-width: 86vw;
+          height: 100vh;
+          height: 100dvh;
           background: #0B1120;
           background: linear-gradient(180deg, #0F172A 0%, #0B1120 100%);
-          border-right: 1px solid rgba(255, 255, 255, 0.1);
-          box-shadow: 10px 0 40px rgba(0, 0, 0, 0.75);
-          z-index: 9999;
+          border-right: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: 10px 0 40px rgba(0, 0, 0, 0.85);
+          z-index: 99999;
           transform: translateX(-100%);
           transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
@@ -1195,6 +1291,6 @@ export default function Navbar({
           }
         }
       `}</style>
-    </header>
+    </>
   );
 }
