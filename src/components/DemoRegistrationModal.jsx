@@ -87,7 +87,7 @@ export default function DemoRegistrationModal({ isOpen, onClose }) {
               <Sparkles size={20} className="text-emerald" />
             </div>
             <div>
-              <h2 className="modal-title text-lg font-bold">Book a Free 2-Day Trial Demo</h2>
+              <h2 className="modal-title text-lg font-bold">Enroll Your Child • Free Trial Demo</h2>
               <p className="text-xs text-secondary">Experience our conceptual teaching methodology with zero commitment</p>
             </div>
           </div>
@@ -108,7 +108,7 @@ export default function DemoRegistrationModal({ isOpen, onClose }) {
             <div className="success-icon-wrap mb-3">
               <CheckCircle2 size={54} className="text-emerald" style={{ margin: '0 auto' }} />
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">Demo Registration Confirmed!</h3>
+            <h3 className="text-xl font-bold text-white mb-1">Child Enrollment Request Received!</h3>
             <p className="text-sm text-secondary mb-4 leading-relaxed">
               Thank you, <strong>{formData.parentName || formData.studentName}</strong>! Our academic coordinator will call you on <strong>+91 {formData.phone}</strong> to confirm your child's 2-day classroom trial.
             </p>
@@ -296,7 +296,7 @@ export default function DemoRegistrationModal({ isOpen, onClose }) {
                 disabled={isSubmitting}
                 style={{ minWidth: '150px' }}
               >
-                {isSubmitting ? 'Registering...' : 'Confirm Free Demo'}
+                {isSubmitting ? 'Submitting Enrollment...' : 'Enroll Child for Free Trial'}
               </button>
             </div>
           </form>

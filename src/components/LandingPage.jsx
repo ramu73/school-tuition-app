@@ -265,16 +265,16 @@ export default function LandingPage({
               <span className="nav-btn-text-short">Login</span>
             </button>
 
-            {/* The Dedicated Single Place for Book Free Demo */}
+            {/* The Dedicated Top Call-to-Action for Enroll Your Child */}
             <button
               type="button"
               className="nav-action-demo-btn cta-glow-btn"
               onClick={handleOpenDemo}
-              title="Book Free Demo"
+              title="Enroll Your Child"
             >
               <Sparkles size={13} />
-              <span className="nav-btn-text-full">Book Free Demo</span>
-              <span className="nav-btn-text-short">Free Demo</span>
+              <span className="nav-btn-text-full">Enroll Your Child</span>
+              <span className="nav-btn-text-short">Enroll</span>
             </button>
 
             {/* Mobile Hamburger Toggle */}
@@ -380,7 +380,7 @@ export default function LandingPage({
                 }}
               >
                 <Sparkles size={14} />
-                <span>Book Free Demo</span>
+                <span>Enroll Your Child</span>
               </button>
             </div>
           </div>
@@ -417,13 +417,22 @@ export default function LandingPage({
               </p>
 
               <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
-                <a
-                  href="#classes"
+                <button
+                  type="button"
+                  onClick={handleOpenDemo}
                   className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta cta-glow-btn"
                 >
-                  <BookOpen size={18} />
-                  <span>Explore Classes 1 to 10</span>
+                  <Sparkles size={18} />
+                  <span>Enroll Your Child</span>
                   <ArrowRight size={16} />
+                </button>
+
+                <a
+                  href="#classes"
+                  className="btn btn-secondary btn-lg flex items-center gap-2"
+                >
+                  <BookOpen size={16} />
+                  <span>Classes 1 to 10</span>
                 </a>
 
                 <a
@@ -555,15 +564,27 @@ export default function LandingPage({
             </p>
 
 
-            <a
-              href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
-              target="_blank"
-              rel="noreferrer"
-              className="mobile-whatsapp-banner flex items-center justify-center gap-2"
-            >
-              <MessageCircle size={16} className="text-emerald" />
-              <span>Direct WhatsApp: <strong>9848266892</strong></span>
-            </a>
+            <div className="mobile-hero-cta-cluster flex flex-col gap-2.5 mb-3">
+              <button
+                type="button"
+                onClick={handleOpenDemo}
+                className="btn btn-primary w-full flex items-center justify-center gap-2 py-3 cta-glow-btn font-bold text-sm"
+              >
+                <Sparkles size={16} />
+                <span>Enroll Your Child</span>
+                <ArrowRight size={15} />
+              </button>
+
+              <a
+                href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
+                target="_blank"
+                rel="noreferrer"
+                className="mobile-whatsapp-banner flex items-center justify-center gap-2"
+              >
+                <MessageCircle size={16} className="text-emerald" />
+                <span>Direct WhatsApp: <strong>9848266892</strong></span>
+              </a>
+            </div>
 
             <div className="mobile-trust-chips-row">
               <div className="mobile-chip">✓ Classes 1–10</div>
