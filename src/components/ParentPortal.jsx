@@ -548,34 +548,24 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
         </div>
       </div>
 
-      {/* Main Section Navigation Pills */}
-      <div className="section-pills-bar">
-        {[
-          { id: 'overview', label: 'All Sections', icon: Layers },
-          { id: 'attendance', label: '1. Attendance', icon: Calendar },
-          { id: 'exams', label: '2. Exam Results', icon: Award },
-          { id: 'homework', label: '3. Homework & Learning', icon: CheckSquare },
-          { id: 'feedback', label: '4. Tutor Feedback & Plan', icon: Sparkles },
-          { id: 'progress', label: '5. Monthly Progress', icon: TrendingUp }
-        ].map(pill => {
-          const Icon = pill.icon;
-          const active = activePortalSection === pill.id;
-          return (
-            <button
-              key={pill.id}
-              onClick={() => setActivePortalSection(pill.id)}
-              className={`section-nav-pill ${active ? 'active' : ''}`}
-            >
-              <Icon size={14} />
-              <span>{pill.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Return to All Sections button when a specific section is filtered from sidebar */}
+      {activePortalSection !== 'overview' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 14px 0' }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-xs"
+            onClick={() => setActivePortalSection('overview')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '9999px' }}
+          >
+            <ChevronLeft size={13} />
+            <span>← View All Sections</span>
+          </button>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            Filter active from Navigation Menu
+          </span>
+        </div>
+      )}
 
-      {/* ============================================================== */}
-      {/* 4. TUTOR FEEDBACK & CHILD IMPROVEMENT PLAN (Highlighted Top) */}
-      {/* ============================================================== */}
       {/* ============================================================== */}
       {/* 4. TUTOR FEEDBACK & CHILD IMPROVEMENT PLAN (Highlighted Top) */}
       {/* ============================================================== */}
