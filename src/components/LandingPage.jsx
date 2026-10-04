@@ -142,7 +142,6 @@ export default function LandingPage({
       benefits: [
         'Dedicated subject experts for Classes 1 to 10 (SSC & CBSE)',
         'Friendly, respectful, and zero-fear classroom environment',
-        'Personalized 1-on-1 mentoring & continuous doubt clarification',
         'Continuous teacher-parent communication regarding growth'
       ],
       quote: '"We don\'t just teach the syllabus — we build lifelong academic confidence."'
@@ -192,7 +191,7 @@ export default function LandingPage({
         'Full CCTV camera surveillance across all classrooms and lobby',
         'Safe, well-lit, centrally located campus in Srinagar Colony',
         'Digital attendance tracking with absence alerts to parents',
-        'Dedicated morning (6-8:30 AM) and evening (5-8:30 PM) sessions'
+        'Evening Batch Slots: 4:00 PM – 6:00 PM | 6:00 PM – 8:00 PM'
       ],
       quote: '"A disciplined, safe environment is the true bedrock of academic growth."',
       highlightStat: '24/7',
@@ -606,7 +605,7 @@ export default function LandingPage({
               </div>
               <div className="timetable-timings-pill flex items-center gap-2">
                 <Clock size={14} className="text-amber" />
-                <span>Morning: 6:00–8:30 AM | Evening: 5:00–8:30 PM</span>
+                <span>Evening: 4:00 PM – 6:00 PM | 6:00 PM – 8:00 PM</span>
               </div>
             </div>
 
@@ -875,7 +874,7 @@ export default function LandingPage({
             <span className="section-pill-tag">Comprehensive Programs</span>
             <h2 className="section-heading-lg">Coaching for Classes 1 to 10</h2>
             <p className="section-sub-text">
-              Structured curriculum designed for State Board (SSC) and CBSE syllabi with morning and evening batch options.
+              Structured curriculum designed for State Board (SSC) and CBSE syllabi with evening batch options (4:00–6:00 PM &amp; 6:00–8:00 PM).
             </p>
           </div>
 
@@ -1040,7 +1039,7 @@ export default function LandingPage({
                 </h2>
 
                 <p className="text-sm text-secondary leading-relaxed mb-6">
-                  We welcome passionate educators for <strong>part-time morning (6:00–8:30 AM) and evening (5:00–8:30 PM) teaching slots</strong> for Classes 1 to 10 across Mathematics, Science, Social Studies, and Languages. Enjoy disciplined batches, max 25 students, and prompt remuneration.
+                  We welcome passionate educators for <strong>part-time evening teaching slots (4:00 PM – 6:00 PM &amp; 6:00 PM – 8:00 PM)</strong> for Classes 1 to 10 across Mathematics, Science, Social Studies, and Languages. Enjoy disciplined batches, max 25 students, and prompt remuneration.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -1154,8 +1153,8 @@ export default function LandingPage({
                   <h4 className="font-bold text-white text-sm">Academy Operating Hours</h4>
                 </div>
                 <p className="text-xs text-secondary leading-relaxed">
-                  Morning Batches: <strong>6:00 AM – 8:30 AM</strong><br />
-                  Evening Batches: <strong>5:00 PM – 8:30 PM</strong><br />
+                  Evening Batch 1: <strong>4:00 PM – 6:00 PM</strong><br />
+                  Evening Batch 2: <strong>6:00 PM – 8:00 PM</strong><br />
                   Monday – Friday: Daily Single-Subject Immersion<br />
                   Saturday: Weekly Slip Test Evaluation &amp; WhatsApp Report
                 </p>

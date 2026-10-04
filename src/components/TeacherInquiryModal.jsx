@@ -23,7 +23,7 @@ export default function TeacherInquiryModal({ isOpen, onClose }) {
     classCode: 'CLASS_10',
     experience: '3+ Years',
     qualification: 'M.Sc., B.Ed',
-    timingPreference: 'Evening (5:00 PM - 8:30 PM)',
+    timingPreference: 'Evening (4:00 PM - 6:00 PM)',
     notes: ''
   });
 
@@ -283,10 +283,10 @@ export default function TeacherInquiryModal({ isOpen, onClose }) {
                   value={formData.timingPreference}
                   onChange={(e) => setFormData({ ...formData, timingPreference: e.target.value })}
                 >
-                  <option value="Evening (5:00 PM - 8:30 PM)">Evening (5:00 PM - 8:30 PM)</option>
-                  <option value="Morning (6:30 AM - 8:30 AM)">Morning (6:30 AM - 8:30 AM)</option>
-                  <option value="Both Morning & Evening">Both Morning &amp; Evening</option>
-                  <option value="Weekend Batches Only">Weekend Batches Only</option>
+                  <option value="Evening (4:00 PM - 6:00 PM)">Evening (4:00 PM - 6:00 PM)</option>
+                  <option value="Evening (6:00 PM - 8:00 PM)">Evening (6:00 PM - 8:00 PM)</option>
+                  <option value="Both Evening Slots (4:00 PM - 8:00 PM)">Both Evening Slots (4:00 PM - 8:00 PM)</option>
+                  <option value="Flexible Evening Timing">Flexible Evening Timing</option>
                 </select>
               </div>
             </div>
