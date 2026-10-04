@@ -498,11 +498,6 @@ export default function LandingPage({
                   </span>
                 </div>
 
-                {/* Floating Top-Right Stat Card */}
-                <div className="slide-floating-stat-box glass-card">
-                  <div className="stat-number">{heroSlides[currentHeroSlide].metricNumber}</div>
-                  <div className="stat-label">{heroSlides[currentHeroSlide].metricLabel}</div>
-                </div>
 
                 {/* Slider Nav Arrows */}
                 <button 
@@ -1824,31 +1819,6 @@ export default function LandingPage({
           color: #FFFFFF;
         }
 
-        .slide-floating-stat-box {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          z-index: 5;
-          padding: 6px 10px;
-          border-radius: 10px;
-          background: rgba(15, 23, 42, 0.88);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          text-align: right;
-        }
-        .stat-number {
-          font-size: 1rem;
-          font-weight: 850;
-          color: #FCD34D;
-          line-height: 1;
-        }
-        .stat-label {
-          font-size: 0.6rem;
-          color: #94A3B8;
-          font-weight: 600;
-          margin-top: 2px;
-        }
 
         /* Nav Arrows */
         .slide-nav-arrow {
