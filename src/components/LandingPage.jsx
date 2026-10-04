@@ -55,16 +55,16 @@ export default function LandingPage({
     {
       id: 'math',
       image: '/showcase/math-coaching.jpg',
-      category: 'SIGNATURE SPECIALIZATION',
+      category: 'SIGNATURE FOCUS',
       title: 'Special Focus on Mathematics',
       subtitle: 'Strong Concepts • Smart Methods • Better Results',
       description: 'Building deep foundational arithmetic, Pre-Algebra, Geometry proofs, and formula mastery with step-by-step guidance.',
       badgeText: '⭐ 98.4% Top Grades',
       badgeColor: 'amber',
       metricNumber: '10/10',
-      metricLabel: 'GPA Target Focus',
+      metricLabel: 'GPA Target',
       pillIcon: '📐',
-      pillLabel: 'Mathematics'
+      pillLabel: 'Maths'
     },
     {
       id: 'oneday',
@@ -73,12 +73,12 @@ export default function LandingPage({
       title: 'The "One Day, One Subject" Rule',
       subtitle: '1.5 to 2 Hours Deep Immersion Every Evening',
       description: 'Zero cognitive fatigue. 100% concept retention by dedicating each weekday to one subject deeply with 1-on-1 doubt clearing.',
-      badgeText: '🎯 100% Concept Retention',
+      badgeText: '🎯 100% Retention',
       badgeColor: 'emerald',
       metricNumber: '25 Max',
-      metricLabel: 'Students Per Batch',
+      metricLabel: 'Per Batch',
       pillIcon: '🎯',
-      pillLabel: 'One Day, One Subject'
+      pillLabel: 'One Day'
     },
     {
       id: 'science',
@@ -86,13 +86,13 @@ export default function LandingPage({
       category: 'CONCEPTUAL CLARITY',
       title: 'Concept-Based Science Learning',
       subtitle: 'Physics, Chemistry & Biology Brought to Life',
-      description: 'Visual demonstrations, ray optics experiments, chemical reaction proofs, and anatomical models eliminate rote memorization forever.',
-      badgeText: '🔬 Real Experiential Learning',
+      description: 'Visual demonstrations, ray optics experiments, chemical reaction proofs, and anatomical models eliminate rote memorization.',
+      badgeText: '🔬 Real Experiential',
       badgeColor: 'sky',
       metricNumber: '100%',
       metricLabel: 'Syllabus Clarity',
       pillIcon: '🔬',
-      pillLabel: 'Science Experiments'
+      pillLabel: 'Science'
     },
     {
       id: 'tests',
@@ -101,12 +101,12 @@ export default function LandingPage({
       title: 'Weekly Tests & WhatsApp Scorecards',
       subtitle: 'Track Your Child\'s Progress Every Single Week',
       description: 'Saturday slip tests benchmark syllabus retention. Detailed percentage scorecards and improvement remarks sent directly to parents.',
-      badgeText: '📱 Instant WhatsApp Reports',
+      badgeText: '📱 Instant WhatsApp',
       badgeColor: 'primary',
       metricNumber: '52+',
-      metricLabel: 'Tests Per Year',
+      metricLabel: 'Weekly Tests',
       pillIcon: '🏆',
-      pillLabel: 'Weekly Slip Tests'
+      pillLabel: 'Tests'
     }
   ];
 
@@ -194,7 +194,7 @@ export default function LandingPage({
         'Full CCTV camera surveillance across all classrooms and lobby',
         'Safe, well-lit, centrally located campus in Srinagar Colony',
         'Digital attendance tracking with absence alerts to parents',
-        'Separate dedicated morning (6-8:30 AM) and evening (5-8:30 PM) sessions'
+        'Dedicated morning (6-8:30 AM) and evening (5-8:30 PM) sessions'
       ],
       quote: '"A disciplined, safe environment is the true bedrock of academic growth."',
       highlightStat: '24/7',
@@ -230,14 +230,14 @@ export default function LandingPage({
       <header className="landing-navbar">
         <div className="landing-nav-container">
           <div className="landing-brand-wrap">
-            <HayagrivaLogo size={42} showGlow={true} />
+            <HayagrivaLogo size={36} showGlow={true} />
             <div className="landing-brand-text">
               <div className="brand-title-row">
-                <span className="brand-main-name">HAYAGRIVA TUTORIALS</span>
-                <span className="brand-classes-badge">Classes 1 - X</span>
+                <span className="brand-main-name">HAYAGRIVA</span>
+                <span className="brand-classes-badge">Classes 1–X</span>
               </div>
               <p className="brand-sub-desc">
-                State Board (SSC) &amp; CBSE • Conceptual Tuition Academy
+                State Board &amp; CBSE • Conceptual Tuition Academy
               </p>
             </div>
           </div>
@@ -252,9 +252,10 @@ export default function LandingPage({
           </nav>
 
           <div className="landing-nav-actions">
+            {/* Desktop Only Login Button */}
             <button
               type="button"
-              className="btn btn-secondary btn-sm nav-login-btn flex items-center gap-1.5"
+              className="btn btn-secondary btn-sm nav-login-btn desktop-only-btn flex items-center gap-1.5"
               onClick={handleOpenParentLogin}
               title="Parent / Student Portal Login"
             >
@@ -262,15 +263,17 @@ export default function LandingPage({
               <span>Portal Login</span>
             </button>
 
+            {/* Compact High-Impact Demo Button */}
             <button
               type="button"
               className="btn btn-primary btn-sm nav-demo-btn flex items-center gap-1.5 cta-glow-btn"
               onClick={handleOpenDemo}
             >
-              <Sparkles size={15} />
-              <span>Book Free Demo</span>
+              <Sparkles size={14} />
+              <span>Free Demo</span>
             </button>
 
+            {/* Mobile Hamburger Toggle */}
             <button
               type="button"
               className="mobile-menu-toggle-btn"
@@ -381,16 +384,16 @@ export default function LandingPage({
       </header>
 
       {/* ============================================================== */}
-      {/* 2. GRAND HERO SECTION WITH SLIDING WINDOW SHOWCASE */}
+      {/* 2. GRAND HERO SECTION WITH MOBILE-FIRST SLIDING SHOWCASE */}
       {/* ============================================================== */}
       <section className="grand-hero-section" id="showcase">
         <div className="hero-glow-sphere sphere-1" />
         <div className="hero-glow-sphere sphere-2" />
 
         <div className="grand-hero-container">
-          {/* Left Column: Academy Value Proposition */}
+          {/* Hero Header & Value Proposition */}
           <div className="hero-lead-col">
-            <div className="hero-badge inline-flex items-center gap-2 mb-4">
+            <div className="hero-badge inline-flex items-center gap-2 mb-3">
               <span className="pulsing-badge-dot" />
               <span className="text-xs font-bold text-amber-300">
                 Admissions Open 2026–2027 • Hyderabad
@@ -403,60 +406,63 @@ export default function LandingPage({
               <span className="text-gradient-primary">Brighter Futures</span>
             </h1>
 
-            <p className="hero-description">
-              Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
-            </p>
+            {/* Desktop-only description & CTAs (Shown on desktop alongside slider) */}
+            <div className="hero-desktop-content-block">
+              <p className="hero-description">
+                Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
+              </p>
 
-            <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
-              <button
-                type="button"
-                className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta"
-                onClick={handleOpenDemo}
-              >
-                <Sparkles size={18} />
-                <span>Book Free 2-Day Trial Demo</span>
-                <ArrowRight size={16} />
-              </button>
+              <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta"
+                  onClick={handleOpenDemo}
+                >
+                  <Sparkles size={18} />
+                  <span>Book Free 2-Day Trial Demo</span>
+                  <ArrowRight size={16} />
+                </button>
 
-              <button
-                type="button"
-                className="btn btn-secondary btn-lg flex items-center gap-2"
-                onClick={handleOpenParentLogin}
-              >
-                <UserCheck size={18} className="text-emerald" />
-                <span>Parent Portal Login</span>
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-lg flex items-center gap-2"
+                  onClick={handleOpenParentLogin}
+                >
+                  <UserCheck size={18} className="text-emerald" />
+                  <span>Parent Portal Login</span>
+                </button>
 
-              <a
-                href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
-                target="_blank"
-                rel="noreferrer"
-                className="quick-call-link flex items-center gap-2 text-emerald font-semibold"
-                title="Direct WhatsApp Chat"
-              >
-                <MessageCircle size={18} />
-                <span>WhatsApp: 9848266892</span>
-              </a>
-            </div>
-
-            {/* Quick Badges Strip */}
-            <div className="hero-trust-badges">
-              <div className="trust-badge-item">
-                <CheckCircle2 size={16} className="text-emerald" />
-                <span>Classes 1 to 10 (SSC &amp; CBSE)</span>
+                <a
+                  href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
+                  target="_blank"
+                  rel="noreferrer"
+                  className="quick-call-link flex items-center gap-2 text-emerald font-semibold"
+                  title="Direct WhatsApp Chat"
+                >
+                  <MessageCircle size={18} />
+                  <span>WhatsApp: 9848266892</span>
+                </a>
               </div>
-              <div className="trust-badge-item">
-                <Video size={16} className="text-sky" />
-                <span>CCTV Monitored Facility</span>
-              </div>
-              <div className="trust-badge-item">
-                <Award size={16} className="text-amber" />
-                <span>Weekly Slip Tests</span>
+
+              {/* Desktop Trust Badges */}
+              <div className="hero-trust-badges">
+                <div className="trust-badge-item">
+                  <CheckCircle2 size={16} className="text-emerald" />
+                  <span>Classes 1 to 10 (SSC &amp; CBSE)</span>
+                </div>
+                <div className="trust-badge-item">
+                  <Video size={16} className="text-sky" />
+                  <span>CCTV Monitored Facility</span>
+                </div>
+                <div className="trust-badge-item">
+                  <Award size={16} className="text-amber" />
+                  <span>Weekly Slip Tests</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Interactive Sliding Window */}
+          {/* Interactive Hero Sliding Window Showcase */}
           <div 
             className="hero-slider-window-col"
             onMouseEnter={() => setIsHeroPaused(true)}
@@ -505,7 +511,7 @@ export default function LandingPage({
                   onClick={handlePrevHeroSlide}
                   aria-label="Previous Slide"
                 >
-                  <ChevronLeft size={20} />
+                  <ChevronLeft size={18} />
                 </button>
                 <button 
                   type="button"
@@ -513,7 +519,7 @@ export default function LandingPage({
                   onClick={handleNextHeroSlide}
                   aria-label="Next Slide"
                 >
-                  <ChevronRight size={20} />
+                  <ChevronRight size={18} />
                 </button>
 
                 {/* Slide Caption Box Overlaid */}
@@ -552,6 +558,49 @@ export default function LandingPage({
               </div>
             </div>
           </div>
+
+          {/* Mobile-Only Description & CTAs Block (Appears directly below the slider on mobile) */}
+          <div className="hero-mobile-content-block">
+            <p className="hero-description mobile-hero-desc">
+              Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics</strong>, our signature <strong>"One Day, One Subject"</strong> framework, and <strong>weekly WhatsApp reports</strong>.
+            </p>
+
+            <div className="mobile-actions-grid">
+              <button
+                type="button"
+                className="btn btn-primary btn-md flex items-center justify-center gap-2 cta-glow-btn w-full"
+                onClick={handleOpenDemo}
+              >
+                <Sparkles size={16} />
+                <span>Book Free Demo</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-md flex items-center justify-center gap-2 w-full"
+                onClick={handleOpenParentLogin}
+              >
+                <UserCheck size={16} className="text-emerald" />
+                <span>Parent Portal</span>
+              </button>
+            </div>
+
+            <a
+              href="https://wa.me/919848266892?text=Hello%20Hayagriva%20Tutorials,%20I%20would%20like%20to%20inquire%20about%20admissions%20for%20my%20child."
+              target="_blank"
+              rel="noreferrer"
+              className="mobile-whatsapp-banner flex items-center justify-center gap-2"
+            >
+              <MessageCircle size={16} className="text-emerald" />
+              <span>Direct WhatsApp: <strong>9848266892</strong></span>
+            </a>
+
+            <div className="mobile-trust-chips-row">
+              <div className="mobile-chip">✓ Classes 1–10</div>
+              <div className="mobile-chip">📹 CCTV Monitored</div>
+              <div className="mobile-chip">🏆 Weekly Tests</div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -560,7 +609,7 @@ export default function LandingPage({
       {/* ============================================================== */}
       <section className="we-offer-master-section" id="we-offer">
         <div className="section-container">
-          <div className="section-header-center text-center mb-10">
+          <div className="section-header-center text-center mb-8">
             <span className="section-pill-tag">
               <Sparkles size={13} className="inline mr-1 text-amber-400" />
               Official Academy Pillars
@@ -577,7 +626,7 @@ export default function LandingPage({
             {/* Offer 1 */}
             <div className="offer-card glass-card">
               <div className="offer-icon-wrapper bg-indigo-soft">
-                <BookOpen size={26} className="text-primary" />
+                <BookOpen size={24} className="text-primary" />
               </div>
               <div className="offer-order-pill">PILLAR 1</div>
               <h3 className="offer-title">ONE DAY, ONE SUBJECT</h3>
@@ -592,7 +641,7 @@ export default function LandingPage({
             {/* Offer 2 */}
             <div className="offer-card glass-card">
               <div className="offer-icon-wrapper bg-emerald-soft">
-                <Award size={26} className="text-emerald" />
+                <Award size={24} className="text-emerald" />
               </div>
               <div className="offer-order-pill">PILLAR 2</div>
               <h3 className="offer-title">WEEKLY TESTS</h3>
@@ -607,7 +656,7 @@ export default function LandingPage({
             {/* Offer 3 */}
             <div className="offer-card glass-card">
               <div className="offer-icon-wrapper bg-amber-soft">
-                <Users size={26} className="text-amber" />
+                <Users size={24} className="text-amber" />
               </div>
               <div className="offer-order-pill">PILLAR 3</div>
               <h3 className="offer-title">HOMEWORK SUPPORT</h3>
@@ -622,7 +671,7 @@ export default function LandingPage({
             {/* Offer 4 */}
             <div className="offer-card glass-card">
               <div className="offer-icon-wrapper bg-rose-soft">
-                <Video size={26} className="text-rose" />
+                <Video size={24} className="text-rose" />
               </div>
               <div className="offer-order-pill">PILLAR 4</div>
               <h3 className="offer-title">CCTV CAMERA FACILITY</h3>
@@ -637,7 +686,7 @@ export default function LandingPage({
             {/* Offer 5 */}
             <div className="offer-card glass-card">
               <div className="offer-icon-wrapper bg-sky-soft">
-                <Target size={26} className="text-sky" />
+                <Target size={24} className="text-sky" />
               </div>
               <div className="offer-order-pill">PILLAR 5</div>
               <h3 className="offer-title">CONCEPT-BASED LEARNING</h3>
@@ -651,7 +700,7 @@ export default function LandingPage({
           </div>
 
           {/* Brochure Tagline Strip */}
-          <div className="brochure-quote-banner glass-card mt-8">
+          <div className="brochure-quote-banner glass-card mt-6">
             <div className="quote-content flex items-center justify-between flex-wrap gap-4">
               <div className="quote-text-wrap flex items-center gap-3">
                 <span className="quote-mark">“</span>
@@ -678,7 +727,7 @@ export default function LandingPage({
       {/* ============================================================== */}
       <section className="why-choose-showcase-section" id="why-choose">
         <div className="section-container">
-          <div className="section-header-center text-center mb-10">
+          <div className="section-header-center text-center mb-8">
             <span className="section-pill-tag">
               <ShieldCheck size={13} className="inline mr-1 text-emerald-400" />
               Why Choose Hayagriva Tutorials?
@@ -691,7 +740,7 @@ export default function LandingPage({
             </p>
           </div>
 
-          {/* Interactive Feature Tabs */}
+          {/* Interactive Feature Tabs (Scrollable on mobile) */}
           <div className="feature-nav-tabs">
             {featureShowcaseTabs.map((tab, idx) => (
               <button
@@ -709,7 +758,7 @@ export default function LandingPage({
           {/* Interactive Sliding Showcase Card */}
           <div className="feature-showcase-window glass-card">
             <div className="feature-window-grid">
-              {/* Left Column: Visual Media with ambient glow */}
+              {/* Visual Media with ambient glow */}
               <div className="feature-visual-wrap">
                 <div className="feature-image-container">
                   <img 
@@ -727,7 +776,7 @@ export default function LandingPage({
                 </div>
               </div>
 
-              {/* Right Column: Detailed Breakdown */}
+              {/* Detailed Breakdown */}
               <div className="feature-content-wrap">
                 <span className="feature-tag-badge">
                   {featureShowcaseTabs[activeFeatureTab].tag}
@@ -754,14 +803,14 @@ export default function LandingPage({
                   <p className="quote-italic">{featureShowcaseTabs[activeFeatureTab].quote}</p>
                 </div>
 
-                <div className="feature-cta-row flex items-center gap-3 mt-6">
+                <div className="feature-cta-row flex items-center gap-3 mt-5">
                   <button
                     type="button"
                     className="btn btn-primary btn-md cta-glow-btn flex items-center gap-2"
                     onClick={handleOpenDemo}
                   >
                     <Sparkles size={16} />
-                    <span>Experience in Free Demo</span>
+                    <span>Free Demo</span>
                   </button>
 
                   <button
@@ -770,7 +819,7 @@ export default function LandingPage({
                     onClick={handleOpenParentLogin}
                   >
                     <UserCheck size={16} className="text-emerald" />
-                    <span>Parent Portal Login</span>
+                    <span>Parent Portal</span>
                   </button>
                 </div>
               </div>
@@ -784,7 +833,7 @@ export default function LandingPage({
       {/* ============================================================== */}
       <section className="weekly-timetable-section" id="strategy">
         <div className="section-container">
-          <div className="section-header-center text-center mb-10">
+          <div className="section-header-center text-center mb-8">
             <span className="section-pill-tag bg-amber-soft text-amber">
               <Zap size={13} className="inline mr-1 text-amber-400" />
               Signature Academic Framework
@@ -798,14 +847,14 @@ export default function LandingPage({
           </div>
 
           <div className="timetable-master-card glass-card">
-            <div className="timetable-header flex items-center justify-between flex-wrap gap-3 mb-6">
+            <div className="timetable-header flex items-center justify-between flex-wrap gap-3 mb-5">
               <div>
                 <span className="badge badge-primary text-3xs font-mono uppercase mb-1">Standard Timetable (Classes 1 to 10)</span>
                 <h4 className="text-base md:text-lg font-bold text-white">Focused Subject Rotation Strategy</h4>
               </div>
               <div className="timetable-timings-pill flex items-center gap-2">
-                <Clock size={15} className="text-amber" />
-                <span>Morning: 6:00 AM – 8:30 AM | Evening: 5:00 PM – 8:30 PM</span>
+                <Clock size={14} className="text-amber" />
+                <span>Morning: 6:00–8:30 AM | Evening: 5:00–8:30 PM</span>
               </div>
             </div>
 
@@ -868,7 +917,7 @@ export default function LandingPage({
       {/* ============================================================== */}
       <section className="classes-wings-section" id="classes">
         <div className="section-container">
-          <div className="section-header-center text-center mb-10">
+          <div className="section-header-center text-center mb-8">
             <span className="section-pill-tag">Comprehensive Programs</span>
             <h2 className="section-heading-lg">Coaching for Classes 1 to 10</h2>
             <p className="section-sub-text">
@@ -952,7 +1001,7 @@ export default function LandingPage({
       {/* ============================================================== */}
       <section className="testimonials-section">
         <div className="section-container">
-          <div className="section-header-center text-center mb-10">
+          <div className="section-header-center text-center mb-8">
             <span className="section-pill-tag">
               <Star size={13} className="inline mr-1 text-amber-400 fill-amber-400" />
               Parent Reviews
@@ -1056,7 +1105,7 @@ export default function LandingPage({
                     onClick={handleOpenTeacher}
                   >
                     <Briefcase size={16} />
-                    <span>Submit Teacher Application</span>
+                    <span>Submit Application</span>
                     <ArrowRight size={14} />
                   </button>
 
@@ -1067,40 +1116,40 @@ export default function LandingPage({
                     className="btn btn-secondary btn-md flex items-center justify-center gap-2 w-full sm:w-auto text-emerald"
                   >
                     <MessageCircle size={16} />
-                    <span>Direct WhatsApp Inquiry</span>
+                    <span>WhatsApp Inquiry</span>
                   </a>
                 </div>
               </div>
 
-              <div className="careers-perks-box glass-card p-5">
+              <div className="careers-perks-box glass-card p-4">
                 <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
                   <Star size={16} className="text-amber" />
                   Why Tutors Love Working With Us:
                 </h4>
 
-                <div className="space-y-3 text-xs text-secondary">
-                  <div className="flex items-start gap-2.5">
+                <div className="space-y-2.5 text-xs text-secondary">
+                  <div className="flex items-start gap-2">
                     <div className="perk-check">✓</div>
                     <div>
-                      <strong className="text-white">Strict Batch Limit:</strong> Disciplined batches capped at max 25 students.
+                      <strong className="text-white">Strict Batch Limit:</strong> Max 25 students per class.
                     </div>
                   </div>
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2">
                     <div className="perk-check">✓</div>
                     <div>
-                      <strong className="text-white">Automated Digital Portal:</strong> Attendance, slip test marks, and instant scorecards handled digitally.
+                      <strong className="text-white">Automated Portal:</strong> Digital roll-call &amp; test grading.
                     </div>
                   </div>
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2">
                     <div className="perk-check">✓</div>
                     <div>
-                      <strong className="text-white">Flexible Timing Options:</strong> Dedicated morning or evening batch schedules to suit your routine.
+                      <strong className="text-white">Flexible Schedules:</strong> Morning or evening batch slots.
                     </div>
                   </div>
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2">
                     <div className="perk-check">✓</div>
                     <div>
-                      <strong className="text-white">Prompt Remuneration:</strong> Transparent compensation with performance appreciation.
+                      <strong className="text-white">Prompt Remuneration:</strong> Transparent compensation.
                     </div>
                   </div>
                 </div>
@@ -1128,7 +1177,7 @@ export default function LandingPage({
                   Srinagar Colony, Hyderabad,<br />
                   Telangana – 500073
                 </p>
-                <div className="mt-3">
+                <div className="mt-2.5">
                   <a
                     href="https://maps.google.com/?q=Yellareddyguda+Srinagar+Colony+Hyderabad"
                     target="_blank"
@@ -1177,18 +1226,18 @@ export default function LandingPage({
       {/* ============================================================== */}
       <footer className="landing-footer">
         <div className="section-container">
-          <div className="flex items-center justify-between flex-wrap gap-4 py-6 border-t border-slate-800">
-            <div className="flex items-center gap-3">
-              <HayagrivaLogo size={32} />
+          <div className="flex items-center justify-between flex-wrap gap-4 py-5 border-t border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <HayagrivaLogo size={28} />
               <div>
                 <span className="text-xs font-semibold text-white">HAYAGRIVA TUTORIALS</span>
                 <div className="text-3xs text-muted">
-                  &copy; {new Date().getFullYear()} HAYAGRIVA TUTORIALS. All rights reserved. • Srinagar Colony, Hyderabad
+                  &copy; {new Date().getFullYear()} HAYAGRIVA TUTORIALS • Srinagar Colony, Hyderabad
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-xs text-secondary">
+            <div className="flex items-center gap-3.5 text-xs text-secondary">
               <button 
                 type="button" 
                 className="hover:text-white transition-colors"
@@ -1208,7 +1257,7 @@ export default function LandingPage({
                 className="hover:text-white transition-colors"
                 onClick={handleOpenTeacher}
               >
-                Faculty Careers
+                Careers
               </button>
               <a 
                 href="#contact" 
@@ -1222,7 +1271,7 @@ export default function LandingPage({
       </footer>
 
       {/* ============================================================== */}
-      {/* COMPONENT STYLES */}
+      {/* COMPONENT STYLES WITH COMPLETE MOBILE-FIRST REFINEMENTS */}
       {/* ============================================================== */}
       <style>{`
         .landing-page-root {
@@ -1237,7 +1286,12 @@ export default function LandingPage({
         .section-container {
           max-width: 1240px;
           margin: 0 auto;
-          padding: 0 20px;
+          padding: 0 16px;
+        }
+        @media (min-width: 768px) {
+          .section-container {
+            padding: 0 24px;
+          }
         }
 
         /* 1. Navbar */
@@ -1245,28 +1299,29 @@ export default function LandingPage({
           position: sticky;
           top: 0;
           z-index: 100;
-          background: rgba(11, 15, 25, 0.94);
+          background: rgba(11, 15, 25, 0.96);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 10px 0;
+          padding: 8px 0;
           width: 100%;
         }
         .landing-nav-container {
           max-width: 1240px;
           margin: 0 auto;
-          padding: 0 20px;
+          padding: 0 14px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 14px;
+          gap: 10px;
         }
         .landing-brand-wrap {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           text-decoration: none;
           min-width: 0;
+          flex-shrink: 1;
         }
         .landing-brand-text {
           display: flex;
@@ -1276,12 +1331,12 @@ export default function LandingPage({
         .brand-title-row {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           flex-wrap: nowrap;
         }
         .brand-main-name {
           font-family: var(--font-heading);
-          font-weight: 800;
+          font-weight: 850;
           color: #FFFFFF;
           font-size: 1.05rem;
           letter-spacing: -0.01em;
@@ -1292,7 +1347,7 @@ export default function LandingPage({
           background: rgba(99, 102, 241, 0.2);
           color: #A5B4FC;
           border: 1px solid rgba(99, 102, 241, 0.35);
-          font-size: 0.65rem;
+          font-size: 0.62rem;
           font-weight: 700;
           padding: 1px 6px;
           border-radius: 4px;
@@ -1304,13 +1359,13 @@ export default function LandingPage({
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          margin-top: 2px;
+          margin-top: 1px;
         }
 
         .landing-nav-links {
           display: none;
           align-items: center;
-          gap: 20px;
+          gap: 18px;
         }
         @media (min-width: 1024px) {
           .landing-nav-links {
@@ -1345,20 +1400,21 @@ export default function LandingPage({
           border-radius: 8px;
         }
         .nav-demo-btn {
-          font-size: 0.78rem;
-          padding: 6px 14px;
+          font-size: 0.76rem;
+          padding: 6px 12px;
           border-radius: 8px;
           font-weight: 700;
+          white-space: nowrap;
         }
         .cta-glow-btn {
           background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
-          box-shadow: 0 0 18px rgba(79, 70, 229, 0.45);
+          box-shadow: 0 0 16px rgba(79, 70, 229, 0.45);
           font-weight: 700;
           transition: all 0.25s ease;
         }
         .cta-glow-btn:hover {
           transform: translateY(-1px);
-          box-shadow: 0 0 24px rgba(99, 102, 241, 0.65);
+          box-shadow: 0 0 22px rgba(99, 102, 241, 0.65);
         }
 
         .mobile-menu-toggle-btn {
@@ -1385,10 +1441,10 @@ export default function LandingPage({
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
           border-top: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 14px 16px 20px 16px;
+          padding: 12px 14px 18px 14px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
           animation: slideDownMobile 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         @keyframes slideDownMobile {
@@ -1423,11 +1479,16 @@ export default function LandingPage({
           border-top: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        /* 2. GRAND HERO SECTION WITH SLIDING WINDOW */
+        /* 2. GRAND HERO SECTION */
         .grand-hero-section {
           position: relative;
-          padding: 60px 0 50px 0;
+          padding: 30px 0 40px 0;
           overflow: hidden;
+        }
+        @media (min-width: 1024px) {
+          .grand-hero-section {
+            padding: 60px 0 50px 0;
+          }
         }
         .hero-glow-sphere {
           position: absolute;
@@ -1437,15 +1498,15 @@ export default function LandingPage({
           z-index: 0;
         }
         .sphere-1 {
-          width: 380px;
-          height: 380px;
+          width: 320px;
+          height: 320px;
           background: rgba(99, 102, 241, 0.16);
-          top: -60px;
+          top: -40px;
           left: 5%;
         }
         .sphere-2 {
-          width: 360px;
-          height: 360px;
+          width: 300px;
+          height: 300px;
           background: rgba(245, 158, 11, 0.12);
           bottom: 0px;
           right: 8%;
@@ -1454,18 +1515,21 @@ export default function LandingPage({
         .grand-hero-container {
           max-width: 1240px;
           margin: 0 auto;
-          padding: 0 20px;
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 40px;
-          align-items: center;
+          padding: 0 14px;
           position: relative;
           z-index: 1;
         }
+        @media (min-width: 768px) {
+          .grand-hero-container {
+            padding: 0 20px;
+          }
+        }
         @media (min-width: 1024px) {
           .grand-hero-container {
+            display: grid;
             grid-template-columns: 1.05fr 1fr;
             gap: 48px;
+            align-items: center;
           }
         }
 
@@ -1477,12 +1541,12 @@ export default function LandingPage({
         .hero-badge {
           background: rgba(245, 158, 11, 0.15);
           border: 1px solid rgba(245, 158, 11, 0.35);
-          padding: 6px 14px;
+          padding: 5px 12px;
           border-radius: 9999px;
         }
         .pulsing-badge-dot {
-          width: 8px;
-          height: 8px;
+          width: 7px;
+          height: 7px;
           border-radius: 50%;
           background: #F59E0B;
           box-shadow: 0 0 8px #F59E0B;
@@ -1490,15 +1554,18 @@ export default function LandingPage({
         }
         .hero-headline {
           font-family: var(--font-heading);
-          font-size: 2.3rem;
-          line-height: 1.15;
+          font-size: 1.85rem;
+          line-height: 1.18;
           font-weight: 850;
           color: #FFFFFF;
-          margin-bottom: 16px;
+          margin-bottom: 12px;
           letter-spacing: -0.025em;
         }
-        @media (min-width: 768px) {
-          .hero-headline { font-size: 3.2rem; }
+        @media (min-width: 640px) {
+          .hero-headline { font-size: 2.3rem; }
+        }
+        @media (min-width: 1024px) {
+          .hero-headline { font-size: 3.1rem; }
         }
         .text-gradient-gold {
           background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 50%, #FBBF24 100%);
@@ -1511,10 +1578,10 @@ export default function LandingPage({
           -webkit-text-fill-color: transparent;
         }
         .hero-description {
-          font-size: 0.98rem;
+          font-size: 0.95rem;
           color: #94A3B8;
-          line-height: 1.65;
-          margin-bottom: 24px;
+          line-height: 1.6;
+          margin-bottom: 20px;
         }
         .hero-primary-cta {
           font-weight: 750;
@@ -1538,7 +1605,7 @@ export default function LandingPage({
           display: flex;
           align-items: center;
           flex-wrap: wrap;
-          gap: 12px;
+          gap: 10px;
           margin-top: 10px;
         }
         .trust-badge-item {
@@ -1557,13 +1624,19 @@ export default function LandingPage({
         /* 3. HERO SLIDER WINDOW CONTAINER */
         .hero-slider-window-col {
           width: 100%;
+          margin: 12px 0 0 0;
+        }
+        @media (min-width: 1024px) {
+          .hero-slider-window-col {
+            margin: 0;
+          }
         }
         .slide-window-frame {
           padding: 0;
           overflow: hidden;
-          border-radius: 20px;
+          border-radius: 18px;
           border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 35px rgba(99, 102, 241, 0.15);
+          box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(99, 102, 241, 0.12);
           position: relative;
         }
         .slide-media-wrap {
@@ -1572,11 +1645,6 @@ export default function LandingPage({
           aspect-ratio: 16 / 10;
           overflow: hidden;
           background: #0F172A;
-        }
-        @media (max-width: 640px) {
-          .slide-media-wrap {
-            aspect-ratio: 4 / 3;
-          }
         }
         .slide-item {
           position: absolute;
@@ -1597,63 +1665,63 @@ export default function LandingPage({
         .slide-overlay-gradient {
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(11, 15, 25, 0.25) 0%, rgba(11, 15, 25, 0.4) 40%, rgba(11, 15, 25, 0.95) 100%);
+          background: linear-gradient(180deg, rgba(11, 15, 25, 0.2) 0%, rgba(11, 15, 25, 0.4) 40%, rgba(11, 15, 25, 0.95) 100%);
         }
 
         .slide-floating-top-badge {
           position: absolute;
-          top: 14px;
-          left: 14px;
+          top: 10px;
+          left: 10px;
           z-index: 5;
         }
         .pill-badge {
-          padding: 5px 12px;
+          padding: 4px 10px;
           border-radius: 9999px;
-          font-size: 0.72rem;
+          font-size: 0.68rem;
           font-weight: 750;
           letter-spacing: 0.02em;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         }
         .badge-amber {
-          background: rgba(245, 158, 11, 0.85);
+          background: rgba(245, 158, 11, 0.9);
           color: #FFFFFF;
         }
         .badge-emerald {
-          background: rgba(16, 185, 129, 0.85);
+          background: rgba(16, 185, 129, 0.9);
           color: #FFFFFF;
         }
         .badge-sky {
-          background: rgba(14, 165, 233, 0.85);
+          background: rgba(14, 165, 233, 0.9);
           color: #FFFFFF;
         }
         .badge-primary {
-          background: rgba(99, 102, 241, 0.85);
+          background: rgba(99, 102, 241, 0.9);
           color: #FFFFFF;
         }
 
         .slide-floating-stat-box {
           position: absolute;
-          top: 14px;
-          right: 14px;
+          top: 10px;
+          right: 10px;
           z-index: 5;
-          padding: 8px 14px;
-          border-radius: 12px;
-          background: rgba(15, 23, 42, 0.85);
+          padding: 6px 10px;
+          border-radius: 10px;
+          background: rgba(15, 23, 42, 0.88);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           border: 1px solid rgba(255, 255, 255, 0.15);
           text-align: right;
         }
         .stat-number {
-          font-size: 1.15rem;
+          font-size: 1rem;
           font-weight: 850;
           color: #FCD34D;
           line-height: 1;
         }
         .stat-label {
-          font-size: 0.65rem;
+          font-size: 0.6rem;
           color: #94A3B8;
           font-weight: 600;
           margin-top: 2px;
@@ -1662,11 +1730,11 @@ export default function LandingPage({
         /* Nav Arrows */
         .slide-nav-arrow {
           position: absolute;
-          top: 45%;
+          top: 42%;
           transform: translateY(-50%);
           z-index: 6;
-          width: 36px;
-          height: 36px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           background: rgba(15, 23, 42, 0.7);
           backdrop-filter: blur(10px);
@@ -1684,26 +1752,26 @@ export default function LandingPage({
           border-color: rgba(99, 102, 241, 0.6);
           transform: translateY(-50%) scale(1.08);
         }
-        .arrow-prev { left: 12px; }
-        .arrow-next { right: 12px; }
+        .arrow-prev { left: 8px; }
+        .arrow-next { right: 8px; }
 
         /* Overlaid Slide Caption */
         .slide-caption-glass-box {
           position: absolute;
-          bottom: 12px;
-          left: 14px;
-          right: 14px;
+          bottom: 10px;
+          left: 10px;
+          right: 10px;
           z-index: 5;
-          padding: 12px 14px;
-          border-radius: 14px;
-          background: rgba(11, 15, 25, 0.78);
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(11, 15, 25, 0.82);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
           border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .caption-category {
           display: inline-block;
-          font-size: 0.65rem;
+          font-size: 0.62rem;
           font-weight: 750;
           color: #FCD34D;
           letter-spacing: 0.05em;
@@ -1711,22 +1779,22 @@ export default function LandingPage({
           margin-bottom: 2px;
         }
         .caption-title {
-          font-size: 1.12rem;
+          font-size: 1rem;
           font-weight: 800;
           color: #FFFFFF;
           margin-bottom: 2px;
           line-height: 1.25;
         }
         .caption-subtitle {
-          font-size: 0.78rem;
+          font-size: 0.74rem;
           font-weight: 600;
           color: #38BDF8;
-          margin-bottom: 4px;
+          margin-bottom: 2px;
         }
         .caption-desc {
-          font-size: 0.75rem;
+          font-size: 0.72rem;
           color: #CBD5E1;
-          line-height: 1.4;
+          line-height: 1.35;
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
@@ -1739,32 +1807,25 @@ export default function LandingPage({
           grid-template-columns: repeat(4, 1fr);
           background: rgba(15, 23, 42, 0.95);
           border-top: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 6px;
-          gap: 6px;
-        }
-        @media (max-width: 540px) {
-          .slide-selector-tabs-bar {
-            grid-template-columns: repeat(2, 1fr);
-          }
+          padding: 5px;
+          gap: 4px;
         }
         .slide-tab-pill {
           position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
-          padding: 8px 6px;
-          border-radius: 10px;
+          gap: 4px;
+          padding: 7px 4px;
+          border-radius: 8px;
           background: transparent;
           border: 1px solid transparent;
           color: #94A3B8;
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           font-weight: 650;
           cursor: pointer;
           transition: all 0.2s ease;
           white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
         .slide-tab-pill:hover {
           color: #FFFFFF;
@@ -1776,38 +1837,106 @@ export default function LandingPage({
           border-color: rgba(99, 102, 241, 0.4);
         }
         .tab-pill-icon {
-          font-size: 0.85rem;
+          font-size: 0.8rem;
         }
         .active-pill-glow {
           position: absolute;
           bottom: 2px;
           left: 50%;
           transform: translateX(-50%);
-          width: 24px;
+          width: 20px;
           height: 2px;
           background: #818CF8;
           border-radius: 2px;
-          box-shadow: 0 0 8px #818CF8;
+          box-shadow: 0 0 6px #818CF8;
+        }
+
+        /* Responsive Mobile Hero Layout Switcher */
+        .hero-mobile-content-block {
+          display: none;
+        }
+        @media (max-width: 1023px) {
+          .hero-desktop-content-block {
+            display: none;
+          }
+          .hero-mobile-content-block {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            margin-top: 18px;
+          }
+          .mobile-hero-desc {
+            font-size: 0.88rem;
+            color: #94A3B8;
+            line-height: 1.55;
+            margin-bottom: 16px;
+          }
+          .mobile-actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+          }
+          .mobile-whatsapp-banner {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 10px;
+            padding: 10px 14px;
+            color: #E2E8F0;
+            text-decoration: none;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+            transition: all 0.2s ease;
+          }
+          .mobile-whatsapp-banner:active {
+            background: rgba(16, 185, 129, 0.2);
+          }
+          .mobile-trust-chips-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 6px;
+          }
+          .mobile-chip {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #CBD5E1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 4px 10px;
+            border-radius: 6px;
+          }
         }
 
         /* 4. "WE OFFER" 5 PILLARS MASTER SECTION */
         .we-offer-master-section {
-          padding: 70px 0;
+          padding: 50px 0;
           background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.08) 0%, rgba(11, 15, 25, 0) 70%);
         }
         .we-offer-5-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-          gap: 16px;
+          gap: 14px;
         }
         @media (min-width: 1100px) {
           .we-offer-5-grid {
             grid-template-columns: repeat(5, 1fr);
           }
         }
+        @media (max-width: 640px) {
+          .we-offer-5-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          .offer-card:nth-child(5) {
+            grid-column: span 2;
+          }
+        }
         .offer-card {
-          padding: 22px 18px;
-          border-radius: 16px;
+          padding: 18px 16px;
+          border-radius: 14px;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
@@ -1816,18 +1945,32 @@ export default function LandingPage({
           background: rgba(17, 24, 39, 0.6);
         }
         .offer-card:hover {
-          transform: translateY(-4px);
+          transform: translateY(-3px);
           border-color: rgba(99, 102, 241, 0.35);
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
         }
         .offer-icon-wrapper {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 14px;
+          margin-bottom: 12px;
+        }
+        @media (max-width: 640px) {
+          .offer-card {
+            padding: 14px 12px;
+          }
+          .offer-icon-wrapper {
+            width: 36px;
+            height: 36px;
+            margin-bottom: 8px;
+          }
+          .offer-icon-wrapper svg {
+            width: 20px;
+            height: 20px;
+          }
         }
         .bg-indigo-soft { background: rgba(99, 102, 241, 0.15); }
         .bg-emerald-soft { background: rgba(16, 185, 129, 0.15); }
@@ -1841,73 +1984,91 @@ export default function LandingPage({
           font-weight: 750;
           color: #94A3B8;
           letter-spacing: 0.06em;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
         .offer-title {
-          font-size: 0.95rem;
+          font-size: 0.88rem;
           font-weight: 800;
           color: #FFFFFF;
-          margin-bottom: 8px;
-          line-height: 1.3;
+          margin-bottom: 6px;
+          line-height: 1.25;
         }
         .offer-text {
-          font-size: 0.8rem;
+          font-size: 0.76rem;
           color: #94A3B8;
-          line-height: 1.55;
-          margin-bottom: 14px;
+          line-height: 1.5;
+          margin-bottom: 10px;
           flex-grow: 1;
         }
         .offer-footer-note {
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           font-weight: 700;
           display: flex;
           align-items: center;
         }
 
         .brochure-quote-banner {
-          padding: 20px 28px;
-          border-radius: 16px;
+          padding: 18px 22px;
+          border-radius: 14px;
           background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(99, 102, 241, 0.12) 100%);
           border: 1px solid rgba(16, 185, 129, 0.3);
         }
         .quote-mark {
-          font-size: 3rem;
+          font-size: 2.5rem;
           color: #10B981;
           font-family: serif;
           line-height: 0.8;
         }
         .quote-heading {
-          font-size: 1.15rem;
+          font-size: 1.05rem;
           font-weight: 800;
           color: #FFFFFF;
         }
         .quote-sub {
-          font-size: 0.8rem;
+          font-size: 0.76rem;
           color: #CBD5E1;
         }
 
         /* 5. "WHY CHOOSE US" INTERACTIVE FEATURE SLIDING SHOWCASE */
         .why-choose-showcase-section {
-          padding: 60px 0;
+          padding: 50px 0;
         }
         .feature-nav-tabs {
           display: flex;
           align-items: center;
           justify-content: center;
           flex-wrap: wrap;
-          gap: 10px;
-          margin-bottom: 24px;
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+        @media (max-width: 768px) {
+          .feature-nav-tabs {
+            justify-content: flex-start;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 6px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .feature-nav-tabs::-webkit-scrollbar {
+            display: none;
+          }
+          .feature-tab-btn {
+            flex-shrink: 0;
+            padding: 8px 12px;
+            font-size: 0.74rem;
+          }
         }
         .feature-tab-btn {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 10px 18px;
-          border-radius: 12px;
+          gap: 6px;
+          padding: 9px 16px;
+          border-radius: 10px;
           background: rgba(17, 24, 39, 0.6);
           border: 1px solid rgba(255, 255, 255, 0.08);
           color: #94A3B8;
-          font-size: 0.82rem;
+          font-size: 0.8rem;
           font-weight: 650;
           cursor: pointer;
           transition: all 0.25s ease;
@@ -1921,35 +2082,35 @@ export default function LandingPage({
           color: #FFFFFF;
           background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(16, 185, 129, 0.2) 100%);
           border-color: #6366F1;
-          box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+          box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
         }
         .tab-number {
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           font-weight: 800;
           color: #FCD34D;
         }
 
         .feature-showcase-window {
-          padding: 32px;
-          border-radius: 24px;
+          padding: 24px;
+          border-radius: 20px;
           border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
         }
         @media (max-width: 640px) {
           .feature-showcase-window {
-            padding: 20px 16px;
+            padding: 16px 14px;
           }
         }
         .feature-window-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 32px;
+          gap: 24px;
           align-items: center;
         }
         @media (min-width: 992px) {
           .feature-window-grid {
             grid-template-columns: 1.15fr 1fr;
-            gap: 40px;
+            gap: 36px;
           }
         }
         .feature-visual-wrap {
@@ -1958,9 +2119,9 @@ export default function LandingPage({
         .feature-image-container {
           position: relative;
           aspect-ratio: 16 / 10;
-          border-radius: 16px;
+          border-radius: 14px;
           overflow: hidden;
-          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
           border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .feature-img {
@@ -1968,10 +2129,6 @@ export default function LandingPage({
           height: 100%;
           object-fit: cover;
           display: block;
-          transition: transform 0.5s ease;
-        }
-        .feature-image-container:hover .feature-img {
-          transform: scale(1.03);
         }
         .feature-image-overlay {
           position: absolute;
@@ -1980,27 +2137,27 @@ export default function LandingPage({
         }
         .feature-floating-stat {
           position: absolute;
-          bottom: 16px;
-          right: 16px;
-          padding: 10px 16px;
-          border-radius: 14px;
-          background: rgba(15, 23, 42, 0.85);
+          bottom: 12px;
+          right: 12px;
+          padding: 8px 12px;
+          border-radius: 10px;
+          background: rgba(15, 23, 42, 0.88);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
           border: 1px solid rgba(255, 255, 255, 0.15);
           text-align: right;
         }
         .stat-large {
-          font-size: 1.35rem;
+          font-size: 1.15rem;
           font-weight: 850;
           color: #38BDF8;
           line-height: 1;
         }
         .stat-desc {
-          font-size: 0.68rem;
+          font-size: 0.62rem;
           color: #94A3B8;
           font-weight: 600;
-          margin-top: 3px;
+          margin-top: 2px;
         }
 
         .feature-content-wrap {
@@ -2010,96 +2167,94 @@ export default function LandingPage({
         }
         .feature-tag-badge {
           display: inline-block;
-          font-size: 0.68rem;
+          font-size: 0.65rem;
           font-weight: 750;
           color: #FCD34D;
           letter-spacing: 0.06em;
           text-transform: uppercase;
           background: rgba(245, 158, 11, 0.12);
           border: 1px solid rgba(245, 158, 11, 0.3);
-          padding: 3px 10px;
+          padding: 3px 8px;
           border-radius: 6px;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
         .feature-window-heading {
           font-family: var(--font-heading);
-          font-size: 1.6rem;
+          font-size: 1.35rem;
           font-weight: 800;
           color: #FFFFFF;
           line-height: 1.25;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
+        }
+        @media (min-width: 768px) {
+          .feature-window-heading { font-size: 1.6rem; }
         }
         .feature-window-desc {
-          font-size: 0.88rem;
+          font-size: 0.85rem;
           color: #94A3B8;
-          line-height: 1.6;
-          margin-bottom: 18px;
+          line-height: 1.55;
+          margin-bottom: 14px;
         }
         .feature-benefits-checklist {
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 8px;
           width: 100%;
-          margin-bottom: 20px;
+          margin-bottom: 16px;
         }
         .benefit-item {
           display: flex;
           align-items: flex-start;
-          gap: 10px;
-          font-size: 0.82rem;
+          gap: 8px;
+          font-size: 0.8rem;
           color: #E2E8F0;
-          line-height: 1.4;
+          line-height: 1.35;
         }
         .benefit-check-circle {
-          width: 18px;
-          height: 18px;
+          width: 16px;
+          height: 16px;
           border-radius: 50%;
           background: rgba(16, 185, 129, 0.2);
           color: #10B981;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           font-weight: 800;
           flex-shrink: 0;
           margin-top: 1px;
         }
         .feature-quote-box {
           border-left: 3px solid #818CF8;
-          padding-left: 12px;
-          margin-bottom: 10px;
+          padding-left: 10px;
+          margin-bottom: 8px;
         }
         .quote-italic {
           font-style: italic;
-          font-size: 0.82rem;
+          font-size: 0.78rem;
           color: #CBD5E1;
         }
 
         /* 6. WEEKLY ROTATION TIMETABLE */
         .weekly-timetable-section {
-          padding: 60px 0;
+          padding: 50px 0;
           background: rgba(15, 23, 42, 0.4);
         }
         .timetable-master-card {
-          padding: 28px;
-          border-radius: 20px;
-        }
-        @media (max-width: 640px) {
-          .timetable-master-card {
-            padding: 20px 14px;
-          }
+          padding: 22px 18px;
+          border-radius: 18px;
         }
         .timetable-timings-pill {
-          font-size: 0.78rem;
+          font-size: 0.75rem;
           color: #FCD34D;
           background: rgba(245, 158, 11, 0.1);
           border: 1px solid rgba(245, 158, 11, 0.25);
-          padding: 6px 14px;
+          padding: 5px 12px;
           border-radius: 8px;
         }
         .timetable-days-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
           gap: 10px;
         }
         @media (min-width: 992px) {
@@ -2107,11 +2262,30 @@ export default function LandingPage({
             grid-template-columns: repeat(7, 1fr);
           }
         }
+        @media (max-width: 768px) {
+          .timetable-days-grid {
+            display: flex;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            gap: 10px;
+            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .timetable-days-grid::-webkit-scrollbar {
+            display: none;
+          }
+          .schedule-day-box {
+            min-width: 140px;
+            max-width: 150px;
+            flex-shrink: 0;
+          }
+        }
         .schedule-day-box {
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.06);
           border-radius: 12px;
-          padding: 16px 12px;
+          padding: 14px 10px;
           text-align: center;
           transition: all 0.2s ease;
         }
@@ -2128,37 +2302,37 @@ export default function LandingPage({
           border-color: rgba(16, 185, 129, 0.3);
         }
         .day-name {
-          font-size: 0.7rem;
+          font-size: 0.68rem;
           font-weight: 800;
           color: #94A3B8;
           letter-spacing: 0.06em;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
         .subject-icon {
-          font-size: 1.6rem;
-          margin-bottom: 6px;
+          font-size: 1.5rem;
+          margin-bottom: 4px;
         }
         .subject-name {
-          font-size: 0.85rem;
+          font-size: 0.82rem;
           font-weight: 750;
           color: #FFFFFF;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
           line-height: 1.25;
         }
         .subject-desc {
-          font-size: 0.68rem;
+          font-size: 0.65rem;
           color: #94A3B8;
-          line-height: 1.45;
+          line-height: 1.4;
         }
 
         /* 7. CLASSES 1 TO 10 TIERS */
         .classes-wings-section {
-          padding: 60px 0;
+          padding: 50px 0;
         }
         .classes-tiers-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 20px;
+          gap: 16px;
         }
         @media (min-width: 860px) {
           .classes-tiers-grid {
@@ -2166,8 +2340,8 @@ export default function LandingPage({
           }
         }
         .class-tier-card {
-          padding: 24px 20px;
-          border-radius: 18px;
+          padding: 20px 16px;
+          border-radius: 16px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -2181,44 +2355,44 @@ export default function LandingPage({
         }
         .featured-flag {
           position: absolute;
-          top: -11px;
-          right: 20px;
+          top: -10px;
+          right: 18px;
           background: #F59E0B;
           color: #000000;
-          font-size: 0.68rem;
+          font-size: 0.65rem;
           font-weight: 800;
-          padding: 2px 10px;
+          padding: 2px 8px;
           border-radius: 9999px;
         }
         .tier-badge {
           display: inline-block;
-          font-size: 0.68rem;
+          font-size: 0.65rem;
           font-weight: 750;
           color: #38BDF8;
           background: rgba(14, 165, 233, 0.12);
           padding: 3px 8px;
           border-radius: 6px;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
         .tier-title {
-          font-size: 1.25rem;
+          font-size: 1.15rem;
           font-weight: 800;
           color: #FFFFFF;
           margin-bottom: 4px;
         }
         .tier-sub {
-          font-size: 0.78rem;
+          font-size: 0.75rem;
           color: #94A3B8;
-          margin-bottom: 16px;
+          margin-bottom: 14px;
         }
         .tier-benefits-list {
           list-style: none;
           padding: 0;
-          margin: 0 0 16px 0;
+          margin: 0 0 14px 0;
           display: flex;
           flex-direction: column;
-          gap: 10px;
-          font-size: 0.8rem;
+          gap: 8px;
+          font-size: 0.78rem;
           color: #CBD5E1;
         }
         .tier-benefits-list li {
@@ -2229,44 +2403,63 @@ export default function LandingPage({
 
         /* 8. TESTIMONIALS */
         .testimonials-section {
-          padding: 60px 0;
+          padding: 50px 0;
         }
         .testimonials-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 18px;
+          gap: 14px;
         }
         @media (min-width: 768px) {
           .testimonials-grid {
             grid-template-columns: repeat(3, 1fr);
           }
         }
+        @media (max-width: 768px) {
+          .testimonials-grid {
+            display: flex;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            gap: 12px;
+            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .testimonials-grid::-webkit-scrollbar {
+            display: none;
+          }
+          .testimonial-card {
+            min-width: 260px;
+            max-width: 280px;
+            flex-shrink: 0;
+          }
+        }
         .testimonial-card {
-          padding: 24px;
-          border-radius: 18px;
+          padding: 20px 18px;
+          border-radius: 16px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
         }
         .testimonial-text {
-          font-size: 0.85rem;
+          font-size: 0.82rem;
           color: #E2E8F0;
-          line-height: 1.6;
-          margin-bottom: 18px;
+          line-height: 1.55;
+          margin-bottom: 16px;
           font-style: italic;
         }
         .testimonial-author {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
         }
         .author-avatar {
-          width: 38px;
-          height: 38px;
+          width: 36px;
+          height: 36px;
           border-radius: 50%;
           background: linear-gradient(135deg, #4F46E5 0%, #10B981 100%);
           color: #FFFFFF;
-          font-size: 0.8rem;
+          font-size: 0.76rem;
           font-weight: 800;
           display: flex;
           align-items: center;
@@ -2274,34 +2467,29 @@ export default function LandingPage({
           flex-shrink: 0;
         }
         .author-name {
-          font-size: 0.85rem;
+          font-size: 0.82rem;
           font-weight: 750;
           color: #FFFFFF;
         }
         .author-meta {
-          font-size: 0.7rem;
+          font-size: 0.68rem;
           color: #94A3B8;
         }
 
         /* 9. CAREERS */
         .careers-section {
-          padding: 50px 0;
+          padding: 40px 0;
         }
         .careers-banner-card {
-          padding: 36px 30px;
-          border-radius: 22px;
+          padding: 28px 22px;
+          border-radius: 18px;
           background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(15, 23, 42, 0.8) 100%);
           border: 1px solid rgba(99, 102, 241, 0.25);
-        }
-        @media (max-width: 640px) {
-          .careers-banner-card {
-            padding: 24px 18px;
-          }
         }
         .careers-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 28px;
+          gap: 20px;
           align-items: center;
         }
         @media (min-width: 900px) {
@@ -2312,21 +2500,21 @@ export default function LandingPage({
         .perk-check {
           color: #10B981;
           font-weight: 800;
-          font-size: 0.85rem;
+          font-size: 0.82rem;
         }
 
         /* 10. CONTACT */
         .contact-master-section {
-          padding: 50px 0;
+          padding: 40px 0;
         }
         .contact-summary-card {
-          padding: 32px 28px;
-          border-radius: 20px;
+          padding: 24px 20px;
+          border-radius: 18px;
         }
         .contact-grid {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 24px;
+          gap: 20px;
         }
         @media (min-width: 768px) {
           .contact-grid {
@@ -2350,55 +2538,67 @@ export default function LandingPage({
         }
         .section-pill-tag {
           display: inline-block;
-          font-size: 0.72rem;
+          font-size: 0.68rem;
           font-weight: 750;
           color: #818CF8;
           background: rgba(99, 102, 241, 0.12);
           border: 1px solid rgba(99, 102, 241, 0.3);
-          padding: 4px 14px;
+          padding: 3px 12px;
           border-radius: 9999px;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
           letter-spacing: 0.04em;
           text-transform: uppercase;
         }
         .section-heading-lg {
           font-family: var(--font-heading);
-          font-size: 1.85rem;
+          font-size: 1.65rem;
           font-weight: 850;
           color: #FFFFFF;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
           line-height: 1.22;
           letter-spacing: -0.02em;
         }
         @media (min-width: 768px) {
-          .section-heading-lg { font-size: 2.4rem; }
+          .section-heading-lg { font-size: 2.2rem; }
         }
         .section-sub-text {
-          font-size: 0.9rem;
+          font-size: 0.85rem;
           color: #94A3B8;
-          line-height: 1.6;
+          line-height: 1.55;
         }
 
-        @media (max-width: 640px) {
+        /* Mobile specific overrides */
+        @media (max-width: 768px) {
+          .desktop-only-btn {
+            display: none !important;
+          }
           .brand-sub-desc {
             display: none;
           }
           .brand-main-name {
-            font-size: 0.92rem;
+            font-size: 0.95rem;
           }
           .brand-classes-badge {
-            font-size: 0.6rem;
+            font-size: 0.58rem;
             padding: 1px 4px;
           }
-          .nav-login-btn span {
+        }
+        @media (max-width: 480px) {
+          .brand-classes-badge {
             display: none;
           }
-          .nav-login-btn {
-            padding: 7px 9px;
+          .brand-main-name {
+            font-size: 0.9rem;
           }
           .nav-demo-btn {
-            padding: 6px 10px;
-            font-size: 0.74rem;
+            padding: 5px 9px;
+            font-size: 0.7rem;
+          }
+          .hero-headline {
+            font-size: 1.75rem;
+          }
+          .caption-desc {
+            display: none;
           }
         }
       `}</style>
