@@ -142,7 +142,7 @@ export default function LandingPage({
       benefits: [
         'Dedicated subject experts for Classes 1 to 10 (SSC & CBSE)',
         'Friendly, respectful, and zero-fear classroom environment',
-        'Sunday 1-on-1 mentoring for doubt clarification',
+        'Personalized 1-on-1 mentoring & continuous doubt clarification',
         'Continuous teacher-parent communication regarding growth'
       ],
       quote: '"We don\'t just teach the syllabus — we build lifelong academic confidence."',
@@ -654,13 +654,6 @@ export default function LandingPage({
                 <div className="subject-name text-amber-300">Weekly Test</div>
                 <p className="subject-desc">Comprehensive weekly slip test evaluating Monday–Friday topics with instant WhatsApp report</p>
               </div>
-
-              <div className="schedule-day-box day-sun highlight-doubt">
-                <div className="day-name text-emerald-400">SUNDAY</div>
-                <div className="subject-icon">🎯</div>
-                <div className="subject-name text-emerald-300">Doubt Clarification</div>
-                <p className="subject-desc">1-on-1 personalized mentoring for slow learners, revision of weak topics &amp; board exam prep</p>
-              </div>
             </div>
           </div>
         </div>
@@ -1164,8 +1157,7 @@ export default function LandingPage({
                   Morning Batches: <strong>6:00 AM – 8:30 AM</strong><br />
                   Evening Batches: <strong>5:00 PM – 8:30 PM</strong><br />
                   Monday – Friday: Daily Single-Subject Immersion<br />
-                  Saturday: Weekly Slip Test Evaluation<br />
-                  Sunday: 1-on-1 Doubt Clarification
+                  Saturday: Weekly Slip Test Evaluation &amp; WhatsApp Report
                 </p>
               </div>
             </div>
@@ -2437,7 +2429,12 @@ export default function LandingPage({
         }
         @media (min-width: 992px) {
           .timetable-days-grid {
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(6, 1fr);
+          }
+        }
+        @media (min-width: 640px) and (max-width: 991px) {
+          .timetable-days-grid {
+            grid-template-columns: repeat(3, 1fr);
           }
         }
         @media (max-width: 768px) {
