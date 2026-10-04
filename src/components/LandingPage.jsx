@@ -262,7 +262,7 @@ export default function LandingPage({
             >
               <UserCheck size={14} className="text-emerald" />
               <span className="nav-btn-text-full">Parental Login</span>
-              <span className="nav-btn-text-short">Parent</span>
+              <span className="nav-btn-text-short">Login</span>
             </button>
 
             {/* The Dedicated Single Place for Book Free Demo */}
@@ -284,7 +284,7 @@ export default function LandingPage({
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Toggle mobile menu"
             >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
           </div>
         </div>
@@ -1482,58 +1482,105 @@ export default function LandingPage({
         }
 
         .nav-btn-text-full {
-          display: inline;
+          display: inline !important;
         }
         .nav-btn-text-short {
-          display: none;
+          display: none !important;
+        }
+
+        /* Below 1024px: Whenever hamburger menu is visible, use compact labels and hide secondary brand text */
+        @media (max-width: 1023px) {
+          .nav-btn-text-full {
+            display: none !important;
+          }
+          .nav-btn-text-short {
+            display: inline !important;
+          }
+          .brand-classes-badge {
+            display: none !important;
+          }
+          .brand-sub-desc {
+            display: none !important;
+          }
+          .landing-nav-actions {
+            margin-left: auto !important;
+            gap: 6px !important;
+            flex-shrink: 0 !important;
+          }
+          .landing-brand-wrap {
+            flex-shrink: 0 !important;
+            min-width: max-content !important;
+          }
         }
 
         @media (max-width: 768px) {
-          .landing-brand-wrap {
-            gap: 6px;
-          }
-          .landing-brand-wrap svg {
-            width: 28px !important;
-            height: 28px !important;
-          }
           .landing-nav-container {
-            padding: 0 10px;
-            gap: 6px;
+            padding: 0 10px !important;
+            gap: 6px !important;
+          }
+          .landing-brand-wrap {
+            gap: 6px !important;
+            flex-shrink: 0 !important;
+            min-width: max-content !important;
+          }
+          .hayagriva-logo-container {
+            gap: 0 !important;
+          }
+          .hayagriva-emblem-badge {
+            width: 26px !important;
+            height: 26px !important;
+            min-width: 26px !important;
+          }
+          .brand-main-name {
+            font-size: 0.88rem !important;
+            white-space: nowrap !important;
+            line-height: 1 !important;
           }
           .landing-nav-actions {
-            gap: 5px;
-          }
-          .nav-btn-text-full {
-            display: none;
-          }
-          .nav-btn-text-short {
-            display: inline;
+            gap: 5px !important;
+            flex-shrink: 0 !important;
+            margin-left: auto !important;
           }
           .nav-action-parental-login {
-            padding: 5px 8px;
-            font-size: 0.72rem;
-            gap: 4px;
+            padding: 5px 8px !important;
+            font-size: 0.72rem !important;
+            gap: 4px !important;
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
           }
           .nav-action-demo-btn {
-            padding: 5px 9px;
-            font-size: 0.72rem;
-            gap: 4px;
+            padding: 5px 9px !important;
+            font-size: 0.72rem !important;
+            gap: 4px !important;
+            white-space: nowrap !important;
+            flex-shrink: 0 !important;
           }
           .mobile-menu-toggle-btn {
-            width: 32px;
-            height: 32px;
+            width: 32px !important;
+            height: 32px !important;
+            min-width: 32px !important;
+            flex-shrink: 0 !important;
           }
         }
+
         @media (max-width: 380px) {
-          .nav-action-parental-login span {
-            display: none;
+          .landing-nav-container {
+            padding: 0 6px !important;
+            gap: 4px !important;
+          }
+          .landing-nav-actions {
+            gap: 4px !important;
+          }
+          .brand-main-name {
+            font-size: 0.82rem !important;
           }
           .nav-action-parental-login {
-            padding: 5px 6px;
+            padding: 4px 6px !important;
+            font-size: 0.68rem !important;
           }
           .nav-action-demo-btn {
-            padding: 5px 7px;
-            font-size: 0.68rem;
+            padding: 4px 7px !important;
+            font-size: 0.68rem !important;
           }
         }
 
@@ -3012,27 +3059,13 @@ export default function LandingPage({
             display: none !important;
           }
           .brand-sub-desc {
-            display: none;
-          }
-          .brand-main-name {
-            font-size: 0.95rem;
+            display: none !important;
           }
           .brand-classes-badge {
-            font-size: 0.58rem;
-            padding: 1px 4px;
+            display: none !important;
           }
         }
         @media (max-width: 480px) {
-          .brand-classes-badge {
-            display: none;
-          }
-          .brand-main-name {
-            font-size: 0.9rem;
-          }
-          .nav-demo-btn {
-            padding: 5px 9px;
-            font-size: 0.7rem;
-          }
           .hero-headline {
             font-size: 1.75rem;
           }
