@@ -142,7 +142,8 @@ export default function Navbar({
             </div>
             <div className="brand-text">
               <div className="brand-title">
-                <span>HAYAGRIVA TUTORIALS</span>
+                <span className="brand-title-full">HAYAGRIVA TUTORIALS</span>
+                <span className="brand-title-short">HAYAGRIVA</span>
                 <span className="brand-tag">Class 1 to X</span>
               </div>
               <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
@@ -610,6 +611,9 @@ export default function Navbar({
           align-items: center;
           gap: 8px;
           line-height: 1.2;
+        }
+        .brand-title-short {
+          display: none;
         }
         .brand-tag {
           font-size: 0.65rem;
@@ -1218,21 +1222,35 @@ export default function Navbar({
             display: none !important;
           }
           .navbar-brand-group {
-            min-width: 0;
+            display: flex;
+            align-items: center;
             gap: 8px;
+            min-width: 0;
+            flex: 1;
+            overflow: hidden;
           }
           .navbar-brand {
-            min-width: 0;
+            display: flex;
+            align-items: center;
             gap: 8px;
+            min-width: 0;
+            overflow: hidden;
           }
           .brand-logo-box {
             flex-shrink: 0;
           }
+          .brand-text {
+            min-width: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          }
           .brand-title {
-            font-size: 0.92rem;
+            font-size: 0.95rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            line-height: 1.2;
           }
           .brand-tag {
             display: none;
@@ -1245,6 +1263,7 @@ export default function Navbar({
             align-items: center;
             gap: 6px;
             flex-shrink: 0;
+            margin-left: auto;
           }
           .btn-label-text { display: none; }
           .user-badge-name { display: none; }
@@ -1253,41 +1272,45 @@ export default function Navbar({
           }
         }
 
-        @media (max-width: 480px) {
+        /* Mobile Screens (Under 640px) - Clean, Uncluttered Top Bar */
+        @media (max-width: 640px) {
           .navbar-inner {
-            padding: 6px 10px !important;
-            gap: 6px !important;
+            padding: 8px 10px !important;
+            gap: 8px !important;
           }
           .mobile-sidebar-toggle-btn {
-            width: 34px;
-            height: 34px;
+            width: 34px !important;
+            height: 34px !important;
           }
-          .navbar-brand-group {
-            gap: 6px;
+          .brand-title-full {
+            display: none !important;
           }
-          .navbar-brand {
-            gap: 6px;
+          .brand-title-short {
+            display: inline !important;
+            font-size: 0.95rem !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.02em !important;
+            color: #FFFFFF !important;
           }
-          .brand-title {
-            font-size: 0.85rem;
-          }
-          .navbar-actions {
-            gap: 4px;
-          }
+          /* Hide secondary pills from mobile header to prevent collisions - all available in sidebar drawer */
           .live-status-pill {
-            padding: 3px 6px;
-            font-size: 0.65rem;
+            display: none !important;
           }
-          .current-user-badge {
-            padding: 2px 6px;
-            font-size: 0.675rem;
-          }
-          .user-role-tag {
-            font-size: 0.575rem;
-            padding: 1px 4px;
+          .db-settings-btn {
+            display: none !important;
           }
           .logout-nav-btn {
-            padding: 4px 6px;
+            display: none !important;
+          }
+          .current-user-badge {
+            padding: 4px 8px !important;
+            gap: 5px !important;
+            background: rgba(15, 23, 42, 0.75) !important;
+          }
+          .user-role-tag {
+            font-size: 0.65rem !important;
+            font-weight: 800 !important;
+            padding: 2px 6px !important;
           }
         }
       `}</style>
