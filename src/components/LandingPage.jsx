@@ -1224,47 +1224,170 @@ export default function LandingPage({
       {/* ============================================================== */}
       {/* 10. FOOTER */}
       {/* ============================================================== */}
-      <footer className="landing-footer">
+      <footer className="landing-footer" id="site-footer">
         <div className="section-container">
-          <div className="flex items-center justify-between flex-wrap gap-4 py-5 border-t border-slate-800">
-            <div className="flex items-center gap-2.5">
-              <HayagrivaLogo size={28} />
-              <div>
-                <span className="text-xs font-semibold text-white">HAYAGRIVA TUTORIALS</span>
-                <div className="text-3xs text-muted">
-                  &copy; {new Date().getFullYear()} HAYAGRIVA TUTORIALS • Srinagar Colony, Hyderabad
+          {/* Top Multi-Column Content */}
+          <div className="footer-top-grid">
+            {/* Column 1: Brand & Contact Identity */}
+            <div className="footer-col brand-col">
+              <div className="footer-brand-header">
+                <HayagrivaLogo size={36} showGlow={true} />
+                <div className="footer-brand-headings">
+                  <span className="footer-brand-title">HAYAGRIVA TUTORIALS</span>
+                  <span className="footer-brand-badge">Classes 1–10 • SSC &amp; CBSE</span>
                 </div>
+              </div>
+
+              <p className="footer-brand-tagline">
+                Transforming academic performance with conceptual clarity, daily single-subject immersion, and dedicated weekly assessments.
+              </p>
+
+              <div className="footer-address-block">
+                <div className="footer-address-line">
+                  <MapPin size={14} className="footer-icon-accent" />
+                  <span>8-3-825/5/5/2, Yellareddyguda, Srinagar Colony, Hyderabad – 500073</span>
+                </div>
+              </div>
+
+              <div className="footer-contact-chips">
+                <a href="tel:+919848266892" className="footer-chip">
+                  <Phone size={13} className="footer-icon-emerald" />
+                  <span>+91 98482 66892</span>
+                </a>
+                <a href="https://wa.me/919848266892" target="_blank" rel="noreferrer" className="footer-chip">
+                  <MessageCircle size={13} className="footer-icon-emerald" />
+                  <span>WhatsApp Us</span>
+                </a>
               </div>
             </div>
 
-            <div className="flex items-center gap-3.5 text-xs text-secondary">
+            {/* Column 2: Academic Programs */}
+            <div className="footer-col">
+              <h4 className="footer-col-title">Academic Wings</h4>
+              <ul className="footer-links-list">
+                <li><a href="#batches" className="footer-nav-link"><span className="footer-link-bullet">›</span> Primary Wing (Classes 1–5)</a></li>
+                <li><a href="#batches" className="footer-nav-link"><span className="footer-link-bullet">›</span> Middle Wing (Classes 6–8)</a></li>
+                <li><a href="#batches" className="footer-nav-link"><span className="footer-link-bullet">›</span> High School (Classes 9–10 SSC &amp; CBSE)</a></li>
+                <li><a href="#features" className="footer-nav-link"><span className="footer-link-bullet">›</span> Special Focus on Mathematics</a></li>
+                <li><a href="#features" className="footer-nav-link"><span className="footer-link-bullet">›</span> Concept-Based Science Lab</a></li>
+              </ul>
+            </div>
+
+            {/* Column 3: The Hayagriva Edge */}
+            <div className="footer-col">
+              <h4 className="footer-col-title">The Hayagriva Edge</h4>
+              <ul className="footer-perks-list">
+                <li className="footer-perk-item">
+                  <CheckCircle2 size={13} className="footer-icon-emerald" />
+                  <span>&ldquo;One Day, One Subject&rdquo; Immersion</span>
+                </li>
+                <li className="footer-perk-item">
+                  <CheckCircle2 size={13} className="footer-icon-emerald" />
+                  <span>Strict Limit: Max 25 Students/Batch</span>
+                </li>
+                <li className="footer-perk-item">
+                  <CheckCircle2 size={13} className="footer-icon-emerald" />
+                  <span>Saturday Weekly Slip Tests</span>
+                </li>
+                <li className="footer-perk-item">
+                  <CheckCircle2 size={13} className="footer-icon-emerald" />
+                  <span>Instant WhatsApp Progress Reports</span>
+                </li>
+                <li className="footer-perk-item">
+                  <CheckCircle2 size={13} className="footer-icon-emerald" />
+                  <span>Air-Conditioned &amp; CCTV Secured</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 4: Quick Portals & Actions */}
+            <div className="footer-col">
+              <h4 className="footer-col-title">Portals &amp; Inquiries</h4>
+              <div className="footer-buttons-stack">
+                <button 
+                  type="button" 
+                  className="footer-btn-primary" 
+                  onClick={handleOpenParentLogin}
+                >
+                  <Users size={14} />
+                  <span>Parent Portal Login</span>
+                </button>
+                <button 
+                  type="button" 
+                  className="footer-btn-secondary" 
+                  onClick={handleOpenDemo}
+                >
+                  <Sparkles size={14} />
+                  <span>Book Free Demo Class</span>
+                </button>
+                <button 
+                  type="button" 
+                  className="footer-btn-ghost" 
+                  onClick={handleOpenTeacher}
+                >
+                  <Briefcase size={14} />
+                  <span>Faculty Careers</span>
+                </button>
+                {onOpenLogin && (
+                  <button 
+                    type="button" 
+                    className="footer-btn-ghost" 
+                    onClick={() => onOpenLogin('ADMIN')}
+                  >
+                    <LogIn size={14} />
+                    <span>Admin / Staff Login</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Copyright & Navigation Bar */}
+          <div className="footer-bottom-bar">
+            <div className="footer-copyright-text">
+              &copy; {new Date().getFullYear()} <strong className="footer-brand-highlight">HAYAGRIVA TUTORIALS</strong>. All rights reserved.
+              <span className="footer-city-tag">• Srinagar Colony, Hyderabad, Telangana</span>
+            </div>
+
+            <div className="footer-bottom-links">
               <button 
                 type="button" 
-                className="hover:text-white transition-colors"
+                className="footer-bottom-link-btn" 
                 onClick={handleOpenParentLogin}
               >
                 Parent Portal
               </button>
+              <span className="footer-dot-separator">•</span>
               <button 
                 type="button" 
-                className="hover:text-white transition-colors"
+                className="footer-bottom-link-btn" 
                 onClick={handleOpenDemo}
               >
                 Free Demo
               </button>
+              <span className="footer-dot-separator">•</span>
               <button 
                 type="button" 
-                className="hover:text-white transition-colors"
+                className="footer-bottom-link-btn" 
                 onClick={handleOpenTeacher}
               >
                 Careers
               </button>
+              <span className="footer-dot-separator">•</span>
               <a 
                 href="#contact" 
-                className="hover:text-white transition-colors"
+                className="footer-bottom-link-btn"
               >
                 Contact
               </a>
+              <span className="footer-dot-separator">•</span>
+              <button 
+                type="button" 
+                className="footer-bottom-link-btn footer-scroll-top-btn"
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              >
+                Top ↑
+              </button>
             </div>
           </div>
         </div>
@@ -2528,7 +2651,321 @@ export default function LandingPage({
 
         /* 11. FOOTER */
         .landing-footer {
-          background: #080B12;
+          background: linear-gradient(180deg, #070A11 0%, #030509 100%);
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 44px 0 24px;
+          color: #94A3B8;
+          position: relative;
+        }
+
+        /* Complete reset for all footer buttons to prevent user-agent default styling */
+        .landing-footer button {
+          appearance: none;
+          -webkit-appearance: none;
+          -moz-appearance: none;
+          background: transparent;
+          border: none;
+          outline: none;
+          color: inherit;
+          font-family: inherit;
+          padding: 0;
+          margin: 0;
+          cursor: pointer;
+          text-decoration: none;
+        }
+
+        .footer-top-grid {
+          display: grid;
+          grid-template-columns: 1.35fr 1fr 1.15fr 1fr;
+          gap: 32px;
+          margin-bottom: 36px;
+        }
+        @media (max-width: 1024px) {
+          .footer-top-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 28px;
+          }
+        }
+        @media (max-width: 640px) {
+          .footer-top-grid {
+            grid-template-columns: 1fr;
+            gap: 24px;
+          }
+        }
+
+        .footer-col {
+          display: flex;
+          flex-direction: column;
+        }
+        .footer-brand-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+        .footer-brand-headings {
+          display: flex;
+          flex-direction: column;
+        }
+        .footer-brand-title {
+          font-family: var(--font-heading);
+          font-size: 1.05rem;
+          font-weight: 800;
+          color: #FFFFFF;
+          letter-spacing: -0.01em;
+          line-height: 1.2;
+        }
+        .footer-brand-badge {
+          display: inline-block;
+          font-size: 0.64rem;
+          font-weight: 700;
+          color: #F59E0B;
+          background: rgba(245, 158, 11, 0.1);
+          border: 1px solid rgba(245, 158, 11, 0.25);
+          padding: 1px 7px;
+          border-radius: 9999px;
+          margin-top: 4px;
+          width: fit-content;
+        }
+        .footer-brand-tagline {
+          font-size: 0.8rem;
+          line-height: 1.55;
+          color: #94A3B8;
+          margin-bottom: 14px;
+        }
+        .footer-address-block {
+          margin-bottom: 14px;
+        }
+        .footer-address-line {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 0.77rem;
+          color: #94A3B8;
+          line-height: 1.45;
+        }
+        .footer-icon-accent {
+          color: #F43F5E;
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+        .footer-icon-emerald {
+          color: #10B981;
+          flex-shrink: 0;
+        }
+        .footer-contact-chips {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .footer-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 8px;
+          color: #E2E8F0;
+          font-size: 0.76rem;
+          font-weight: 550;
+          text-decoration: none;
+          transition: all 0.2s ease;
+        }
+        .footer-chip:hover {
+          background: rgba(99, 102, 241, 0.15);
+          border-color: rgba(99, 102, 241, 0.35);
+          color: #FFFFFF;
+          transform: translateY(-1px);
+        }
+
+        .footer-col-title {
+          font-family: var(--font-heading);
+          font-size: 0.88rem;
+          font-weight: 750;
+          color: #FFFFFF;
+          margin-bottom: 16px;
+          letter-spacing: 0.02em;
+          position: relative;
+          padding-bottom: 8px;
+        }
+        .footer-col-title::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 24px;
+          height: 2px;
+          background: #6366F1;
+          border-radius: 2px;
+        }
+        .footer-links-list, .footer-perks-list {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .footer-nav-link {
+          color: #94A3B8;
+          text-decoration: none;
+          font-size: 0.79rem;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.18s ease;
+        }
+        .footer-nav-link:hover {
+          color: #FFFFFF;
+          transform: translateX(3px);
+        }
+        .footer-link-bullet {
+          color: #6366F1;
+          font-weight: 700;
+          font-size: 0.95rem;
+          line-height: 1;
+        }
+        .footer-perk-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 0.78rem;
+          color: #94A3B8;
+          line-height: 1.45;
+        }
+        .footer-buttons-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+        .footer-btn-primary {
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: 100%;
+          background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%) !important;
+          color: #FFFFFF !important;
+          padding: 9px 14px !important;
+          border-radius: 9px;
+          font-size: 0.8rem;
+          font-weight: 650;
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+          transition: all 0.2s ease;
+        }
+        .footer-btn-primary:hover {
+          background: linear-gradient(135deg, #4338CA 0%, #4F46E5 100%) !important;
+          box-shadow: 0 6px 18px rgba(79, 70, 229, 0.4);
+          transform: translateY(-1px);
+        }
+        .footer-btn-secondary {
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: 100%;
+          background: rgba(255, 255, 255, 0.05) !important;
+          border: 1px solid rgba(255, 255, 255, 0.12) !important;
+          color: #E2E8F0 !important;
+          padding: 8px 14px !important;
+          border-radius: 9px;
+          font-size: 0.79rem;
+          font-weight: 600;
+          transition: all 0.2s ease;
+        }
+        .footer-btn-secondary:hover {
+          background: rgba(255, 255, 255, 0.1) !important;
+          border-color: rgba(255, 255, 255, 0.25) !important;
+          color: #FFFFFF !important;
+        }
+        .footer-btn-ghost {
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: 100%;
+          background: transparent !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          color: #94A3B8 !important;
+          padding: 8px 14px !important;
+          border-radius: 9px;
+          font-size: 0.77rem;
+          font-weight: 550;
+          transition: all 0.2s ease;
+        }
+        .footer-btn-ghost:hover {
+          color: #FFFFFF !important;
+          border-color: rgba(255, 255, 255, 0.18) !important;
+          background: rgba(255, 255, 255, 0.04) !important;
+        }
+
+        .footer-bottom-bar {
+          border-top: 1px solid rgba(255, 255, 255, 0.07);
+          padding-top: 22px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 14px;
+          font-size: 0.76rem;
+          color: #64748B;
+        }
+        @media (max-width: 768px) {
+          .footer-bottom-bar {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+          }
+        }
+        .footer-copyright-text {
+          color: #94A3B8;
+        }
+        .footer-brand-highlight {
+          color: #FFFFFF;
+          font-weight: 700;
+        }
+        .footer-city-tag {
+          color: #64748B;
+          margin-left: 4px;
+        }
+        .footer-bottom-links {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        @media (max-width: 768px) {
+          .footer-bottom-links {
+            justify-content: center;
+          }
+        }
+        .footer-bottom-link-btn {
+          appearance: none;
+          -webkit-appearance: none;
+          background: transparent !important;
+          border: none !important;
+          color: #94A3B8 !important;
+          font-size: 0.77rem !important;
+          font-weight: 550;
+          text-decoration: none !important;
+          cursor: pointer;
+          padding: 3px 6px !important;
+          border-radius: 5px;
+          transition: all 0.15s ease;
+        }
+        .footer-bottom-link-btn:hover {
+          color: #818CF8 !important;
+          background: rgba(99, 102, 241, 0.08) !important;
+        }
+        .footer-dot-separator {
+          color: #334155;
+          font-size: 0.65rem;
+        }
+        .footer-scroll-top-btn {
+          color: #818CF8 !important;
+          font-weight: 600 !important;
         }
 
         /* Reusable Section Headers */
