@@ -137,26 +137,60 @@ export default function Attendance({
     setTimeout(() => setSaveIndicator(false), 2200);
   };
 
+  // Sunday detection & Extra Class State
+  const isSelectedDateSunday = useMemo(() => {
+    if (!selectedDate) return false;
+    const parts = selectedDate.split('-');
+    if (parts.length !== 3) return false;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return d.getDay() === 0;
+  }, [selectedDate]);
+
+  const hasSundayRecords = useMemo(() => {
+    if (!isSelectedDateSunday) return false;
+    return attendance.some(a => a.date === selectedDate && (a.status === 'PRESENT' || a.status === 'ABSENT' || a.status === 'LATE'));
+  }, [isSelectedDateSunday, attendance, selectedDate]);
+
+  const [sundayExtraClassActive, setSundayExtraClassActive] = useState(false);
+
+  useEffect(() => {
+    setSundayExtraClassActive(false);
+  }, [selectedDate]);
+
+  const isSundayExtraClass = isSelectedDateSunday && (hasSundayRecords || sundayExtraClassActive);
+
   // Helper: Get student status on selected date
   const getStudentStatus = (studentId) => {
     const record = attendance.find(a => a.studentId === studentId && a.date === selectedDate);
-    if (!record) return 'PRESENT';
-    return record.status || 'PRESENT';
+    if (record) return record.status || 'PRESENT';
+    if (isSelectedDateSunday && !isSundayExtraClass) {
+      return 'HOLIDAY';
+    }
+    return 'PRESENT';
   };
 
   // 1-Tap Toggle: Present ↔ Absent (Works across any view and auto-detects student batch)
   const handleToggleAbsent = (studentId) => {
     const student = students.find(s => s.id === studentId);
     const currentStatus = getStudentStatus(studentId);
-    const newStatus = currentStatus === 'ABSENT' ? 'PRESENT' : 'ABSENT';
+    let newStatus;
+    if (currentStatus === 'HOLIDAY') {
+      newStatus = 'PRESENT';
+    } else if (currentStatus === 'ABSENT') {
+      newStatus = 'PRESENT';
+    } else {
+      newStatus = 'ABSENT';
+    }
 
     const existingIndex = attendance.findIndex(a => a.studentId === studentId && a.date === selectedDate);
     let updated = [...attendance];
+    const remarks = isSelectedDateSunday ? 'Sunday Extra Class' : '';
 
     if (existingIndex >= 0) {
       updated[existingIndex] = {
         ...updated[existingIndex],
         status: newStatus,
+        remarks: updated[existingIndex].remarks || remarks,
         batchId: student?.batchId || updated[existingIndex]?.batchId
       };
     } else {
@@ -165,8 +199,13 @@ export default function Attendance({
         studentId,
         date: selectedDate,
         status: newStatus,
+        remarks,
         batchId: student?.batchId
       });
+    }
+
+    if (isSelectedDateSunday && !sundayExtraClassActive) {
+      setSundayExtraClassActive(true);
     }
 
     onSaveData({ ...data, attendance: updated });
@@ -178,11 +217,13 @@ export default function Attendance({
     const student = students.find(s => s.id === studentId);
     const existingIndex = attendance.findIndex(a => a.studentId === studentId && a.date === selectedDate);
     let updated = [...attendance];
+    const remarks = isSelectedDateSunday ? 'Sunday Extra Class' : '';
 
     if (existingIndex >= 0) {
       updated[existingIndex] = {
         ...updated[existingIndex],
         status,
+        remarks: updated[existingIndex].remarks || remarks,
         batchId: student?.batchId || updated[existingIndex]?.batchId
       };
     } else {
@@ -191,34 +232,60 @@ export default function Attendance({
         studentId,
         date: selectedDate,
         status,
+        remarks,
         batchId: student?.batchId
       });
+    }
+
+    if (isSelectedDateSunday && !sundayExtraClassActive) {
+      setSundayExtraClassActive(true);
     }
 
     onSaveData({ ...data, attendance: updated });
     triggerSaveIndicator();
   };
 
-  // Reset entire batch to Present
+  // Reset entire batch to Present (or Mark All Attended for Sunday Extra Class)
   const handleResetAllPresent = () => {
     let updated = [...attendance];
+    const remarks = isSelectedDateSunday ? 'Sunday Extra Class' : '';
+
     eligibleBatchStudents.forEach(student => {
       const existingIndex = updated.findIndex(a => a.studentId === student.id && a.date === selectedDate);
       if (existingIndex >= 0) {
-        updated[existingIndex] = { ...updated[existingIndex], status: 'PRESENT' };
+        updated[existingIndex] = { 
+          ...updated[existingIndex], 
+          status: 'PRESENT',
+          remarks: updated[existingIndex].remarks || remarks
+        };
       } else {
         updated.push({
           id: generateNextId(updated),
           studentId: student.id,
           date: selectedDate,
           status: 'PRESENT',
+          remarks,
           batchId: student.batchId
         });
       }
     });
 
+    if (isSelectedDateSunday && !sundayExtraClassActive) {
+      setSundayExtraClassActive(true);
+    }
+
     onSaveData({ ...data, attendance: updated });
     triggerSaveIndicator();
+  };
+
+  // Revert Sunday to default weekly holiday
+  const handleRevertSundayHoliday = () => {
+    if (window.confirm(`Revert ${formattedSelectedDate} to default Weekly Holiday? Any Sunday extra class attendance records for this date will be cleared.`)) {
+      const remainingAttendance = attendance.filter(a => a.date !== selectedDate);
+      onSaveData({ ...data, attendance: remainingAttendance });
+      setSundayExtraClassActive(false);
+      triggerSaveIndicator();
+    }
   };
 
   // ==========================================
@@ -226,28 +293,30 @@ export default function Attendance({
   // ==========================================
   const activeStudentsTotal = accessibleStudents.filter(s => s.status === 'ACTIVE').length;
 
-  const allAbsenteesForDate = attendance
-    .filter(a => a.date === selectedDate && a.status === 'ABSENT')
-    .map(record => {
-      const student = accessibleStudents.find(s => s.id === record.studentId);
-      if (!student || student.status !== 'ACTIVE') return null;
-      const studentClass = classes.find(c => c.code === student.classCode);
-      const studentBatch = batches.find(b => b.id === (record.batchId || student.batchId));
-      return {
-        ...student,
-        attendanceRecordId: record.id,
-        recordDate: record.date,
-        recordStatus: record.status,
-        className: studentClass?.name || student.classCode,
-        classCategory: studentClass?.category || '',
-        batchName: studentBatch?.name || 'Main Batch',
-        batchTiming: studentBatch?.timing || 'Tuition Hours'
-      };
-    })
-    .filter(Boolean);
+  const allAbsenteesForDate = (isSelectedDateSunday && !isSundayExtraClass) 
+    ? []
+    : attendance
+        .filter(a => a.date === selectedDate && a.status === 'ABSENT')
+        .map(record => {
+          const student = accessibleStudents.find(s => s.id === record.studentId);
+          if (!student || student.status !== 'ACTIVE') return null;
+          const studentClass = classes.find(c => c.code === student.classCode);
+          const studentBatch = batches.find(b => b.id === (record.batchId || student.batchId));
+          return {
+            ...student,
+            attendanceRecordId: record.id,
+            recordDate: record.date,
+            recordStatus: record.status,
+            className: studentClass?.name || student.classCode,
+            classCategory: studentClass?.category || '',
+            batchName: studentBatch?.name || 'Main Batch',
+            batchTiming: studentBatch?.timing || 'Tuition Hours'
+          };
+        })
+        .filter(Boolean);
 
   const overallTurnout = activeStudentsTotal > 0 
-    ? Math.max(0, Math.round(((activeStudentsTotal - allAbsenteesForDate.length) / activeStudentsTotal) * 100))
+    ? (isSelectedDateSunday && !isSundayExtraClass ? null : Math.max(0, Math.round(((activeStudentsTotal - allAbsenteesForDate.length) / activeStudentsTotal) * 100)))
     : 100;
 
   // Filtered All Absentees list for table
@@ -273,7 +342,9 @@ export default function Attendance({
       year: 'numeric'
     });
 
-    let text = `📌 *HAYAGRIVA TUTORIALS — ABSENTEE REGISTER*\n`;
+    let text = isSelectedDateSunday
+      ? `📌 *HAYAGRIVA TUTORIALS — SUNDAY EXTRA CLASS ABSENTEE REGISTER*\n`
+      : `📌 *HAYAGRIVA TUTORIALS — ABSENTEE REGISTER*\n`;
     text += `📅 Date: ${dateFormatted}\n`;
     text += `Total Absentees: ${allAbsenteesForDate.length} of ${activeStudentsTotal} (Turnout: ${overallTurnout}%)\n\n`;
 
@@ -343,11 +414,12 @@ export default function Attendance({
 
   const batchAbsentStudents = eligibleBatchStudents.filter(s => getStudentStatus(s.id) === 'ABSENT');
   const batchLateStudents = eligibleBatchStudents.filter(s => getStudentStatus(s.id) === 'LATE');
-  const batchPresentCount = eligibleBatchStudents.length - batchAbsentStudents.length - batchLateStudents.length;
+  const batchPresentStudents = eligibleBatchStudents.filter(s => getStudentStatus(s.id) === 'PRESENT');
+  const batchPresentCount = isSelectedDateSunday && !isSundayExtraClass ? 0 : batchPresentStudents.length;
   const batchAbsentCount = batchAbsentStudents.length;
   const batchLateCount = batchLateStudents.length;
   const batchAttendancePercentage = eligibleBatchStudents.length > 0 
-    ? Math.round((batchPresentCount / eligibleBatchStudents.length) * 100) 
+    ? (isSelectedDateSunday && !isSundayExtraClass ? null : Math.round((batchPresentCount / eligibleBatchStudents.length) * 100))
     : 100;
 
   const displayBatchStudents = eligibleBatchStudents;
@@ -507,18 +579,70 @@ export default function Attendance({
               </div>
 
               <div className="metric-pill">
-                <CheckCircle2 size={15} className="text-emerald" />
+                <CheckCircle2 size={15} className={isSelectedDateSunday && !isSundayExtraClass ? 'text-amber' : 'text-emerald'} />
                 <span>
-                  Center Turnout: <strong>{overallTurnout}%</strong>
+                  Center Turnout: <strong>{isSelectedDateSunday && !isSundayExtraClass ? 'Weekly Holiday' : `${overallTurnout}%`}</strong>
                 </span>
               </div>
 
               <div className="metric-pill text-muted text-xs">
                 <span>
-                  {accessibleClasses.filter(c => allAbsenteesForDate.some(a => a.classCode === c.code)).length} of {accessibleClasses.length} classes have absentees
+                  {isSelectedDateSunday && !isSundayExtraClass
+                    ? '🌴 Sunday Default Holiday (No classes scheduled)'
+                    : `${accessibleClasses.filter(c => allAbsenteesForDate.some(a => a.classCode === c.code)).length} of ${accessibleClasses.length} classes have absentees`
+                  }
                 </span>
               </div>
             </div>
+
+            {/* Sunday Default Holiday Banner */}
+            {isSelectedDateSunday && !isSundayExtraClass && (
+              <div className="sunday-holiday-banner mt-3">
+                <div className="banner-left">
+                  <div className="sunday-pill-tag">🌴 Sunday Default Holiday</div>
+                  <div className="sunday-banner-text">
+                    <h3 className="text-sm font-bold text-white mb-0">Tuition batches are off today by default</h3>
+                    <p className="text-xs text-muted mb-0">
+                      Regular batches do not run on Sunday. If you conducted a special revision session, mock test, or extra batch, you can take attendance below.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => {
+                    setSundayExtraClassActive(true);
+                    setViewMode('batch');
+                  }}
+                >
+                  <Zap size={14} />
+                  <span>Take Sunday Extra Class Attendance</span>
+                </button>
+              </div>
+            )}
+
+            {/* Sunday Extra Class Active Banner */}
+            {isSelectedDateSunday && isSundayExtraClass && (
+              <div className="sunday-active-banner mt-3">
+                <div className="banner-left">
+                  <div className="sunday-active-tag">⚡ Sunday Extra Class Active</div>
+                  <div className="sunday-banner-text">
+                    <h3 className="text-sm font-bold text-white mb-0">Sunday Extra Class Attendance Active</h3>
+                    <p className="text-xs text-muted mb-0">
+                      Students attending this session are credited in their attendance records and monthly percentage.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={handleRevertSundayHoliday}
+                >
+                  <RotateCcw size={13} />
+                  <span>Revert to Weekly Holiday</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Filters Bar: Batch Filter + Class Dropdown + Search Input */}
@@ -593,21 +717,45 @@ export default function Attendance({
           {allAbsenteesForDate.length === 0 ? (
             <div className="glass-card perfect-attendance-card">
               <div className="celebration-icon-box">
-                <CheckCircle2 size={46} className="text-emerald" />
+                {isSelectedDateSunday && !isSundayExtraClass ? (
+                  <span style={{ fontSize: '42px', lineHeight: 1 }}>🌴</span>
+                ) : (
+                  <CheckCircle2 size={46} className="text-emerald" />
+                )}
               </div>
-              <h2 className="celebration-title">100% Attendance on {formattedSelectedDate}!</h2>
+              <h2 className="celebration-title">
+                {isSelectedDateSunday && !isSundayExtraClass
+                  ? `Sunday Weekly Holiday (${formattedSelectedDate})`
+                  : `100% Attendance on ${formattedSelectedDate}!`}
+              </h2>
               <p className="celebration-subtitle">
-                No students across Classes 1 to 10 are marked absent for this date. All enrolled students are marked Present.
+                {isSelectedDateSunday && !isSundayExtraClass
+                  ? 'Sundays are configured as weekly holidays for all tuition batches. Attendance is not marked and students are not marked absent.'
+                  : 'No students across Classes 1 to 10 are marked absent for this date. All enrolled students are marked Present.'}
               </p>
               <div className="celebration-actions">
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  onClick={() => setViewMode('batch')}
-                >
-                  <ListChecks size={15} />
-                  <span>Open Roll Call Register</span>
-                </button>
+                {isSelectedDateSunday && !isSundayExtraClass ? (
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setSundayExtraClassActive(true);
+                      setViewMode('batch');
+                    }}
+                  >
+                    <Zap size={15} />
+                    <span>Take Sunday Extra Class Attendance</span>
+                  </button>
+                ) : (
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => setViewMode('batch')}
+                  >
+                    <ListChecks size={15} />
+                    <span>Open Roll Call Register</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : filteredAllAbsentees.length === 0 ? (
@@ -640,7 +788,9 @@ export default function Attendance({
                 </thead>
                 <tbody>
                   {filteredAllAbsentees.map((student, index) => {
-                    const messageText = `Dear Sir/Mam, this is to inform you that your child *${student.name}* of *${student.className}* was marked ABSENT for tuition today (${selectedDate}). Regular attendance is critical for academic continuity. Kindly contact us if you have any questions. - HAYAGRIVA TUTORIALS`;
+                    const messageText = isSelectedDateSunday
+                      ? `Dear Sir/Mam, this is to inform you that your child *${student.name}* of *${student.className}* was marked ABSENT for the Sunday Extra Class today (${selectedDate}). Regular attendance is critical for academic continuity. Kindly contact us if you have any questions. - HAYAGRIVA TUTORIALS`
+                      : `Dear Sir/Mam, this is to inform you that your child *${student.name}* of *${student.className}* was marked ABSENT for tuition today (${selectedDate}). Regular attendance is critical for academic continuity. Kindly contact us if you have any questions. - HAYAGRIVA TUTORIALS`;
                     const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=${encodeURIComponent(messageText)}`;
 
                     return (
@@ -726,6 +876,26 @@ export default function Attendance({
       {/* ========================================================================= */}
       {currentViewMode === 'batch' && (
         <div className="batch-attendance-container">
+          {/* Sunday Extra Class Active Notice */}
+          {isSelectedDateSunday && isSundayExtraClass && (
+            <div className="sunday-active-banner glass-card mb-3">
+              <div className="banner-left">
+                <div className="sunday-active-tag">⚡ Sunday Extra Class Active</div>
+                <span className="text-xs text-white">
+                  Attendance roll call is active for <strong>{formattedSelectedDate}</strong>. Students marked present receive attendance credit.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-secondary"
+                onClick={handleRevertSundayHoliday}
+              >
+                <RotateCcw size={12} />
+                <span>Revert to Weekly Holiday</span>
+              </button>
+            </div>
+          )}
+
           {/* Top Banner if there are absentees across tuition */}
           {allAbsenteesForDate.length > 0 && (
             <div className="center-absentees-banner glass-card">
@@ -844,7 +1014,7 @@ export default function Attendance({
                 </div>
               )}
               <div className="stat-pill stat-rate">
-                <span>Turnout: <strong>{batchAttendancePercentage}%</strong></span>
+                <span>Turnout: <strong>{isSelectedDateSunday && !isSundayExtraClass ? 'Weekly Off' : `${batchAttendancePercentage}%`}</strong></span>
               </div>
 
               <div className="batch-actions-right ml-auto">
@@ -852,11 +1022,11 @@ export default function Attendance({
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={handleResetAllPresent}
-                  title="Reset everyone in this class/batch to Present"
+                  title={isSelectedDateSunday ? "Mark all students in this batch as attended extra class" : "Reset everyone in this class/batch to Present"}
                   disabled={eligibleBatchStudents.length === 0}
                 >
-                  <RotateCcw size={13} />
-                  <span>Reset All Present</span>
+                  {isSelectedDateSunday ? <Zap size={13} className="text-amber" /> : <RotateCcw size={13} />}
+                  <span>{isSelectedDateSunday ? 'Mark All Attended' : 'Reset All Present'}</span>
                 </button>
               </div>
             </div>
@@ -886,205 +1056,254 @@ export default function Attendance({
             )}
           </div>
 
-          {/* Quick Search Input */}
-          <div className="search-bar-row">
-            <div className="search-input-box">
-              <Search size={16} className="search-icon" />
-              <input 
-                type="text"
-                className="form-input"
-                placeholder="Search student by name or roll number to mark..."
-                value={batchSearchQuery}
-                onChange={(e) => setBatchSearchQuery(e.target.value)}
-              />
-              {batchSearchQuery && (
-                <button className="search-clear-btn" onClick={() => setBatchSearchQuery('')}>
-                  <X size={14} />
-                </button>
-              )}
+          {/* Conditional: Sunday Weekly Holiday Card vs Active Roll Call */}
+          {isSelectedDateSunday && !isSundayExtraClass ? (
+            <div className="glass-card sunday-batch-holiday-card">
+              <div className="sunday-card-icon-box">
+                <span style={{ fontSize: '44px', lineHeight: 1 }}>🌴</span>
+              </div>
+              <div className="sunday-card-content">
+                <div className="sunday-pill-tag">Default Weekly Holiday</div>
+                <h2 className="sunday-card-title">Sunday Off — No Regular Classes Scheduled</h2>
+                <p className="sunday-card-desc">
+                  Sundays are default weekly holidays for all tuition batches at Hayagriva Tutorials. Regular attendance roll call is off and students are not penalized.
+                </p>
+                <div className="sunday-card-callout">
+                  <Zap size={16} className="text-amber flex-shrink-0" />
+                  <span>
+                    Conducted a <strong>Sunday Extra Class</strong>, revision batch, or special test? Click below to enable roll call and record student attendance.
+                  </span>
+                </div>
+                <div className="sunday-card-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setSundayExtraClassActive(true);
+                      handleResetAllPresent();
+                    }}
+                  >
+                    <Zap size={15} />
+                    <span>Enable Sunday Extra Class Attendance</span>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="search-helper-text">
-              {displayBatchStudents.length} of {eligibleBatchStudents.length} students shown
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Quick Search Input */}
+              <div className="search-bar-row">
+                <div className="search-input-box">
+                  <Search size={16} className="search-icon" />
+                  <input 
+                    type="text"
+                    className="form-input"
+                    placeholder="Search student by name or roll number to mark..."
+                    value={batchSearchQuery}
+                    onChange={(e) => setBatchSearchQuery(e.target.value)}
+                  />
+                  {batchSearchQuery && (
+                    <button className="search-clear-btn" onClick={() => setBatchSearchQuery('')}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <div className="search-helper-text">
+                  {displayBatchStudents.length} of {eligibleBatchStudents.length} students shown
+                </div>
+              </div>
 
-          {/* Split Layout: Attendance Table on Left + Absentee Sidebar on Right */}
-          <div className="attendance-split-layout">
-            {/* Student Roll Call Table */}
-            <div className="table-container flex-1">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '90px' }}>Roll No</th>
-                    <th>Student Name</th>
-                    <th style={{ width: '130px' }}>Standard</th>
-                    {!isTeacher && <th>Parent Phone</th>}
-                    <th style={{ textAlign: 'center', width: '220px' }}>Take Attendance</th>
-                    <th style={{ width: '110px' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayBatchStudents.length === 0 ? (
-                    <tr>
-                      <td colSpan={!isTeacher ? 6 : 5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                        {eligibleBatchStudents.length === 0 
-                          ? 'No active students enrolled in this batch yet.' 
-                          : `No students matching "${batchSearchQuery}".`}
-                      </td>
-                    </tr>
-                  ) : (
-                    displayBatchStudents.map((student) => {
-                      const status = getStudentStatus(student.id);
-                      const isAbsent = status === 'ABSENT';
-                      const isLate = status === 'LATE';
-                      const sClass = classes.find(c => c.code === student.classCode);
-
-                      return (
-                        <tr key={student.id} className={isAbsent ? 'row-absent' : ''}>
-                          <td className="font-mono text-xs text-muted">{student.admissionNo}</td>
-                          <td>
-                            <div className="font-semibold text-white">{student.name}</div>
-                            <div className="text-xs text-muted">{student.school || 'School unspecified'}</div>
-                          </td>
-                          <td>
-                            <span className="badge badge-class">
-                              {sClass?.name || student.classCode}
-                            </span>
-                          </td>
-                          
-                          {/* Privacy: Parent phone is strictly hidden from Teachers */}
-                          {!isTeacher && (
-                            <td className="text-xs font-mono text-secondary">{student.parentPhone}</td>
-                          )}
-
-                          {/* 1-Tap Attendance Action */}
-                          <td style={{ textAlign: 'center' }}>
-                            <div className="fast-attendance-cell">
-                              <button
-                                type="button"
-                                className={`btn-fast-attendance ${isAbsent ? 'status-absent' : isLate ? 'status-late' : 'status-present'}`}
-                                onClick={() => handleToggleAbsent(student.id)}
-                                title={isAbsent ? "Currently Absent. Click to mark Present." : "Currently Present. Click to mark Absent."}
-                              >
-                                {isAbsent ? (
-                                  <>
-                                    <XCircle size={16} />
-                                    <span className="status-title">ABSENT</span>
-                                    <span className="status-sub-hint">Tap for Present</span>
-                                  </>
-                                ) : isLate ? (
-                                  <>
-                                    <Clock size={16} />
-                                    <span className="status-title">LATE</span>
-                                    <span className="status-sub-hint">Tap for Absent</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle2 size={16} />
-                                    <span className="status-title">PRESENT</span>
-                                    <span className="status-sub-hint">Tap if Absent</span>
-                                  </>
-                                )}
-                              </button>
-
-                              {/* Quick Late Toggle Option */}
-                              <button
-                                type="button"
-                                className={`btn-late-mini ${isLate ? 'active' : ''}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSetStatus(student.id, isLate ? 'PRESENT' : 'LATE');
-                                }}
-                                title={isLate ? "Unmark Late" : "Mark as Late arrival"}
-                              >
-                                L
-                              </button>
-                            </div>
-                          </td>
-
-                          {/* Status Badge */}
-                          <td>
-                            {isAbsent ? (
-                              <span className="badge badge-danger">Absent</span>
-                            ) : isLate ? (
-                              <span className="badge badge-warning">Late</span>
-                            ) : (
-                              <span className="badge badge-success">Present</span>
-                            )}
+              {/* Split Layout: Attendance Table on Left + Absentee Sidebar on Right */}
+              <div className="attendance-split-layout">
+                {/* Student Roll Call Table */}
+                <div className="table-container flex-1">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '90px' }}>Roll No</th>
+                        <th>Student Name</th>
+                        <th style={{ width: '130px' }}>Standard</th>
+                        {!isTeacher && <th>Parent Phone</th>}
+                        <th style={{ textAlign: 'center', width: '220px' }}>Take Attendance</th>
+                        <th style={{ width: '120px' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayBatchStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={!isTeacher ? 6 : 5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                            {eligibleBatchStudents.length === 0 
+                              ? 'No active students enrolled in this batch yet.' 
+                              : `No students matching "${batchSearchQuery}".`}
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      ) : (
+                        displayBatchStudents.map((student) => {
+                          const status = getStudentStatus(student.id);
+                          const isAbsent = status === 'ABSENT';
+                          const isLate = status === 'LATE';
+                          const sClass = classes.find(c => c.code === student.classCode);
 
-            {/* Right Sidebar: Batch Absentee Alerts */}
-            <div className="glass-card absentee-sidebar">
-              <div className="absentee-header">
-                <AlertTriangle size={18} className="text-rose" />
-                <h2 className="absentee-title">Batch Absentees ({batchAbsentStudents.length})</h2>
-              </div>
-              
-              <p className="text-xs text-muted mb-3">
-                {!isTeacher 
-                  ? 'Send instant WhatsApp notices to parents for students in this batch.'
-                  : 'Absentees are automatically saved and visible to Admin in the master register.'}
-              </p>
+                          return (
+                            <tr key={student.id} className={isAbsent ? 'row-absent' : ''}>
+                              <td className="font-mono text-xs text-muted">{student.admissionNo}</td>
+                              <td>
+                                <div className="font-semibold text-white">{student.name}</div>
+                                <div className="text-xs text-muted">{student.school || 'School unspecified'}</div>
+                              </td>
+                              <td>
+                                <span className="badge badge-class">
+                                  {sClass?.name || student.classCode}
+                                </span>
+                              </td>
+                              
+                              {/* Privacy: Parent phone is strictly hidden from Teachers */}
+                              {!isTeacher && (
+                                <td className="text-xs font-mono text-secondary">{student.parentPhone}</td>
+                              )}
 
-              {batchAbsentStudents.length === 0 ? (
-                <div className="no-absentees-box">
-                  <CheckCircle2 size={26} className="text-emerald mb-2" />
-                  <div className="font-semibold text-xs text-emerald">100% Present in Batch!</div>
-                  <div className="text-xs text-muted mt-1">No students marked absent for this batch.</div>
+                              {/* 1-Tap Attendance Action */}
+                              <td style={{ textAlign: 'center' }}>
+                                <div className="fast-attendance-cell">
+                                  <button
+                                    type="button"
+                                    className={`btn-fast-attendance ${isAbsent ? 'status-absent' : isLate ? 'status-late' : 'status-present'}`}
+                                    onClick={() => handleToggleAbsent(student.id)}
+                                    title={isAbsent ? "Currently Absent. Click to mark Present." : "Currently Present. Click to mark Absent."}
+                                  >
+                                    {isAbsent ? (
+                                      <>
+                                        <XCircle size={16} />
+                                        <span className="status-title">ABSENT</span>
+                                        <span className="status-sub-hint">Tap for Present</span>
+                                      </>
+                                    ) : isLate ? (
+                                      <>
+                                        <Clock size={16} />
+                                        <span className="status-title">LATE</span>
+                                        <span className="status-sub-hint">Tap for Absent</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 size={16} />
+                                        <span className="status-title">{isSelectedDateSunday ? 'ATTENDED' : 'PRESENT'}</span>
+                                        <span className="status-sub-hint">{isSelectedDateSunday ? 'Extra Class' : 'Tap if Absent'}</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {/* Quick Late Toggle Option */}
+                                  <button
+                                    type="button"
+                                    className={`btn-late-mini ${isLate ? 'active' : ''}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSetStatus(student.id, isLate ? 'PRESENT' : 'LATE');
+                                    }}
+                                    title={isLate ? "Unmark Late" : "Mark as Late arrival"}
+                                  >
+                                    L
+                                  </button>
+                                </div>
+                              </td>
+
+                              {/* Status Badge */}
+                              <td>
+                                {isAbsent ? (
+                                  <span className="badge badge-danger">Absent</span>
+                                ) : isLate ? (
+                                  <span className="badge badge-warning">Late</span>
+                                ) : isSelectedDateSunday ? (
+                                  <span className="badge badge-success">Attended (Extra)</span>
+                                ) : (
+                                  <span className="badge badge-success">Present</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              ) : (
-                <div className="absentees-list">
-                  {batchAbsentStudents.map(student => {
-                    const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
-                    const messageText = `Dear Sir/Mam, this is to inform you that your child *${student.name}* was marked ABSENT for *${className}* tuition today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`;
-                    const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=${encodeURIComponent(messageText)}`;
 
-                    return (
-                      <div key={student.id} className="absentee-card">
-                        <div className="flex-1">
-                          <div className="font-semibold text-xs text-white">{student.name}</div>
-                          {!isTeacher ? (
-                            <div className="text-xs text-muted font-mono">📱 {student.parentPhone}</div>
-                          ) : (
-                            <div className="text-xs text-emerald font-medium">Recorded Absent ✓</div>
-                          )}
-                        </div>
+                {/* Right Sidebar: Batch Absentee Alerts */}
+                <div className="glass-card absentee-sidebar">
+                  <div className="absentee-header">
+                    <AlertTriangle size={18} className="text-rose" />
+                    <h2 className="absentee-title">
+                      {isSelectedDateSunday ? `Extra Class Absentees (${batchAbsentStudents.length})` : `Batch Absentees (${batchAbsentStudents.length})`}
+                    </h2>
+                  </div>
+                  
+                  <p className="text-xs text-muted mb-3">
+                    {!isTeacher 
+                      ? 'Send instant WhatsApp notices to parents for students in this batch.'
+                      : 'Absentees are automatically saved and visible to Admin in the master register.'}
+                  </p>
 
-                        {!isTeacher ? (
-                          <a 
-                            href={whatsappUrl} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="btn btn-sm btn-success whatsapp-alert-btn"
-                            title={`Send WhatsApp absentee notice to ${student.parentName || 'Parent'}`}
-                          >
-                            <MessageSquare size={13} />
-                            <span>Alert</span>
-                          </a>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => handleToggleAbsent(student.id)}
-                            title="Unmark absent"
-                          >
-                            <RotateCcw size={12} />
-                          </button>
-                        )}
+                  {batchAbsentStudents.length === 0 ? (
+                    <div className="no-absentees-box">
+                      <CheckCircle2 size={26} className="text-emerald mb-2" />
+                      <div className="font-semibold text-xs text-emerald">
+                        {isSelectedDateSunday ? 'All Enrolled Attended Extra Class!' : '100% Present in Batch!'}
                       </div>
-                    );
-                  })}
+                      <div className="text-xs text-muted mt-1">
+                        {isSelectedDateSunday
+                          ? 'No students marked absent for this Sunday extra session.'
+                          : 'No students marked absent for this batch.'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="absentees-list">
+                      {batchAbsentStudents.map(student => {
+                        const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
+                        const messageText = isSelectedDateSunday
+                          ? `Dear Sir/Mam, this is to inform you that your child *${student.name}* was marked ABSENT for the *${className}* Sunday Extra Class today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`
+                          : `Dear Sir/Mam, this is to inform you that your child *${student.name}* was marked ABSENT for *${className}* tuition today (${selectedDate}). Kindly ensure regular attendance. - HAYAGRIVA TUTORIALS`;
+                        const whatsappUrl = `https://wa.me/91${student.parentPhone}?text=${encodeURIComponent(messageText)}`;
+
+                        return (
+                          <div key={student.id} className="absentee-card">
+                            <div className="flex-1">
+                              <div className="font-semibold text-xs text-white">{student.name}</div>
+                              {!isTeacher ? (
+                                <div className="text-xs text-muted font-mono">📱 {student.parentPhone}</div>
+                              ) : (
+                                <div className="text-xs text-emerald font-medium">Recorded Absent ✓</div>
+                              )}
+                            </div>
+
+                            {!isTeacher ? (
+                              <a 
+                                href={whatsappUrl} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="btn btn-sm btn-success whatsapp-alert-btn"
+                                title={`Send WhatsApp absentee notice to ${student.parentName || 'Parent'}`}
+                              >
+                                <MessageSquare size={13} />
+                                <span>Alert</span>
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                onClick={() => handleToggleAbsent(student.id)}
+                                title="Unmark absent"
+                              >
+                                <RotateCcw size={12} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1723,6 +1942,130 @@ export default function Attendance({
         .whatsapp-alert-btn {
           padding: 5px 10px;
           font-size: 0.75rem;
+        }
+
+        /* Sunday Holiday & Extra Class Banners */
+        .sunday-holiday-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 20px;
+          background: rgba(245, 158, 11, 0.08);
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          border-radius: var(--radius-md);
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .sunday-active-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 18px;
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          border-radius: var(--radius-md);
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+        .banner-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .sunday-banner-text {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .sunday-pill-tag {
+          display: inline-flex;
+          align-items: center;
+          background: rgba(245, 158, 11, 0.2);
+          border: 1px solid rgba(245, 158, 11, 0.4);
+          color: #FBBF24;
+          font-size: 0.75rem;
+          font-weight: 700;
+          padding: 3px 9px;
+          border-radius: var(--radius-full);
+          white-space: nowrap;
+        }
+        .sunday-active-tag {
+          display: inline-flex;
+          align-items: center;
+          background: rgba(16, 185, 129, 0.2);
+          border: 1px solid rgba(16, 185, 129, 0.4);
+          color: #34D399;
+          font-size: 0.75rem;
+          font-weight: 700;
+          padding: 3px 9px;
+          border-radius: var(--radius-full);
+          white-space: nowrap;
+        }
+        .sunday-batch-holiday-card {
+          display: flex;
+          align-items: center;
+          padding: 40px 32px;
+          gap: 28px;
+          background: rgba(15, 23, 42, 0.65);
+          border: 1px solid rgba(245, 158, 11, 0.25);
+          border-radius: var(--radius-lg);
+          margin-top: 16px;
+        }
+        .sunday-card-icon-box {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 90px;
+          height: 90px;
+          border-radius: 50%;
+          background: rgba(245, 158, 11, 0.12);
+          border: 1px solid rgba(245, 158, 11, 0.3);
+          flex-shrink: 0;
+        }
+        .sunday-card-content {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          flex: 1;
+        }
+        .sunday-card-title {
+          font-size: 1.35rem;
+          font-weight: 800;
+          color: white;
+          margin: 0;
+        }
+        .sunday-card-desc {
+          font-size: 0.875rem;
+          color: var(--text-secondary);
+          margin: 0;
+          line-height: 1.5;
+        }
+        .sunday-card-callout {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: rgba(30, 41, 59, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 10px 14px;
+          border-radius: var(--radius-md);
+          font-size: 0.8125rem;
+          color: var(--text-secondary);
+          margin-top: 4px;
+        }
+        .sunday-card-actions {
+          margin-top: 8px;
+        }
+        .btn-outline-secondary {
+          background: transparent;
+          border: 1px solid var(--border-subtle);
+          color: var(--text-secondary);
+          transition: all 0.15s ease;
+        }
+        .btn-outline-secondary:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+          border-color: rgba(255, 255, 255, 0.2);
         }
 
         /* Mobile Responsive */

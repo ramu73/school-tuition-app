@@ -115,7 +115,9 @@ export default function Dashboard({
   const totalStudents = activeStudents.length;
 
   // Today's attendance (scoped to teacher's students if teacher)
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayDateObj = new Date();
+  const isTodaySunday = todayDateObj.getDay() === 0;
+  const todayStr = todayDateObj.toISOString().split('T')[0];
   const todayAttendance = attendance.filter(a => {
     if (a.date !== todayStr) return false;
     if (isTeacher) {
@@ -360,13 +362,31 @@ export default function Dashboard({
               <CheckCircle size={20} />
             </div>
           </div>
-          <div className="kpi-value">{todayAttendance.length > 0 ? `${attendanceRate}%` : 'Not Marked'}</div>
+          <div className="kpi-value">
+            {isTodaySunday && todayAttendance.length === 0 ? (
+              <span style={{ fontSize: '1.25rem', color: '#A5B4FC' }}>Sunday Off</span>
+            ) : todayAttendance.length > 0 ? (
+              `${attendanceRate}%`
+            ) : (
+              'Not Marked'
+            )}
+          </div>
           <div className="kpi-footer">
-            <span className="kpi-tag tag-success">{presentCount} Present</span>
-            {todayAbsenteesCount > 0 ? (
+            {isTodaySunday && todayAttendance.length === 0 ? (
+              <span className="kpi-tag tag-sky">🌴 Weekly Holiday</span>
+            ) : (
+              <span className="kpi-tag tag-success">{presentCount} Present</span>
+            )}
+            {isTodaySunday && todayAttendance.length > 0 ? (
+              <span className="kpi-tag tag-success" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontWeight: 600 }}>
+                ⚡ Extra Class
+              </span>
+            ) : todayAbsenteesCount > 0 ? (
               <span className="kpi-tag tag-danger" style={{ background: 'rgba(244, 63, 94, 0.2)', color: '#FB7185', border: '1px solid rgba(244, 63, 94, 0.4)', fontWeight: 600 }}>
                 🚨 {todayAbsenteesCount} Absent Today →
               </span>
+            ) : isTodaySunday ? (
+              <span className="kpi-note">Conduct Extra Class →</span>
             ) : (
               <span className="kpi-note">All Absentees Register →</span>
             )}
