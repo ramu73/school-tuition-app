@@ -68,7 +68,6 @@ export default function Fees({
     monthlyCollected,
     monthlyPending: totalOutstanding,
     collectionRate,
-    allTimeCollected,
     studentFeeCycles,
     dueOrOverdue,
     defaultersCount,
@@ -343,19 +342,6 @@ export default function Fees({
           </div>
           <div className="text-xs text-rose font-semibold">
             {defaultersCount} Students Due (₹{dueOrOverdue.reduce((sum, c) => sum + c.balance, 0).toLocaleString('en-IN')})
-          </div>
-        </div>
-
-        <div className="glass-card fee-kpi-card">
-          <div className="kpi-top">
-            <span className="kpi-label">Total All-Time Collected</span>
-            <IndianRupee size={18} className="text-sky" />
-          </div>
-          <div className="kpi-value text-sky">
-            ₹{allTimeCollected.toLocaleString('en-IN')}
-          </div>
-          <div className="text-xs text-muted">
-            All-time revenue via Cash, UPI &amp; Bank
           </div>
         </div>
       </div>
