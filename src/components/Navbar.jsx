@@ -143,7 +143,6 @@ export default function Navbar({
             <div className="brand-text">
               <div className="brand-title">
                 <span className="brand-title-full">HAYAGRIVA TUTORIALS</span>
-                <span className="brand-title-short">HAYAGRIVA</span>
                 <span className="brand-tag">Class 1 to X</span>
               </div>
               <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
@@ -353,7 +352,7 @@ export default function Navbar({
             <div className="sidebar-drawer-brand">
               <HayagrivaLogo size={32} showGlow={true} />
               <div className="sidebar-drawer-title-wrap">
-                <div className="sidebar-drawer-title">HAYAGRIVA TUTORIALS</div>
+                <div className="sidebar-drawer-title">Hayagriva Tutorials</div>
                 <div className="sidebar-drawer-subtitle">Academy Portal • Class 1–X</div>
               </div>
             </div>
@@ -426,8 +425,42 @@ export default function Navbar({
                   })}
                 </nav>
 
-                <div className="sidebar-section-label mt-4">Direct Communications</div>
+                <div className="sidebar-section-label mt-4">Direct Communications &amp; Quick Actions</div>
                 <div className="sidebar-admin-tools">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-parent-notices'));
+                    }}
+                    className="sidebar-tool-btn"
+                  >
+                    <div className="sidebar-item-left">
+                      <span className="sidebar-item-icon-wrap text-amber">
+                        <Megaphone size={17} />
+                      </span>
+                      <span className="sidebar-item-label">Academy Notifications</span>
+                    </div>
+                    <ChevronRight size={15} className="sidebar-item-arrow" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-parent-fees'));
+                    }}
+                    className="sidebar-tool-btn"
+                  >
+                    <div className="sidebar-item-left">
+                      <span className="sidebar-item-icon-wrap text-emerald">
+                        <IndianRupee size={17} />
+                      </span>
+                      <span className="sidebar-item-label">Fee Details &amp; Receipts</span>
+                    </div>
+                    <ChevronRight size={15} className="sidebar-item-arrow" />
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -437,7 +470,7 @@ export default function Navbar({
                     className="sidebar-tool-btn"
                   >
                     <div className="sidebar-item-left">
-                      <span className="sidebar-item-icon-wrap text-emerald">
+                      <span className="sidebar-item-icon-wrap text-sky">
                         <Phone size={17} />
                       </span>
                       <span className="sidebar-item-label">Contact Academy Tutor</span>
@@ -1088,7 +1121,7 @@ export default function Navbar({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 10px 12px;
+          padding: 11px 14px;
           border-radius: 8px;
           border: 1px solid transparent;
           background: transparent;
@@ -1098,6 +1131,13 @@ export default function Navbar({
           font-weight: 500;
           transition: all 0.18s ease;
           text-align: left;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: rgba(99, 102, 241, 0.2);
+          user-select: none;
+        }
+        .sidebar-nav-item > *,
+        .sidebar-tool-btn > * {
+          pointer-events: none;
         }
         .sidebar-nav-item:hover,
         .sidebar-tool-btn:hover {
@@ -1283,14 +1323,12 @@ export default function Navbar({
             height: 34px !important;
           }
           .brand-title-full {
-            display: none !important;
-          }
-          .brand-title-short {
             display: inline !important;
-            font-size: 0.95rem !important;
+            font-size: 0.88rem !important;
             font-weight: 800 !important;
-            letter-spacing: 0.02em !important;
+            letter-spacing: 0.01em !important;
             color: #FFFFFF !important;
+            white-space: nowrap !important;
           }
           /* Hide secondary pills from mobile header to prevent collisions - all available in sidebar drawer */
           .live-status-pill {

@@ -69,22 +69,45 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const [activeScorecard, setActiveScorecard] = useState(null);
   const [downloadingScorecard, setDownloadingScorecard] = useState(false);
 
+  const navigateToSection = (sectionId) => {
+    setActivePortalSection(sectionId);
+    setTimeout(() => {
+      if (sectionId === 'overview') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        const el = document.getElementById(`parent-section-${sectionId}`);
+        if (el) {
+          const yOffset = -70; // offset for sticky top navbar
+          const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    }, 80);
+  };
+
   // Sync section switches and modal events triggered by the mobile sidebar drawer
   useEffect(() => {
     const handleSwitch = (e) => {
       if (e.detail) {
-        setActivePortalSection(e.detail);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        navigateToSection(e.detail);
       }
     };
-    const handleContactTutor = () => {
-      setContactModalOpen(true);
-    };
+    const handleContactTutor = () => setContactModalOpen(true);
+    const handleNotices = () => setNoticesModalOpen(true);
+    const handleFees = () => setFeeModalOpen(true);
+
     window.addEventListener('switch-parent-section', handleSwitch);
     window.addEventListener('open-parent-contact', handleContactTutor);
+    window.addEventListener('open-parent-notices', handleNotices);
+    window.addEventListener('open-parent-fees', handleFees);
+
     return () => {
       window.removeEventListener('switch-parent-section', handleSwitch);
       window.removeEventListener('open-parent-contact', handleContactTutor);
+      window.removeEventListener('open-parent-notices', handleNotices);
+      window.removeEventListener('open-parent-fees', handleFees);
     };
   }, []);
 
@@ -353,23 +376,13 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
 
   return (
     <div className="parent-portal-container">
-      {/* Top Banner with Child Selector & Quick Navigation */}
+      {/* Top Banner with Child Selector */}
       <div className="portal-header-card glass-card">
         <div className="portal-header-content">
           <div>
-            <div className="parent-greeting">HAYAGRIVA TUTORIALS • PARENT PORTAL</div>
+            <div className="parent-greeting">Hayagriva Tutorials • Parent Portal</div>
             <h1 className="parent-title">Welcome, {currentUser?.name || currentStudent?.parentName || 'Parent / Guardian'}</h1>
             <p className="parent-sub">Monitoring academic progress, homework, test scorecards & faculty improvement plans</p>
-          </div>
-          <div className="header-btn-row">
-            <button
-              onClick={() => setContactModalOpen(true)}
-              className="btn btn-secondary btn-sm"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Phone size={13} className="text-emerald" />
-              <span>Contact Tutor</span>
-            </button>
           </div>
         </div>
 
@@ -391,6 +404,38 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ⚡ Quick Actions Top Banner (Notifications, Fees & Contact Tutor) */}
+      <div className="portal-top-banner glass-card">
+        <div className="top-banner-inner">
+          <button 
+            type="button" 
+            className="top-banner-btn"
+            onClick={() => setNoticesModalOpen(true)}
+          >
+            <Megaphone size={16} className="text-amber" />
+            <span>Notifications ({relevantAnnouncements.length})</span>
+          </button>
+
+          <button 
+            type="button" 
+            className="top-banner-btn"
+            onClick={() => setFeeModalOpen(true)}
+          >
+            <IndianRupee size={16} className={totalDue > 0 ? 'text-rose' : 'text-emerald'} />
+            <span>Fees {totalDue > 0 ? `(₹${totalDue} Due)` : '(Cleared)'}</span>
+          </button>
+
+          <button 
+            type="button" 
+            className="top-banner-btn"
+            onClick={() => setContactModalOpen(true)}
+          >
+            <Phone size={16} className="text-sky" />
+            <span>Contact Tutor</span>
+          </button>
+        </div>
       </div>
 
       {/* Student Profile Identity Card */}
@@ -439,7 +484,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
 
         <div className="overview-kpis-grid">
           {/* KPI 1: Attendance */}
-          <div className="overview-kpi-item" onClick={() => setActivePortalSection('attendance')}>
+          <div className="overview-kpi-item" onClick={() => navigateToSection('attendance')}>
             <div className="kpi-icon-mini bg-emerald-subtle text-emerald">
               <Calendar size={18} />
             </div>
@@ -455,7 +500,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           </div>
 
           {/* KPI 2: Latest Test */}
-          <div className="overview-kpi-item" onClick={() => setActivePortalSection('exams')}>
+          <div className="overview-kpi-item" onClick={() => navigateToSection('exams')}>
             <div className="kpi-icon-mini bg-primary-subtle text-primary">
               <Award size={18} />
             </div>
@@ -481,7 +526,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           </div>
 
           {/* KPI 3: Homework */}
-          <div className="overview-kpi-item" onClick={() => setActivePortalSection('homework')}>
+          <div className="overview-kpi-item" onClick={() => navigateToSection('homework')}>
             <div className="kpi-icon-mini bg-amber-subtle text-amber">
               <CheckSquare size={18} />
             </div>
@@ -497,7 +542,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           </div>
 
           {/* KPI 4: Tutor Feedback */}
-          <div className="overview-kpi-item" onClick={() => setActivePortalSection('feedback')}>
+          <div className="overview-kpi-item" onClick={() => navigateToSection('feedback')}>
             <div className="kpi-icon-mini bg-sky-subtle text-sky">
               <Sparkles size={18} />
             </div>
@@ -522,7 +567,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           </div>
 
           {/* KPI 5: Monthly Progress */}
-          <div className="overview-kpi-item" onClick={() => setActivePortalSection('progress')}>
+          <div className="overview-kpi-item" onClick={() => navigateToSection('progress')}>
             <div className="kpi-icon-mini bg-purple-subtle text-purple">
               <TrendingUp size={18} />
             </div>
@@ -548,21 +593,23 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
         </div>
       </div>
 
-      {/* Return to All Sections button when a specific section is filtered from sidebar */}
+      {/* Return to All Sections button when a specific section is filtered from sidebar or KPI */}
       {activePortalSection !== 'overview' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 14px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 14px 0', padding: '8px 14px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: '#A5B4FC', textTransform: 'capitalize' }}>
+              Showing: {activePortalSection === 'feedback' ? 'Tutor Feedback' : activePortalSection}
+            </span>
+          </div>
           <button
             type="button"
             className="btn btn-secondary btn-xs"
-            onClick={() => setActivePortalSection('overview')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', padding: '4px 10px', borderRadius: '9999px' }}
+            onClick={() => navigateToSection('overview')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', padding: '4px 12px', borderRadius: '9999px', background: 'rgba(255, 255, 255, 0.08)' }}
           >
             <ChevronLeft size={13} />
             <span>← View All Sections</span>
           </button>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            Filter active from Navigation Menu
-          </span>
         </div>
       )}
 
@@ -570,7 +617,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       {/* 4. TUTOR FEEDBACK & CHILD IMPROVEMENT PLAN (Highlighted Top) */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'feedback') && (
-        <div className="portal-section-card glass-card feedback-highlight-card">
+        <div id="parent-section-feedback" className="portal-section-card glass-card feedback-highlight-card">
           <div className="section-title-row">
             <div className="section-title-group">
               <div className="title-icon-badge bg-amber-soft">
@@ -722,7 +769,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       {/* 2. EXAM RESULTS & SCORECARDS SECTION */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'exams') && (
-        <div className="portal-section-card glass-card">
+        <div id="parent-section-exams" className="portal-section-card glass-card">
           <div className="section-title-row">
             <div className="section-title-group">
               <div className="title-icon-badge bg-primary-soft">
@@ -785,7 +832,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       {/* 3. HOMEWORK & LEARNING TRACKER SECTION */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'homework') && (
-        <div className="portal-section-card glass-card">
+        <div id="parent-section-homework" className="portal-section-card glass-card">
           <div className="section-title-row">
             <div className="section-title-group">
               <div className="title-icon-badge bg-emerald-soft">
@@ -846,7 +893,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       {/* 1. ATTENDANCE SECTION (Interactive Calendar with Absence Highlights) */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'attendance') && (
-        <div className="portal-section-card glass-card">
+        <div id="parent-section-attendance" className="portal-section-card glass-card">
           <div className="section-title-row">
             <div className="section-title-group">
               <div className="title-icon-badge bg-emerald-soft">
@@ -1141,7 +1188,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       {/* 5. MONTHLY PROGRESS SUMMARY SECTION */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'progress') && (
-        <div className="portal-section-card glass-card">
+        <div id="parent-section-progress" className="portal-section-card glass-card">
           <div className="section-title-row">
             <div className="section-title-group">
               <div className="title-icon-badge bg-purple-soft">
@@ -1222,39 +1269,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
         </div>
       )}
 
-      {/* ============================================================== */}
-      {/* BOTTOM MENU / QUICK ACTIONS (User Specification) */}
-      {/* ============================================================== */}
-      <div className="portal-bottom-menu glass-card">
-        <div className="bottom-menu-inner">
-          <button 
-            type="button" 
-            className="bottom-menu-btn"
-            onClick={() => setNoticesModalOpen(true)}
-          >
-            <Megaphone size={16} className="text-amber" />
-            <span>Notifications ({relevantAnnouncements.length})</span>
-          </button>
 
-          <button 
-            type="button" 
-            className="bottom-menu-btn"
-            onClick={() => setFeeModalOpen(true)}
-          >
-            <IndianRupee size={16} className={totalDue > 0 ? 'text-rose' : 'text-emerald'} />
-            <span>Fees {totalDue > 0 ? `(₹${totalDue} Due)` : '(Cleared)'}</span>
-          </button>
-
-          <button 
-            type="button" 
-            className="bottom-menu-btn"
-            onClick={() => setContactModalOpen(true)}
-          >
-            <Phone size={16} className="text-sky" />
-            <span>Contact Tutor</span>
-          </button>
-        </div>
-      </div>
 
       {/* ============================================================== */}
       {/* MODALS */}
@@ -2534,25 +2549,23 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           border-color: rgba(99, 102, 241, 0.3);
         }
 
-        /* Bottom Menu */
-        .portal-bottom-menu {
-          position: sticky;
-          bottom: 12px;
-          z-index: 40;
+        /* Top Quick Actions Banner */
+        .portal-top-banner {
           padding: 10px 16px;
-          background: rgba(15, 23, 42, 0.95);
+          background: rgba(15, 23, 42, 0.7);
           backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: var(--radius-md);
+          margin-bottom: 16px;
         }
-        .bottom-menu-inner {
+        .top-banner-inner {
           display: flex;
           align-items: center;
-          justify-content: space-around;
+          justify-content: flex-start;
           flex-wrap: wrap;
           gap: 10px;
         }
-        .bottom-menu-btn {
+        .top-banner-btn {
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -2566,7 +2579,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           cursor: pointer;
           transition: all 0.2s ease;
         }
-        .bottom-menu-btn:hover {
+        .top-banner-btn:hover {
           background: var(--primary-600);
           border-color: var(--primary-500);
           transform: translateY(-1px);
@@ -2641,8 +2654,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           .student-hero-card { flex-direction: column; align-items: flex-start; }
           .tuition-batch-info-box { width: 100%; }
           .overview-kpis-grid { grid-template-columns: 1fr 1fr; }
-          .bottom-menu-inner { justify-content: space-between; }
-          .bottom-menu-btn { padding: 6px 12px; font-size: 0.75rem; }
+          .portal-top-banner { padding: 8px 12px; margin-bottom: 12px; }
+          .top-banner-inner { gap: 8px; justify-content: flex-start; }
+          .top-banner-btn { padding: 6px 12px; font-size: 0.75rem; gap: 6px; }
           .scorecard-details { grid-template-columns: 1fr; }
           .scorecard-marks-highlight { flex-direction: column; text-align: center; }
 
