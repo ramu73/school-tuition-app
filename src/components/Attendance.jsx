@@ -1167,7 +1167,7 @@ export default function Attendance({
                                 <div className="fast-attendance-cell">
                                   <button
                                     type="button"
-                                    className={`btn-fast-attendance ${isAbsent ? 'status-absent' : isLate ? 'status-late' : 'status-present'}`}
+                                    className={`btn-fast-attendance ${isAbsent ? 'status-absent' : isLate ? 'status-late' : isSelectedDateSunday ? 'status-extra' : 'status-present'}`}
                                     onClick={() => handleToggleAbsent(student.id)}
                                     title={isAbsent ? "Currently Absent. Click to mark Present." : "Currently Present. Click to mark Absent."}
                                   >
@@ -1185,9 +1185,9 @@ export default function Attendance({
                                       </>
                                     ) : (
                                       <>
-                                        <CheckCircle2 size={16} />
+                                        {isSelectedDateSunday ? <Zap size={16} className="text-amber" /> : <CheckCircle2 size={16} />}
                                         <span className="status-title">{isSelectedDateSunday ? 'ATTENDED' : 'PRESENT'}</span>
-                                        <span className="status-sub-hint">{isSelectedDateSunday ? 'Extra Class' : 'Tap if Absent'}</span>
+                                        <span className="status-sub-hint">{isSelectedDateSunday ? '⚡ Extra Class' : 'Tap if Absent'}</span>
                                       </>
                                     )}
                                   </button>
@@ -1214,7 +1214,7 @@ export default function Attendance({
                                 ) : isLate ? (
                                   <span className="badge badge-warning">Late</span>
                                 ) : isSelectedDateSunday ? (
-                                  <span className="badge badge-success">Attended (Extra)</span>
+                                  <span className="badge badge-extra-class">⚡ Attended (Extra)</span>
                                 ) : (
                                   <span className="badge badge-success">Present</span>
                                 )}
@@ -1863,6 +1863,22 @@ export default function Attendance({
           background: rgba(245, 158, 11, 0.15);
           border-color: rgba(245, 158, 11, 0.4);
           color: #FBBF24;
+        }
+        .btn-fast-attendance.status-extra {
+          background: rgba(245, 158, 11, 0.16);
+          border-color: rgba(245, 158, 11, 0.55);
+          color: #FDE68A;
+          box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+        }
+        .btn-fast-attendance.status-extra:hover {
+          background: rgba(245, 158, 11, 0.28);
+          border-color: #F59E0B;
+        }
+        .badge-extra-class {
+          background: rgba(245, 158, 11, 0.2) !important;
+          border: 1px solid rgba(245, 158, 11, 0.55) !important;
+          color: #FBBF24 !important;
+          font-weight: 700;
         }
         .status-title {
           letter-spacing: 0.03em;

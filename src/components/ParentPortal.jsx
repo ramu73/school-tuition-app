@@ -1121,7 +1121,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                               className={`status-pill-present ${hasSundayClass ? 'pill-extra-class' : ''}`} 
                               title={hasSundayClass ? 'Attended Sunday Extra Class' : 'Present (Class Attended)'}
                             >
-                              <span className="status-icon">✓</span>
+                              <span className="status-icon">{hasSundayClass ? '⚡' : '✓'}</span>
                               <span className="status-text">{hasSundayClass ? 'Extra Class' : 'Present'}</span>
                             </span>
                           </div>
@@ -1147,8 +1147,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                   <span>Present (Class Attended)</span>
                 </div>
                 <div className="legend-item">
-                  <span className="legend-dot" style={{ background: '#059669', boxShadow: '0 0 6px rgba(16, 185, 129, 0.6)' }} />
-                  <span>Sunday Extra Class (Attended)</span>
+                  <span className="legend-dot dot-extra-class" />
+                  <span style={{ color: '#FBBF24', fontWeight: 600 }}>Sunday Extra Class (Attended)</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-dot dot-absent" />
@@ -1174,13 +1174,16 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                 ) : (
                   <div className="attendance-log-pills">
                     {recentAttendance.map((rec, i) => (
-                      <div key={i} className={`attendance-log-item ${rec.status === 'ABSENT' ? 'log-absent' : 'log-present'}`}>
+                      <div 
+                        key={i} 
+                        className={`attendance-log-item ${rec.status === 'ABSENT' ? 'log-absent' : rec.isSundayClass ? 'log-extra-class' : 'log-present'}`}
+                      >
                         <div className="flex items-center gap-2">
                           <span className="log-date font-mono">{rec.date}</span>
                           {rec.remarks && <span className="text-3xs text-secondary italic">({rec.remarks})</span>}
                         </div>
-                        <span className={`badge badge-sm ${rec.status === 'ABSENT' ? 'badge-danger' : 'badge-success'}`}>
-                          {rec.status === 'ABSENT' ? '✕ Absent' : '✓ Present'}
+                        <span className={`badge badge-sm ${rec.status === 'ABSENT' ? 'badge-danger' : rec.isSundayClass ? 'badge-extra-class' : 'badge-success'}`}>
+                          {rec.status === 'ABSENT' ? '✕ Absent' : rec.isSundayClass ? '⚡ Extra Class' : '✓ Present'}
                         </span>
                       </div>
                     ))}
@@ -2458,14 +2461,14 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           white-space: nowrap;
         }
         .cal-cell.cell-extra-class {
-          background: rgba(16, 185, 129, 0.12) !important;
-          border: 1px solid rgba(16, 185, 129, 0.45) !important;
+          background: rgba(245, 158, 11, 0.12) !important;
+          border: 1px solid rgba(245, 158, 11, 0.55) !important;
         }
         .status-pill-present.pill-extra-class {
-          background: rgba(16, 185, 129, 0.25);
-          border: 1px solid rgba(16, 185, 129, 0.6);
-          color: #6EE7B7;
-          box-shadow: 0 0 6px rgba(16, 185, 129, 0.25);
+          background: rgba(245, 158, 11, 0.22) !important;
+          border: 1px solid rgba(245, 158, 11, 0.65) !important;
+          color: #FDE68A !important;
+          box-shadow: 0 0 8px rgba(245, 158, 11, 0.3) !important;
         }
 
         /* Holiday Cell */
@@ -2474,9 +2477,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           min-width: 0;
         }
         .status-pill-holiday {
-          background: rgba(245, 158, 11, 0.15);
-          border: 1px solid rgba(245, 158, 11, 0.35);
-          color: #FBBF24;
+          background: rgba(148, 163, 184, 0.15);
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          color: #94A3B8;
           font-size: 0.6rem;
           font-weight: 700;
           padding: 2px 4px;
@@ -2530,9 +2533,22 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           border-radius: 3px;
         }
         .dot-present { background: #10B981; }
+        .dot-extra-class { 
+          background: #F59E0B; 
+          box-shadow: 0 0 7px rgba(245, 158, 11, 0.85); 
+        }
         .dot-absent { background: #F43F5E; box-shadow: 0 0 6px rgba(244, 63, 94, 0.6); }
         .dot-weekend { background: rgba(255, 255, 255, 0.25); }
         .dot-today { background: #6366F1; }
+        .badge-extra-class {
+          background: rgba(245, 158, 11, 0.2);
+          border: 1px solid rgba(245, 158, 11, 0.5);
+          color: #FBBF24;
+        }
+        .log-extra-class {
+          border-left: 3px solid #F59E0B !important;
+          background: rgba(245, 158, 11, 0.06);
+        }
 
         .attendance-grid-layout {
           display: grid;
