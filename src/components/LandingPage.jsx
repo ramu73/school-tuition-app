@@ -230,7 +230,7 @@ export default function LandingPage({
             <HayagrivaLogo size={36} showGlow={true} />
             <div className="landing-brand-text">
               <div className="brand-title-row">
-                <span className="brand-main-name">HAYAGRIVA</span>
+                <span className="brand-main-name">HAYAGRIVA TUTORIALS</span>
                 <span className="brand-classes-badge">Classes 1–X</span>
               </div>
               <p className="brand-sub-desc">
