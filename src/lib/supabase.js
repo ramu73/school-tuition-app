@@ -253,13 +253,22 @@ export async function fetchTuitionDataFromSupabase() {
 
     const marks = (marksRes.data || []).map(m => {
       const parentExam = exams.find(e => e.id === m.exam_id);
+      let subject = m.subject || parentExam?.subject || '';
+      let cleanRemarks = m.remarks || '';
+      if (cleanRemarks && cleanRemarks.startsWith('[SUBJ:')) {
+        const closeIdx = cleanRemarks.indexOf(']');
+        if (closeIdx !== -1) {
+          subject = cleanRemarks.substring(6, closeIdx).trim();
+          cleanRemarks = cleanRemarks.substring(closeIdx + 1).trim();
+        }
+      }
       return {
         id: m.id,
         examId: m.exam_id,
         studentId: m.student_id,
-        subject: m.subject || parentExam?.subject || '',
+        subject: subject,
         marksObtained: Number(m.marks_obtained),
-        remarks: m.remarks || ''
+        remarks: cleanRemarks
       };
     });
 
@@ -543,6 +552,8 @@ export async function syncTuitionDataToSupabase(data) {
 
         // Deduplicate client marks by exam_id + student_id to prevent ON CONFLICT aborts
         const markMap = new Map();
+        const parentExamMap = new Map((data.exams || []).map(e => [e.id, e]));
+
         data.marks
           .filter(m => validExamIds.has(m.examId) && validStudentIds.has(m.studentId))
           .forEach(m => {
@@ -554,12 +565,30 @@ export async function syncTuitionDataToSupabase(data) {
             }
             if (rowId > maxDbId) maxDbId = rowId;
 
+            let storedRemarks = m.remarks || '';
+            if (storedRemarks.startsWith('[SUBJ:')) {
+              const closeIdx = storedRemarks.indexOf(']');
+              if (closeIdx !== -1) {
+                storedRemarks = storedRemarks.substring(closeIdx + 1).trim();
+              }
+            }
+
+            const markSubject = m.subject || parentExamMap.get(m.examId)?.subject || '';
+            if (markSubject) {
+              storedRemarks = `[SUBJ:${markSubject}] ${storedRemarks}`.trim();
+            }
+
+            // Cap at 190 characters to safely fit within VARCHAR(200) column
+            if (storedRemarks.length > 190) {
+              storedRemarks = storedRemarks.slice(0, 190);
+            }
+
             markMap.set(key, {
               id: rowId,
               exam_id: m.examId,
               student_id: m.studentId,
               marks_obtained: Number(m.marksObtained || 0),
-              remarks: m.remarks || ''
+              remarks: storedRemarks
             });
           });
 

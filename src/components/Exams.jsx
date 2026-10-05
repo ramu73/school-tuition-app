@@ -109,18 +109,16 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     }
   }, [selectedClass, exams]);
 
-  // Subjects available for current class (normalizing legacy names and ensuring Telugu, Hindi, Computer are present)
-  const currentClassObj = classes.find(c => c.code === (currentExam?.classCode || selectedClass));
-  const availableClassSubjects = useMemo(() => {
-    const raw = currentClassObj?.subjects && currentClassObj.subjects.length > 0
-      ? currentClassObj.subjects
+  // Helper to get normalized subjects available for any class
+  const getSubjectsForClass = useCallback((classCode) => {
+    const classObj = classes.find(c => c.code === classCode);
+    const raw = classObj?.subjects && classObj.subjects.length > 0
+      ? classObj.subjects
       : ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'General Science', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Computer'];
 
     const list = [];
     raw.forEach(s => {
-      if (s === 'Telugu / Hindi') {
-        list.push('Telugu', 'Hindi');
-      } else if (s === 'Language II') {
+      if (s === 'Telugu / Hindi' || s === 'Language II') {
         list.push('Telugu', 'Hindi');
       } else {
         list.push(s);
@@ -132,7 +130,12 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     });
 
     return Array.from(new Set(list));
-  }, [currentClassObj]);
+  }, [classes]);
+
+  // Subjects available for current test / selected class
+  const availableClassSubjects = useMemo(() => {
+    return getSubjectsForClass(currentExam?.classCode || selectedClass);
+  }, [getSubjectsForClass, currentExam?.classCode, selectedClass]);
 
   // Eligible students for the current exam's class (scoped to teacher batches if teacher)
   const examStudents = currentExam 
@@ -248,13 +251,17 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       return;
     }
 
+    const oldExam = exams.find(ex => ex.id === editExamData.id);
+    const oldSubject = oldExam?.subject;
+    const newSubject = editExamData.subject.trim();
+
     const updatedExams = exams.map(ex => {
       if (ex.id === editExamData.id) {
         return {
           ...ex,
           title: editExamData.title.trim(),
           classCode: editExamData.classCode,
-          subject: editExamData.subject.trim(),
+          subject: newSubject,
           totalMarks: tot,
           passingMarks: pass,
           date: editExamData.date
@@ -263,9 +270,20 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       return ex;
     });
 
+    // Also update existing marks for this exam if they used the old default subject or had no subject
+    const updatedMarks = marks.map(m => {
+      if (m.examId === editExamData.id) {
+        if (!m.subject || m.subject === oldSubject) {
+          return { ...m, subject: newSubject };
+        }
+      }
+      return m;
+    });
+
     onSaveData({
       ...data,
-      exams: updatedExams
+      exams: updatedExams,
+      marks: updatedMarks
     });
 
     logger.action(currentUser, 'EDIT_EXAM', `Updated test "${editExamData.title}" details`, { examId: editExamData.id });
@@ -361,7 +379,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         examId: currentExam.id,
         studentId,
         subject: newSubject.trim(),
-        marksObtained: 0,
+        marksObtained: '',
         remarks: 'Pending'
       });
     }
@@ -937,7 +955,15 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   <select 
                     className="form-select"
                     value={newExamData.classCode}
-                    onChange={(e) => setNewExamData({ ...newExamData, classCode: e.target.value })}
+                    onChange={(e) => {
+                      const newCls = e.target.value;
+                      const subs = getSubjectsForClass(newCls);
+                      setNewExamData(prev => ({ 
+                        ...prev, 
+                        classCode: newCls,
+                        subject: subs.includes(prev.subject) ? prev.subject : (subs[0] || 'Mathematics')
+                      }));
+                    }}
                   >
                     {classes.map(cls => (
                       <option key={cls.code} value={cls.code}>{cls.name}</option>
@@ -949,10 +975,10 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   <label className="form-label">Default Subject *</label>
                   <select 
                     className={`form-select ${examErrors.subject ? 'input-error' : ''}`}
-                    value={availableClassSubjects.includes(newExamData.subject) ? newExamData.subject : (newExamData.subject ? '__CUSTOM__' : '')}
+                    value={getSubjectsForClass(newExamData.classCode).includes(newExamData.subject) ? newExamData.subject : (newExamData.subject ? '__CUSTOM__' : '')}
                     onChange={(e) => {
                       if (e.target.value === '__CUSTOM__') {
-                        const custom = window.prompt('Enter custom subject name for this test:', newExamData.subject && !availableClassSubjects.includes(newExamData.subject) ? newExamData.subject : '');
+                        const custom = window.prompt('Enter custom subject name for this test:', newExamData.subject && !getSubjectsForClass(newExamData.classCode).includes(newExamData.subject) ? newExamData.subject : '');
                         if (custom && custom.trim()) {
                           setNewExamData({ ...newExamData, subject: custom.trim() });
                           if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
@@ -964,10 +990,10 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                     }}
                   >
                     <option value="">-- Select Subject --</option>
-                    {availableClassSubjects.map((sub, idx) => (
+                    {getSubjectsForClass(newExamData.classCode).map((sub, idx) => (
                       <option key={idx} value={sub}>{sub}</option>
                     ))}
-                    {!availableClassSubjects.includes(newExamData.subject) && newExamData.subject && (
+                    {!getSubjectsForClass(newExamData.classCode).includes(newExamData.subject) && newExamData.subject && (
                       <option value={newExamData.subject}>{newExamData.subject} (Custom)</option>
                     )}
                     <option value="__CUSTOM__">✏️ Other / Custom Subject...</option>
@@ -1100,7 +1126,15 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   <select 
                     className="form-select"
                     value={editExamData.classCode}
-                    onChange={(e) => setEditExamData({ ...editExamData, classCode: e.target.value })}
+                    onChange={(e) => {
+                      const newCls = e.target.value;
+                      const subs = getSubjectsForClass(newCls);
+                      setEditExamData(prev => ({ 
+                        ...prev, 
+                        classCode: newCls,
+                        subject: subs.includes(prev.subject) ? prev.subject : (subs[0] || 'Mathematics')
+                      }));
+                    }}
                   >
                     {classes.map(cls => (
                       <option key={cls.code} value={cls.code}>{cls.name}</option>
@@ -1110,17 +1144,37 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 <div className="form-group">
                   <label className="form-label">Default Subject *</label>
-                  <input 
-                    type="text"
-                    className={`form-input ${examErrors.subject ? 'input-error' : ''}`}
-                    value={editExamData.subject}
-                    onChange={(e) => setEditExamData({ ...editExamData, subject: e.target.value })}
-                  />
+                  <select 
+                    className={`form-select ${examErrors.subject ? 'input-error' : ''}`}
+                    value={getSubjectsForClass(editExamData.classCode).includes(editExamData.subject) ? editExamData.subject : (editExamData.subject ? '__CUSTOM__' : '')}
+                    onChange={(e) => {
+                      if (e.target.value === '__CUSTOM__') {
+                        const custom = window.prompt('Enter custom subject name for this test:', editExamData.subject && !getSubjectsForClass(editExamData.classCode).includes(editExamData.subject) ? editExamData.subject : '');
+                        if (custom && custom.trim()) {
+                          setEditExamData({ ...editExamData, subject: custom.trim() });
+                          if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+                        }
+                      } else {
+                        setEditExamData({ ...editExamData, subject: e.target.value });
+                        if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+                      }
+                    }}
+                  >
+                    <option value="">-- Select Subject --</option>
+                    {getSubjectsForClass(editExamData.classCode).map((sub, idx) => (
+                      <option key={idx} value={sub}>{sub}</option>
+                    ))}
+                    {!getSubjectsForClass(editExamData.classCode).includes(editExamData.subject) && editExamData.subject && (
+                      <option value={editExamData.subject}>{editExamData.subject} (Custom)</option>
+                    )}
+                    <option value="__CUSTOM__">✏️ Other / Custom Subject...</option>
+                  </select>
                   {examErrors.subject && (
                     <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
                       {examErrors.subject}
                     </span>
                   )}
+                  <span className="text-3xs text-muted mt-1">Note: Existing marks for this test will be updated to the new default subject.</span>
                 </div>
               </div>
 
