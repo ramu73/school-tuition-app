@@ -18,7 +18,8 @@ import {
   Send,
   Copy,
   UserCheck,
-  AlertTriangle
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { 
   calculateStudentFeeCycle, 
@@ -28,6 +29,7 @@ import {
 } from '../lib/feeCycle';
 import { generateNextId } from '../lib/storage';
 import { logger } from '../lib/logger';
+import { deletePaymentReceiptFromSupabase } from '../lib/supabase';
 import HayagrivaLogo from './HayagrivaLogo';
 
 
@@ -40,7 +42,7 @@ export default function Fees({
 }) {
   const { fees = [], students = [], classes = [], receipts = [] } = data;
 
-  const [viewMode, setViewMode] = useState('cycles'); // 'cycles' (Joining Date Reminders) or 'ledger'
+  const [viewMode, setViewMode] = useState('cycles'); // 'cycles', 'ledger', or 'receipts'
   const [cycleFilter, setCycleFilter] = useState('ALL'); // ALL, OVERDUE, DUE_TODAY, UPCOMING, PAID
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, DEFAULTERS, PARTIAL, PAID
   const [selectedLedgerMonth, setSelectedLedgerMonth] = useState('CURRENT'); // 'CURRENT' or 'ALL'
@@ -50,6 +52,9 @@ export default function Fees({
 
   // Selected receipt for printable modal
   const [activeReceipt, setActiveReceipt] = useState(null);
+
+  // Undo Payment Confirmation Modal State
+  const [undoModalData, setUndoModalData] = useState(null);
 
   // Collect Fee Modal State
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -198,6 +203,107 @@ export default function Fees({
     setActiveReceipt(newReceipt);
   };
 
+  // Handle request to undo a payment for a student
+  const handleRequestUndoForStudent = (studentId, monthYear) => {
+    const sId = Number(studentId);
+    const student = students.find(s => s.id === sId);
+
+    // Find matching receipt for this student in this month or latest receipt
+    const studentReceipt = (receipts || []).find(r => 
+      Number(r.studentId) === sId && (r.monthYear === monthYear || !monthYear)
+    ) || (receipts || []).find(r => Number(r.studentId) === sId);
+
+    const feeRecord = (fees || []).find(f => f.studentId === sId && (f.monthYear === monthYear || !monthYear));
+
+    if (studentReceipt) {
+      setUndoModalData(studentReceipt);
+    } else if (feeRecord && Number(feeRecord.amountPaid) > 0) {
+      // Synthesize receipt data from feeRecord if receipt object is missing
+      setUndoModalData({
+        id: feeRecord.id,
+        receiptNo: feeRecord.receiptNo || `REC-PREV-${sId}`,
+        studentId: sId,
+        studentName: student?.name || 'Student',
+        classCode: student?.classCode || 'CLASS_10',
+        amount: Number(feeRecord.amountPaid),
+        monthYear: feeRecord.monthYear || currentMonth,
+        date: feeRecord.lastPaymentDate || new Date().toISOString().split('T')[0],
+        mode: feeRecord.paymentMode || 'OFFLINE',
+        isSynthesized: true
+      });
+    }
+  };
+
+  // Confirm and execute the undo payment operation
+  const handleConfirmUndoPayment = async (receiptToUndo) => {
+    if (!receiptToUndo) return;
+
+    const sId = Number(receiptToUndo.studentId);
+    const amountNum = Number(receiptToUndo.amount);
+    const mYear = receiptToUndo.monthYear || currentMonth;
+
+    // 1. Remove receipt from receipts array
+    const updatedReceipts = (receipts || []).filter(r => 
+      r.receiptNo !== receiptToUndo.receiptNo && r.id !== receiptToUndo.id
+    );
+
+    // 2. Update fee record
+    let updatedFees = [...fees];
+    const feeIndex = updatedFees.findIndex(f => 
+      f.studentId === sId && (f.monthYear === mYear || f.receiptNo === receiptToUndo.receiptNo)
+    );
+
+    if (feeIndex >= 0) {
+      const currentFee = updatedFees[feeIndex];
+      const newPaid = Math.max(0, Number(currentFee.amountPaid) - amountNum);
+      const newBalance = Math.max(0, Number(currentFee.amountDue) - newPaid);
+      const newStatus = newPaid === 0 ? 'PENDING' : (newBalance === 0 ? 'PAID' : 'PARTIAL');
+
+      // Check remaining receipts for this student
+      const remainingStudentReceipts = updatedReceipts.filter(r => Number(r.studentId) === sId);
+      const latestReceipt = remainingStudentReceipts[0];
+
+      updatedFees[feeIndex] = {
+        ...currentFee,
+        amountPaid: newPaid,
+        balance: newBalance,
+        status: newStatus,
+        lastPaymentDate: latestReceipt?.date || null,
+        receiptNo: latestReceipt?.receiptNo || null
+      };
+    }
+
+    // 3. Immediately save updated data
+    onSaveData({
+      ...data,
+      fees: updatedFees,
+      receipts: updatedReceipts
+    });
+
+    // 4. Also delete from Supabase in background if receiptNo exists
+    if (receiptToUndo.receiptNo && !receiptToUndo.isSynthesized) {
+      deletePaymentReceiptFromSupabase(receiptToUndo.receiptNo).catch(() => {});
+    }
+
+    // 5. Audit logger
+    logger.action(
+      currentUser,
+      'UNDO_FEE_PAYMENT',
+      `Undid mistaken payment of ₹${amountNum} (Receipt: ${receiptToUndo.receiptNo}) for student "${receiptToUndo.studentName}"`,
+      {
+        studentId: sId,
+        receiptNo: receiptToUndo.receiptNo,
+        amount: amountNum
+      }
+    );
+
+    // 6. Close modals
+    setUndoModalData(null);
+    if (activeReceipt && (activeReceipt.receiptNo === receiptToUndo.receiptNo || activeReceipt.id === receiptToUndo.id)) {
+      setActiveReceipt(null);
+    }
+  };
+
   // Filter cycles
   const filteredCycles = studentFeeCycles.filter(item => {
     if (classFilter !== 'ALL' && item.classCode !== classFilter) return false;
@@ -294,6 +400,19 @@ export default function Fees({
     return true;
   });
 
+  // Filter payment receipts
+  const filteredReceipts = (receipts || []).filter(r => {
+    if (classFilter !== 'ALL' && r.classCode !== classFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = (r.studentName || '').toLowerCase().includes(q);
+      const matchRec = (r.receiptNo || '').toLowerCase().includes(q);
+      const matchRef = (r.transactionRef || '').toLowerCase().includes(q);
+      return matchName || matchRec || matchRef;
+    }
+    return true;
+  });
+
   return (
     <div className="fees-page">
       {/* Top Header */}
@@ -365,6 +484,13 @@ export default function Fees({
           >
             <Receipt size={16} />
             <span>Standard Monthly Ledger</span>
+          </button>
+          <button 
+            className={`view-tab-btn ${viewMode === 'receipts' ? 'active' : ''}`}
+            onClick={() => setViewMode('receipts')}
+          >
+            <RotateCcw size={16} />
+            <span>Receipts &amp; Payment History ({receipts.length})</span>
           </button>
         </div>
       </div>
@@ -547,21 +673,35 @@ export default function Fees({
                           )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          {item.balance > 0 ? (
-                            <button 
-                              className="btn btn-sm btn-primary"
-                              onClick={() => {
-                                handleStudentSelect(item.studentId);
-                                setFeeCollectModalOpen(true);
-                              }}
-                            >
-                              Collect
-                            </button>
-                          ) : (
-                            <span className="badge badge-success">
-                              <Check size={12} />
-                            </span>
-                          )}
+                          <div className="action-buttons-flex" style={{ justifyContent: 'center' }}>
+                            {item.balance > 0 && (
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => {
+                                  handleStudentSelect(item.studentId);
+                                  setFeeCollectModalOpen(true);
+                                }}
+                              >
+                                Collect
+                              </button>
+                            )}
+                            {item.balance <= 0 && (
+                              <span className="badge badge-success">
+                                <Check size={12} />
+                                <span>Paid</span>
+                              </span>
+                            )}
+                            {Number(item.amountPaid) > 0 && (
+                              <button 
+                                className="undo-action-btn"
+                                title="Undo Mistaken Payment"
+                                onClick={() => handleRequestUndoForStudent(item.studentId, item.cycleMonth)}
+                              >
+                                <RotateCcw size={12} />
+                                <span>Undo</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -718,22 +858,151 @@ export default function Fees({
                           )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          {fee.balance > 0 ? (
-                            <button 
-                              className="btn btn-sm btn-primary"
-                              onClick={() => {
-                                handleStudentSelect(student?.id);
-                                setFeeCollectModalOpen(true);
-                              }}
-                            >
-                              Collect
-                            </button>
-                          ) : (
-                            <span className="badge badge-success">
-                              <Check size={12} />
-                              <span>Cleared</span>
-                            </span>
+                          <div className="action-buttons-flex" style={{ justifyContent: 'center' }}>
+                            {fee.balance > 0 && (
+                              <button 
+                                className="btn btn-sm btn-primary"
+                                onClick={() => {
+                                  handleStudentSelect(student?.id);
+                                  setFeeCollectModalOpen(true);
+                                }}
+                              >
+                                Collect
+                              </button>
+                            )}
+                            {fee.balance <= 0 && (
+                              <span className="badge badge-success">
+                                <Check size={12} />
+                                <span>Cleared</span>
+                              </span>
+                            )}
+                            {Number(fee.amountPaid) > 0 && (
+                              <button 
+                                className="undo-action-btn"
+                                title="Undo Mistaken Payment"
+                                onClick={() => handleRequestUndoForStudent(student?.id, fee.monthYear)}
+                              >
+                                <RotateCcw size={12} />
+                                <span>Undo</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 3: PAYMENT RECEIPTS & TRANSACTION HISTORY */}
+      {viewMode === 'receipts' && (
+        <div className="receipts-view-container">
+          <div className="glass-card fee-filters-card">
+            <div className="filters-row">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-sm">
+                  Total Issued Receipts: <strong className="text-primary">{filteredReceipts.length}</strong>
+                </span>
+                <span className="text-xs text-muted">
+                  (Total Collected: ₹{filteredReceipts.reduce((sum, r) => sum + Number(r.amount || 0), 0).toLocaleString('en-IN')})
+                </span>
+              </div>
+
+              <div className="class-filter-box">
+                <select 
+                  className="form-select select-class-sm"
+                  value={classFilter}
+                  onChange={(e) => setClassFilter(e.target.value)}
+                >
+                  <option value="ALL">All Standards (1 to 10)</option>
+                  {classes.map(cls => (
+                    <option key={cls.code} value={cls.code}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="search-box-wrapper">
+                <Search size={16} className="search-icon" />
+                <input 
+                  type="text"
+                  placeholder="Search receipt #, student, ref..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Receipt #</th>
+                  <th>Student &amp; Standard</th>
+                  <th>Payment Date</th>
+                  <th>Billing Month</th>
+                  <th>Amount Paid</th>
+                  <th>Payment Mode &amp; Ref</th>
+                  <th style={{ textAlign: 'center' }}>Print Receipt</th>
+                  <th style={{ textAlign: 'center' }}>Undo / Revert</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReceipts.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                      No payment receipts found matching the filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredReceipts.map((rec) => {
+                    const rawClassName = classes.find(c => c.code === rec.classCode)?.name || rec.classCode || 'Class';
+                    const className = (rawClassName || '').replace(/\s*\(SSC\/CBSE\)/gi, '').trim();
+
+                    return (
+                      <tr key={rec.id || rec.receiptNo}>
+                        <td>
+                          <span className="font-mono font-bold text-primary">{rec.receiptNo}</span>
+                        </td>
+                        <td>
+                          <div className="font-semibold">{rec.studentName}</div>
+                          <span className="badge badge-class">{className}</span>
+                        </td>
+                        <td className="font-mono text-xs">{rec.date}</td>
+                        <td className="text-xs font-semibold">{rec.monthYear}</td>
+                        <td className="text-emerald font-bold">
+                          ₹{Number(rec.amount).toLocaleString('en-IN')}
+                        </td>
+                        <td>
+                          <span className="badge badge-surface">{rec.mode}</span>
+                          {rec.transactionRef && (
+                            <div className="text-xs text-muted font-mono mt-0.5">{rec.transactionRef}</div>
                           )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button 
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => setActiveReceipt(rec)}
+                            title="View and Print Official Institutional Receipt"
+                          >
+                            <Printer size={13} />
+                            <span>Print</span>
+                          </button>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button 
+                            className="undo-action-btn"
+                            onClick={() => setUndoModalData(rec)}
+                            title="Undo this payment and reverse fee status"
+                          >
+                            <RotateCcw size={13} />
+                            <span>Undo Payment</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -973,8 +1242,92 @@ export default function Fees({
                 <Printer size={16} />
                 <span>Print Receipt</span>
               </button>
+              <button 
+                type="button"
+                className="btn-undo-receipt"
+                onClick={() => setUndoModalData(activeReceipt)}
+                title="Undo this payment and reverse fee status"
+              >
+                <RotateCcw size={16} />
+                <span>Undo Payment</span>
+              </button>
               <button className="btn btn-secondary" onClick={() => setActiveReceipt(null)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo Payment Confirmation Modal */}
+      {undoModalData && (
+        <div className="modal-overlay">
+          <div className="modal-content undo-confirm-modal">
+            <div className="modal-header">
+              <div className="flex items-center gap-2 text-rose">
+                <AlertTriangle size={20} />
+                <h2 className="modal-title text-rose">Undo Fee Payment Confirmation</h2>
+              </div>
+              <button className="close-btn" onClick={() => setUndoModalData(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="undo-modal-body">
+              <div className="undo-alert-box">
+                <p>
+                  Are you sure you want to <strong>undo and revert</strong> this fee payment?
+                </p>
+                <p className="text-xs text-muted mt-1">
+                  This action will remove the payment receipt, restore the student's due balance, mark their fee status back to <strong>Pending / Due</strong>, and adjust monthly collection totals.
+                </p>
+              </div>
+
+              <div className="undo-details-card">
+                <div className="undo-detail-row">
+                  <span className="undo-detail-label">Student Name:</span>
+                  <span className="undo-detail-value font-bold">{undoModalData.studentName}</span>
+                </div>
+                <div className="undo-detail-row">
+                  <span className="undo-detail-label">Receipt Number:</span>
+                  <span className="undo-detail-value font-mono">{undoModalData.receiptNo}</span>
+                </div>
+                <div className="undo-detail-row">
+                  <span className="undo-detail-label">Amount Paid:</span>
+                  <span className="undo-detail-value font-bold text-rose">₹{Number(undoModalData.amount).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="undo-detail-row">
+                  <span className="undo-detail-label">Payment Date:</span>
+                  <span className="undo-detail-value font-mono">{undoModalData.date}</span>
+                </div>
+                <div className="undo-detail-row">
+                  <span className="undo-detail-label">Payment Mode:</span>
+                  <span className="undo-detail-value">{undoModalData.mode}</span>
+                </div>
+                {undoModalData.monthYear && (
+                  <div className="undo-detail-row">
+                    <span className="undo-detail-label">Billing Cycle:</span>
+                    <span className="undo-detail-value">{undoModalData.monthYear}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer flex justify-between gap-3">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setUndoModalData(null)}
+              >
+                Cancel / Keep Payment
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger flex items-center gap-2"
+                onClick={() => handleConfirmUndoPayment(undoModalData)}
+              >
+                <RotateCcw size={16} />
+                <span>Yes, Undo Payment</span>
               </button>
             </div>
           </div>
@@ -1368,6 +1721,87 @@ export default function Fees({
           justify-content: flex-end;
           gap: 12px;
           margin-top: 16px;
+        }
+
+        .undo-action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: rgba(244, 63, 94, 0.1);
+          border: 1px solid rgba(244, 63, 94, 0.3);
+          color: #FB7185;
+          font-family: var(--font-body);
+          font-weight: 600;
+          font-size: 0.75rem;
+          padding: 4px 8px;
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .undo-action-btn:hover {
+          background: rgba(244, 63, 94, 0.22);
+          border-color: #FB7185;
+          color: #FFF;
+          box-shadow: 0 2px 6px rgba(244, 63, 94, 0.2);
+        }
+
+        .btn-undo-receipt {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(244, 63, 94, 0.12);
+          border: 1px solid rgba(244, 63, 94, 0.35);
+          color: #FB7185;
+          padding: 8px 14px;
+          border-radius: var(--radius-md);
+          font-family: var(--font-body);
+          font-weight: 600;
+          font-size: 0.8125rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .btn-undo-receipt:hover {
+          background: #E11D48;
+          color: white;
+          border-color: #BE123C;
+          box-shadow: 0 2px 8px rgba(225, 29, 72, 0.35);
+        }
+
+        .undo-confirm-modal {
+          max-width: 480px;
+        }
+        .undo-modal-body {
+          padding: 16px 0;
+        }
+        .undo-alert-box {
+          background: rgba(244, 63, 94, 0.1);
+          border-left: 4px solid #F43F5E;
+          border-radius: var(--radius-sm);
+          padding: 12px 14px;
+          margin-bottom: 16px;
+          color: var(--text-primary);
+          font-size: 0.875rem;
+        }
+        .undo-details-card {
+          background: var(--bg-surface);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 14px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .undo-detail-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 0.8125rem;
+        }
+        .undo-detail-label {
+          color: var(--text-secondary);
+        }
+        .undo-detail-value {
+          color: var(--text-primary);
         }
 
         /* Mobile Responsive Layout for Fees */

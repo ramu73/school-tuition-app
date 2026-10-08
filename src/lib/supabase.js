@@ -513,7 +513,11 @@ export async function syncTuitionDataToSupabase(data) {
         }));
       if (receiptRows.length > 0) {
         await supabase.from('payment_receipts').upsert(receiptRows, { onConflict: 'receipt_no' });
+        const validNos = receiptRows.map(r => `'${r.receipt_no}'`);
+        await supabase.from('payment_receipts').delete().not('receipt_no', 'in', `(${validNos.join(',')})`);
       }
+    } else if (Array.isArray(data.receipts) && data.receipts.length === 0) {
+      await supabase.from('payment_receipts').delete().neq('id', 0);
     }
 
     // 6. Exams & Marks
@@ -712,7 +716,20 @@ export async function clearSupabaseDatabase() {
     await supabase.from('batches').delete().neq('id', 0);
     return { success: true };
   } catch (err) {
-    console.error('Error clearing Supabase database:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Delete single payment receipt from Supabase
+export async function deletePaymentReceiptFromSupabase(receiptNo) {
+  const supabase = getSupabaseClient();
+  if (!supabase || !receiptNo) return { success: false };
+  try {
+    const { error } = await supabase.from('payment_receipts').delete().eq('receipt_no', receiptNo);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    console.error('Error deleting payment receipt from Supabase:', err);
     return { success: false, error: err.message };
   }
 }
