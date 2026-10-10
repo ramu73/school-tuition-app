@@ -1396,42 +1396,159 @@ export default function Dashboard({
           .dashboard-hero {
             padding: 16px 14px;
             gap: 14px;
+            width: 100%;
+            box-sizing: border-box;
+          }
+          .hero-branding-left {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+          }
+          .hero-logo-row {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 8px;
+            width: 100%;
+          }
+          .hero-logo-row > div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+          }
+          .hero-logo-row .hayagriva-emblem-badge {
+            width: 48px !important;
+            height: 48px !important;
+            min-width: 48px !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
           }
           .hero-heading {
-            font-size: 1.35rem;
+            margin: 4px 0 !important;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+          }
+          .hero-brand-plaque {
+            padding: 4px 12px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+          }
+          .hero-brand-plaque .brand-name-hayagriva {
+            font-size: 1.25rem !important;
+            letter-spacing: 0.03em !important;
+          }
+          .hero-brand-plaque .brand-name-tutorials {
+            font-size: 1.05rem !important;
+            letter-spacing: 0.05em !important;
           }
           .hero-tagline-quote {
-            font-size: 0.775rem;
+            font-size: 0.78rem !important;
+            line-height: 1.35 !important;
+            text-align: center;
+            margin-top: 3px;
           }
           .maths-focus-banner {
-            padding: 8px 12px;
+            padding: 10px 14px;
+            width: 100%;
+            box-sizing: border-box;
+            background: rgba(13, 34, 74, 0.85);
+            border: 1px solid rgba(245, 166, 35, 0.45);
+            border-radius: var(--radius-md);
+            text-align: center;
+            margin-top: 10px !important;
+          }
+          .maths-focus-tag {
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            color: #FBBF24;
+            font-weight: 800;
+            text-align: center;
           }
           .maths-bullets {
-            flex-direction: column;
-            gap: 4px;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 12px;
+            font-size: 0.74rem;
+            color: #E2E8F0;
+            flex-wrap: wrap;
+            margin-top: 4px;
+          }
+          .hero-actions-right {
+            width: 100%;
+            gap: 10px;
           }
           .contact-pills-box {
+            display: flex;
             flex-direction: column;
-            align-items: flex-start;
-            gap: 4px;
+            align-items: stretch;
+            gap: 6px;
+            width: 100%;
           }
           .contact-pill-item {
             width: 100%;
-            font-size: 0.7rem;
-            white-space: normal;
-            word-break: break-word;
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: #F1F5F9;
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 7px 10px;
+            border-radius: var(--radius-md);
+            text-align: center;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .hero-actions {
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+            width: 100% !important;
+          }
+          .hero-actions .btn {
+            padding: 10px 8px !important;
+            font-size: 0.8125rem !important;
+            font-weight: 600 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            border-radius: 10px !important;
           }
           .we-offer-strip {
-            padding: 10px 12px;
+            padding: 12px 14px;
+            border-radius: var(--radius-md);
             flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
+            align-items: center;
+            gap: 10px;
+          }
+          .offer-title-pill {
+            align-self: center;
+            font-size: 0.74rem;
+            padding: 4px 14px;
           }
           .offer-items-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 8px 12px;
             width: 100%;
+          }
+          .offer-item {
+            font-size: 0.76rem;
+            color: #E2E8F0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
           }
           .kpi-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -1490,12 +1607,17 @@ export default function Dashboard({
           }
         }
 
-        @media (max-width: 420px) {
-          .kpi-grid {
-            grid-template-columns: 1fr;
+        @media (max-width: 380px) {
+          .hero-brand-plaque .brand-name-hayagriva {
+            font-size: 1.1rem !important;
           }
-          .hero-actions {
-            grid-template-columns: 1fr;
+          .hero-brand-plaque .brand-name-tutorials {
+            font-size: 0.92rem !important;
+          }
+          .maths-bullets {
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
           }
           .offer-items-grid {
             grid-template-columns: 1fr;

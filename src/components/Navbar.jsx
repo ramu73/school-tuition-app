@@ -106,18 +106,18 @@ export default function Navbar({
   }, [sidebarOpen]);
 
   const allNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
-    { id: 'students', label: 'Students', icon: Users, roles: [USER_ROLES.ADMIN] },
-    { id: 'batches', label: 'Batches & Timing', icon: CalendarDays, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
-    { id: 'attendance', label: 'Attendance', icon: CheckSquare, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
-    { id: 'fees', label: 'Fee Management', icon: IndianRupee, roles: [USER_ROLES.ADMIN] },
-    { id: 'exams', label: 'Exams & Marks', icon: BookOpen, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
-    { id: 'notifications', label: 'Broadcast & Notices', icon: Megaphone, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] }
+    { id: 'dashboard', label: 'Dashboard', shortLabel: 'Dashboard', icon: LayoutDashboard, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'students', label: 'Students', shortLabel: 'Students', icon: Users, roles: [USER_ROLES.ADMIN] },
+    { id: 'batches', label: 'Batches & Timing', shortLabel: 'Batches', icon: CalendarDays, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'attendance', label: 'Attendance', shortLabel: 'Attendance', icon: CheckSquare, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'fees', label: 'Tuition Fees', shortLabel: 'Fees', icon: IndianRupee, roles: [USER_ROLES.ADMIN] },
+    { id: 'exams', label: 'Exams & Marks', shortLabel: 'Exams', icon: BookOpen, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] },
+    { id: 'notifications', label: 'Broadcast & Notices', shortLabel: 'Notices', icon: Megaphone, roles: [USER_ROLES.ADMIN, USER_ROLES.TEACHER] }
   ];
 
   // Filter navigation items by role
   const navItems = currentUser?.role === USER_ROLES.PARENT 
-    ? [{ id: 'parent-portal', label: 'Student Portal', icon: Users }]
+    ? [{ id: 'parent-portal', label: 'Student Portal', shortLabel: 'Portal', icon: Users }]
     : allNavItems.filter(item => item.roles.includes(currentUser?.role || USER_ROLES.ADMIN));
 
   return (
@@ -163,9 +163,11 @@ export default function Navbar({
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
                 className={`nav-tab-btn ${isActive ? 'active' : ''}`}
+                title={item.label}
               >
                 <Icon size={16} />
-                <span>{item.label}</span>
+                <span className="tab-label-full">{item.label}</span>
+                <span className="tab-label-short">{item.shortLabel || item.label}</span>
               </button>
             );
           })}
@@ -605,22 +607,23 @@ export default function Navbar({
           max-width: 100vw;
         }
         .navbar-inner {
-          max-width: 1400px;
+          max-width: 1440px;
           margin: 0 auto;
-          padding: 10px 20px;
+          padding: 8px 16px;
           display: flex;
           flex-direction: row;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
+          gap: 12px;
           width: 100%;
           min-width: 0;
+          box-sizing: border-box;
         }
         .navbar-brand-group {
           display: flex;
           align-items: center;
-          gap: 12px;
-          min-width: 0;
+          gap: 10px;
+          flex-shrink: 0;
           order: 1;
         }
         .mobile-sidebar-toggle-btn {
@@ -629,7 +632,7 @@ export default function Navbar({
         .navbar-brand {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           cursor: pointer;
           user-select: none;
           flex-shrink: 0;
@@ -640,28 +643,36 @@ export default function Navbar({
           justify-content: center;
           border-radius: 50%;
           transition: all 0.25s ease;
+          flex-shrink: 0;
         }
         .navbar-brand:hover .brand-logo-box {
           transform: scale(1.08);
         }
+        .brand-text {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
         .brand-title {
           font-family: var(--font-heading);
-          font-size: 1.1rem;
+          font-size: 1.05rem;
           font-weight: 700;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           line-height: 1.2;
+          white-space: nowrap;
         }
         .navbar-brand-plaque {
-          font-size: 0.95rem;
+          font-size: 0.92rem;
           padding: 3px 8px;
+          white-space: nowrap;
         }
         .navbar-brand-plaque .brand-name-hayagriva {
-          font-size: 0.98rem;
+          font-size: 0.95rem;
         }
         .navbar-brand-plaque .brand-name-tutorials {
-          font-size: 0.88rem;
+          font-size: 0.85rem;
         }
         .brand-title-short {
           display: none;
@@ -678,20 +689,22 @@ export default function Navbar({
           white-space: nowrap;
         }
         .brand-subtitle {
-          font-size: 0.725rem;
+          font-size: 0.7rem;
           color: var(--text-secondary);
+          white-space: nowrap;
         }
         .navbar-links {
           display: flex !important;
           flex-direction: row !important;
           align-items: center !important;
-          gap: 6px;
+          gap: 4px;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
-          padding: 2px;
+          padding: 2px 4px;
           scrollbar-width: none !important;
           -ms-overflow-style: none !important;
           min-width: 0;
+          flex: 1 1 auto;
           order: 2;
         }
         .navbar-links::-webkit-scrollbar {
@@ -703,7 +716,7 @@ export default function Navbar({
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          padding: 7px 12px;
+          padding: 6px 11px;
           font-size: 0.8125rem;
           font-weight: 600;
           font-family: var(--font-body);
@@ -715,6 +728,12 @@ export default function Navbar({
           white-space: nowrap;
           transition: all 0.2s ease;
           flex-shrink: 0;
+        }
+        .tab-label-short {
+          display: none;
+        }
+        .tab-label-full {
+          display: inline;
         }
         .nav-tab-btn:hover {
           color: var(--text-primary);
@@ -729,7 +748,7 @@ export default function Navbar({
         .navbar-actions {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 7px;
           flex-shrink: 0;
           order: 3;
           margin-left: auto;
@@ -1245,6 +1264,55 @@ export default function Navbar({
           margin-top: 8px;
         }
 
+        /* Medium & High-DPI Desktop Viewports (Compact headers, dual labels) */
+        @media (max-width: 1350px) {
+          .navbar-inner {
+            gap: 10px;
+            padding: 8px 12px;
+          }
+          .brand-subtitle {
+            display: none !important;
+          }
+          .tab-label-full {
+            display: none !important;
+          }
+          .tab-label-short {
+            display: inline !important;
+          }
+          .nav-tab-btn {
+            padding: 6px 9px;
+            font-size: 0.8rem;
+            gap: 5px;
+          }
+          .btn-label-text {
+            display: none;
+          }
+          .user-badge-name {
+            max-width: 90px;
+          }
+        }
+
+        /* Compact Desktop & Tablet Landscape (961px - 1100px) */
+        @media (max-width: 1100px) {
+          .brand-tag {
+            display: none !important;
+          }
+          .live-status-pill .live-pill-text {
+            display: none !important;
+          }
+          .live-status-pill {
+            padding: 5px 6px;
+          }
+          .nav-tab-btn {
+            padding: 5px 7px;
+            font-size: 0.775rem;
+            gap: 4px;
+          }
+          .current-user-badge {
+            padding: 4px 8px;
+          }
+        }
+
         /* Mobile & Tablet Responsive Layout */
         @media (max-width: 960px) {
           .navbar-inner {
@@ -1333,20 +1401,46 @@ export default function Navbar({
         /* Mobile Screens (Under 640px) - Clean, Uncluttered Top Bar */
         @media (max-width: 640px) {
           .navbar-inner {
-            padding: 8px 10px !important;
-            gap: 8px !important;
+            padding: 6px 10px !important;
+            gap: 6px !important;
           }
           .mobile-sidebar-toggle-btn {
-            width: 34px !important;
-            height: 34px !important;
+            width: 32px !important;
+            height: 32px !important;
+            flex-shrink: 0;
           }
-          .brand-title-full {
-            display: inline !important;
-            font-size: 0.88rem !important;
-            font-weight: 800 !important;
-            letter-spacing: 0.01em !important;
-            color: #FFFFFF !important;
-            white-space: nowrap !important;
+          .navbar-brand-group {
+            gap: 6px !important;
+            min-width: 0 !important;
+            flex: 1 !important;
+          }
+          .navbar-brand {
+            gap: 6px !important;
+            min-width: 0 !important;
+          }
+          .navbar-brand-plaque {
+            padding: 2px 6px !important;
+            gap: 4px !important;
+            border-radius: 6px !important;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25) !important;
+          }
+          .navbar-brand-plaque .brand-name-hayagriva {
+            font-size: 0.8rem !important;
+            letter-spacing: 0.02em !important;
+          }
+          .navbar-brand-plaque .brand-name-tutorials {
+            font-size: 0.72rem !important;
+            letter-spacing: 0.04em !important;
+          }
+          .brand-title {
+            font-size: 0.82rem !important;
+            gap: 4px !important;
+          }
+          .brand-tag {
+            display: none !important;
+          }
+          .brand-subtitle {
+            display: none !important;
           }
           /* Hide secondary pills from mobile header to prevent collisions - all available in sidebar drawer */
           .live-status-pill {
@@ -1359,14 +1453,38 @@ export default function Navbar({
             display: none !important;
           }
           .current-user-badge {
-            padding: 4px 8px !important;
-            gap: 5px !important;
+            padding: 4px 6px !important;
+            gap: 4px !important;
             background: rgba(15, 23, 42, 0.75) !important;
+            flex-shrink: 0 !important;
           }
           .user-role-tag {
-            font-size: 0.65rem !important;
+            font-size: 0.6rem !important;
             font-weight: 800 !important;
-            padding: 2px 6px !important;
+            padding: 1px 5px !important;
+          }
+          .user-badge-name {
+            display: none !important;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .navbar-inner {
+            padding: 5px 6px !important;
+            gap: 4px !important;
+          }
+          .navbar-brand-plaque {
+            padding: 2px 4px !important;
+            gap: 3px !important;
+          }
+          .navbar-brand-plaque .brand-name-hayagriva {
+            font-size: 0.74rem !important;
+          }
+          .navbar-brand-plaque .brand-name-tutorials {
+            font-size: 0.66rem !important;
+          }
+          .current-user-badge {
+            padding: 3px 5px !important;
           }
         }
       `}</style>
