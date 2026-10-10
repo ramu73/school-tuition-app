@@ -1146,9 +1146,12 @@ export default function Fees({
               <div className="receipt-banner">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
                   <HayagrivaLogo size={34} showText={false} />
-                  <div className="tuition-logo-title">HAYAGRIVA TUTORIALS</div>
+                  <div className="tuition-logo-title">
+                    <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                    <span className="brand-name-tutorials"> TUTORIALS</span>
+                  </div>
                 </div>
-                <div className="tuition-motto">LEARN • GROW • SUCCEED</div>
+                <div className="tuition-motto brand-tagline-motto">LEARN • GROW • SUCCEED</div>
                 <div className="tuition-address">
                   8-3-825/5/5/2, Yellareddyguda, Srinagar Colony, Hyderabad - 500073
                 </div>
@@ -1593,13 +1596,13 @@ export default function Fees({
           font-size: 1.35rem;
           font-weight: 800;
           letter-spacing: 0.05em;
-          color: #1e1b4b;
+          color: #052B76;
         }
         .tuition-motto {
           font-size: 0.725rem;
           font-weight: 700;
           letter-spacing: 0.12em;
-          color: #4338CA;
+          color: #052B76;
           margin-bottom: 3px;
         }
         .tuition-address {

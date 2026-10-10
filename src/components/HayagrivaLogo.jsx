@@ -71,13 +71,13 @@ export default function HayagrivaLogo({
       </div>
 
       {showText && (
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+        <div className="brand-plaque" style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '4px 12px', gap: '1px' }}>
           <div style={{ 
             fontFamily: "'Times New Roman', serif, Outfit", 
             fontSize: '1.25rem', 
             fontWeight: 800, 
             letterSpacing: '0.04em',
-            color: lightMode ? '#0D224A' : '#FFFFFF'
+            color: '#052B76'
           }}>
             HAYAGRIVA
           </div>
@@ -86,15 +86,15 @@ export default function HayagrivaLogo({
             fontSize: '0.78rem', 
             fontWeight: 700, 
             letterSpacing: '0.22em',
-            color: '#16A34A'
+            color: '#379330'
           }}>
             — TUTORIALS —
           </div>
           <div style={{ 
             fontSize: '0.62rem', 
-            fontWeight: 600, 
+            fontWeight: 700, 
             letterSpacing: '0.15em', 
-            color: lightMode ? '#475569' : '#94A3B8',
+            color: '#052B76',
             marginTop: '2px'
           }}>
             LEARN • GROW • SUCCEED

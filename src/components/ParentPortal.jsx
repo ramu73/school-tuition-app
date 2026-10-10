@@ -395,7 +395,13 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       <div className="portal-header-card glass-card">
         <div className="portal-header-content">
           <div>
-            <div className="parent-greeting">Hayagriva Tutorials • Parent Portal</div>
+            <div className="parent-greeting" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span className="brand-plaque" style={{ padding: '2px 8px', fontSize: '0.82rem' }}>
+                <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                <span className="brand-name-tutorials">TUTORIALS</span>
+              </span>
+              <span>• Parent Portal</span>
+            </div>
             <h1 className="parent-title">Welcome, {currentUser?.name || currentStudent?.parentName || 'Parent / Guardian'}</h1>
             <p className="parent-sub">Monitoring academic progress, homework, test scorecards & faculty improvement plans</p>
           </div>

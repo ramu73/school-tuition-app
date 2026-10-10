@@ -176,8 +176,15 @@ export default function Dashboard({
           <div className="hero-logo-row">
             <HayagrivaLogo size={52} showText={false} showGlow={true} />
             <div>
-              <div className="badge badge-class mb-1">LEARN • GROW • SUCCEED</div>
-              <h1 className="hero-heading">HAYAGRIVA TUTORIALS</h1>
+              <div className="badge badge-class mb-1" style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', color: '#052B76', fontWeight: 700, letterSpacing: '0.12em' }}>
+                LEARN • GROW • SUCCEED
+              </div>
+              <h1 className="hero-heading">
+                <span className="brand-plaque hero-brand-plaque">
+                  <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                  <span className="brand-name-tutorials">TUTORIALS</span>
+                </span>
+              </h1>
               <div className="hero-tagline-quote">"Building Strong Foundations for Brighter Futures"</div>
             </div>
           </div>
@@ -816,9 +823,19 @@ export default function Dashboard({
           font-size: 1.85rem;
           font-weight: 800;
           letter-spacing: 0.02em;
-          color: #F9FAFB;
           line-height: 1.15;
-          margin-bottom: 2px;
+          margin-bottom: 4px;
+        }
+        .hero-brand-plaque {
+          padding: 4px 14px;
+          border-radius: 10px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+        }
+        .hero-brand-plaque .brand-name-hayagriva {
+          font-size: 1.65rem;
+        }
+        .hero-brand-plaque .brand-name-tutorials {
+          font-size: 1.4rem;
         }
         .hero-tagline-quote {
           font-size: 0.84rem;

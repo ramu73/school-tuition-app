@@ -707,7 +707,11 @@ export default function App() {
       <footer className="tuition-footer">
         <div className="footer-inner">
           <div>
-            <strong>HAYAGRIVA TUTORIALS</strong> — School Tuition & Coaching Management System
+            <span className="brand-plaque" style={{ padding: '2px 8px', marginRight: '8px' }}>
+              <span className="brand-name-hayagriva">HAYAGRIVA</span>
+              <span className="brand-name-tutorials">TUTORIALS</span>
+            </span>
+            — School Tuition &amp; Coaching Management System
             <span className="text-muted ml-2">| Classes 1 to 10 Specialized</span>
           </div>
           <div className="footer-links">

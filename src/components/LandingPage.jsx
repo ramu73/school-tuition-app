@@ -230,7 +230,10 @@ export default function LandingPage({
             <HayagrivaLogo size={36} showGlow={true} />
             <div className="landing-brand-text">
               <div className="brand-title-row">
-                <span className="brand-main-name">HAYAGRIVA TUTORIALS</span>
+                <span className="brand-plaque landing-brand-plaque">
+                  <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                  <span className="brand-name-tutorials">TUTORIALS</span>
+                </span>
                 <span className="brand-classes-badge">Classes 1–X</span>
               </div>
               <p className="brand-sub-desc">
@@ -1176,7 +1179,10 @@ export default function LandingPage({
               <div className="footer-brand-header">
                 <HayagrivaLogo size={36} showGlow={true} />
                 <div className="footer-brand-headings">
-                  <span className="footer-brand-title">HAYAGRIVA TUTORIALS</span>
+                  <span className="brand-plaque footer-brand-plaque">
+                    <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                    <span className="brand-name-tutorials">TUTORIALS</span>
+                  </span>
                   <span className="footer-brand-badge">Classes 1–10 • SSC &amp; CBSE</span>
                 </div>
               </div>
@@ -1374,14 +1380,25 @@ export default function LandingPage({
           gap: 6px;
           flex-wrap: nowrap;
         }
-        .brand-main-name {
-          font-family: var(--font-heading);
-          font-weight: 850;
-          color: #FFFFFF;
+        .landing-brand-plaque {
+          font-size: 0.95rem;
+          padding: 2px 8px;
+        }
+        .landing-brand-plaque .brand-name-hayagriva {
+          font-size: 0.98rem;
+        }
+        .landing-brand-plaque .brand-name-tutorials {
+          font-size: 0.88rem;
+        }
+        .footer-brand-plaque {
           font-size: 1.05rem;
-          letter-spacing: -0.01em;
-          white-space: nowrap;
-          line-height: 1.2;
+          padding: 3px 10px;
+        }
+        .footer-brand-plaque .brand-name-hayagriva {
+          font-size: 1.1rem;
+        }
+        .footer-brand-plaque .brand-name-tutorials {
+          font-size: 0.95rem;
         }
         .brand-classes-badge {
           background: rgba(99, 102, 241, 0.2);

@@ -142,7 +142,10 @@ export default function Navbar({
             </div>
             <div className="brand-text">
               <div className="brand-title">
-                <span className="brand-title-full">HAYAGRIVA TUTORIALS</span>
+                <span className="brand-plaque navbar-brand-plaque">
+                  <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                  <span className="brand-name-tutorials">TUTORIALS</span>
+                </span>
                 <span className="brand-tag">Class 1 to X</span>
               </div>
               <div className="brand-subtitle">Classes 1 to 10 Tuition Academy</div>
@@ -352,7 +355,12 @@ export default function Navbar({
             <div className="sidebar-drawer-brand">
               <HayagrivaLogo size={32} showGlow={true} />
               <div className="sidebar-drawer-title-wrap">
-                <div className="sidebar-drawer-title">Hayagriva Tutorials</div>
+                <div className="sidebar-drawer-title">
+                  <span className="brand-plaque" style={{ padding: '2px 8px', fontSize: '0.85rem' }}>
+                    <span className="brand-name-hayagriva">HAYAGRIVA</span>
+                    <span className="brand-name-tutorials">TUTORIALS</span>
+                  </span>
+                </div>
                 <div className="sidebar-drawer-subtitle">Academy Portal • Class 1–X</div>
               </div>
             </div>
@@ -644,6 +652,16 @@ export default function Navbar({
           align-items: center;
           gap: 8px;
           line-height: 1.2;
+        }
+        .navbar-brand-plaque {
+          font-size: 0.95rem;
+          padding: 3px 8px;
+        }
+        .navbar-brand-plaque .brand-name-hayagriva {
+          font-size: 0.98rem;
+        }
+        .navbar-brand-plaque .brand-name-tutorials {
+          font-size: 0.88rem;
         }
         .brand-title-short {
           display: none;

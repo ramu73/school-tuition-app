@@ -286,7 +286,12 @@ export default function LoginModal({ onLoginSuccess, students = [], onClose, ini
           >
             <HayagrivaLogo size={52} showGlow={true} />
           </div>
-          <h1 className="login-title">HAYAGRIVA TUTORIALS</h1>
+          <h1 className="login-title">
+            <span className="brand-plaque login-brand-plaque">
+              <span className="brand-name-hayagriva">HAYAGRIVA</span>
+              <span className="brand-name-tutorials">TUTORIALS</span>
+            </span>
+          </h1>
           <p className="login-subtitle">Classes 1 to 10 Coaching & Tuition Academy</p>
           <div className="role-instruction">Select your portal to continue:</div>
         </div>
@@ -526,12 +531,18 @@ export default function LoginModal({ onLoginSuccess, students = [], onClose, ini
           transform: scale(0.92);
         }
         .login-title {
-          font-family: var(--font-heading);
+          margin-bottom: 8px;
+        }
+        .login-brand-plaque {
+          padding: 4px 14px;
+          border-radius: 10px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        }
+        .login-brand-plaque .brand-name-hayagriva {
           font-size: 1.35rem;
-          font-weight: 800;
-          letter-spacing: 0.04em;
-          color: white;
-          margin-bottom: 4px;
+        }
+        .login-brand-plaque .brand-name-tutorials {
+          font-size: 1.15rem;
         }
         .login-subtitle {
           font-size: 0.8125rem;
