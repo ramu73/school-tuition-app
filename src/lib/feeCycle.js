@@ -108,6 +108,7 @@ export function calculateStudentFeeCycle(
     dueDateStr,
     formattedDueDate: activeDueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
     monthYearLabel,
+    cycleMonth: monthYearLabel,
     amountDue,
     amountPaid,
     balance,

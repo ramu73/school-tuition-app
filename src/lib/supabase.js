@@ -734,6 +734,48 @@ export async function deletePaymentReceiptFromSupabase(receiptNo) {
   }
 }
 
+// Update fee record payment in Supabase (used when recording or undoing payment)
+export async function updateFeeRecordPaymentInSupabase(studentId, monthYear, amountPaid, status) {
+  const supabase = getSupabaseClient();
+  if (!supabase || !studentId) return { success: false };
+  try {
+    const sId = Number(studentId);
+    const newPaid = Number(amountPaid) || 0;
+    const newStatus = status || (newPaid === 0 ? 'PENDING' : 'PAID');
+
+    let res = null;
+    if (monthYear) {
+      res = await supabase
+        .from('fee_records')
+        .update({ 
+          amount_paid: newPaid, 
+          status: newStatus 
+        })
+        .eq('student_id', sId)
+        .ilike('month_year', monthYear.trim())
+        .select();
+    }
+
+    // Fallback: If no rows updated and undoing payment (newPaid === 0), update any record for this student with amount_paid > 0
+    if ((!res || !res.data || res.data.length === 0) && newPaid === 0) {
+      res = await supabase
+        .from('fee_records')
+        .update({ 
+          amount_paid: 0, 
+          status: 'PENDING' 
+        })
+        .eq('student_id', sId)
+        .gt('amount_paid', 0)
+        .select();
+    }
+
+    return { success: true, data: res?.data };
+  } catch (err) {
+    console.error('Error updating fee record in Supabase:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 // Fetch Staff & Faculty accounts from Supabase PostgreSQL
 export async function fetchStaffAccountsFromSupabase() {
   const supabase = getSupabaseClient();

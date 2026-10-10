@@ -29,7 +29,7 @@ import {
 } from '../lib/feeCycle';
 import { generateNextId } from '../lib/storage';
 import { logger } from '../lib/logger';
-import { deletePaymentReceiptFromSupabase } from '../lib/supabase';
+import { deletePaymentReceiptFromSupabase, updateFeeRecordPaymentInSupabase } from '../lib/supabase';
 import HayagrivaLogo from './HayagrivaLogo';
 
 
@@ -207,18 +207,56 @@ export default function Fees({
   const handleRequestUndoForStudent = (studentId, monthYear) => {
     const sId = Number(studentId);
     const student = students.find(s => s.id === sId);
+    const targetMonth = (monthYear || '').trim().toLowerCase();
 
-    // Find matching receipt for this student in this month or latest receipt
-    const studentReceipt = (receipts || []).find(r => 
-      Number(r.studentId) === sId && (r.monthYear === monthYear || !monthYear)
-    ) || (receipts || []).find(r => Number(r.studentId) === sId);
-
-    const feeRecord = (fees || []).find(f => f.studentId === sId && (f.monthYear === monthYear || !monthYear));
+    // 1. Search in receipts
+    let studentReceipt = null;
+    if (targetMonth) {
+      studentReceipt = (receipts || []).find(r => 
+        Number(r.studentId) === sId && (r.monthYear || '').trim().toLowerCase() === targetMonth
+      );
+    }
+    if (!studentReceipt) {
+      // Find latest receipt for this student that has a positive amount
+      studentReceipt = (receipts || []).find(r => Number(r.studentId) === sId && Number(r.amount) > 0);
+    }
+    if (!studentReceipt) {
+      studentReceipt = (receipts || []).find(r => Number(r.studentId) === sId);
+    }
 
     if (studentReceipt) {
       setUndoModalData(studentReceipt);
-    } else if (feeRecord && Number(feeRecord.amountPaid) > 0) {
-      // Synthesize receipt data from feeRecord if receipt object is missing
+      return;
+    }
+
+    // 2. Search in fee records
+    let feeRecord = null;
+    if (targetMonth) {
+      feeRecord = (fees || []).find(f => 
+        f.studentId === sId && 
+        (f.monthYear || '').trim().toLowerCase() === targetMonth && 
+        Number(f.amountPaid) > 0
+      );
+    }
+    if (!feeRecord) {
+      // Find any fee record for this student with paid amount > 0
+      feeRecord = (fees || []).find(f => 
+        f.studentId === sId && Number(f.amountPaid) > 0
+      );
+    }
+    if (!feeRecord && targetMonth) {
+      feeRecord = (fees || []).find(f => 
+        f.studentId === sId && (f.monthYear || '').trim().toLowerCase() === targetMonth
+      );
+    }
+    if (!feeRecord) {
+      feeRecord = (fees || []).find(f => f.studentId === sId);
+    }
+
+    // 3. Cycle fallback
+    const cycle = studentFeeCycles.find(c => c.studentId === sId);
+
+    if (feeRecord && Number(feeRecord.amountPaid) > 0) {
       setUndoModalData({
         id: feeRecord.id,
         receiptNo: feeRecord.receiptNo || `REC-PREV-${sId}`,
@@ -226,9 +264,37 @@ export default function Fees({
         studentName: student?.name || 'Student',
         classCode: student?.classCode || 'CLASS_10',
         amount: Number(feeRecord.amountPaid),
-        monthYear: feeRecord.monthYear || currentMonth,
+        monthYear: feeRecord.monthYear || monthYear || currentMonth,
         date: feeRecord.lastPaymentDate || new Date().toISOString().split('T')[0],
         mode: feeRecord.paymentMode || 'OFFLINE',
+        isSynthesized: true
+      });
+    } else if (cycle && Number(cycle.amountPaid) > 0) {
+      setUndoModalData({
+        id: `CYCLE-${sId}`,
+        receiptNo: `REC-CYCLE-${sId}`,
+        studentId: sId,
+        studentName: student?.name || cycle.studentName || 'Student',
+        classCode: student?.classCode || cycle.classCode || 'CLASS_10',
+        amount: Number(cycle.amountPaid),
+        monthYear: cycle.monthYearLabel || monthYear || currentMonth,
+        date: cycle.lastPaymentDate || new Date().toISOString().split('T')[0],
+        mode: 'OFFLINE',
+        isSynthesized: true
+      });
+    } else if (student) {
+      // Direct student fallback to guarantee modal always opens
+      const defaultMonthlyFee = Number(student.monthlyFee || 2000);
+      setUndoModalData({
+        id: feeRecord?.id || `REC-${sId}`,
+        receiptNo: feeRecord?.receiptNo || `REC-PREV-${sId}`,
+        studentId: sId,
+        studentName: student.name,
+        classCode: student.classCode || 'CLASS_10',
+        amount: Number(feeRecord?.amountPaid || defaultMonthlyFee),
+        monthYear: feeRecord?.monthYear || monthYear || currentMonth,
+        date: feeRecord?.lastPaymentDate || new Date().toISOString().split('T')[0],
+        mode: feeRecord?.paymentMode || 'OFFLINE',
         isSynthesized: true
       });
     }
@@ -244,15 +310,32 @@ export default function Fees({
 
     // 1. Remove receipt from receipts array
     const updatedReceipts = (receipts || []).filter(r => 
-      r.receiptNo !== receiptToUndo.receiptNo && r.id !== receiptToUndo.id
+      (receiptToUndo.receiptNo ? r.receiptNo !== receiptToUndo.receiptNo : true) && 
+      (receiptToUndo.id ? r.id !== receiptToUndo.id : true)
     );
 
     // 2. Update fee record
     let updatedFees = [...fees];
-    const feeIndex = updatedFees.findIndex(f => 
-      f.studentId === sId && (f.monthYear === mYear || f.receiptNo === receiptToUndo.receiptNo)
+    let feeIndex = updatedFees.findIndex(f => 
+      (receiptToUndo.id && f.id === receiptToUndo.id) || 
+      (receiptToUndo.receiptNo && f.receiptNo === receiptToUndo.receiptNo)
     );
 
+    if (feeIndex === -1 && mYear) {
+      const targetMonth = mYear.trim().toLowerCase();
+      feeIndex = updatedFees.findIndex(f => 
+        Number(f.studentId) === sId && 
+        (f.monthYear || '').trim().toLowerCase() === targetMonth
+      );
+    }
+
+    if (feeIndex === -1) {
+      feeIndex = updatedFees.findIndex(f => 
+        Number(f.studentId) === sId && Number(f.amountPaid) > 0
+      );
+    }
+
+    let targetFee = null;
     if (feeIndex >= 0) {
       const currentFee = updatedFees[feeIndex];
       const newPaid = Math.max(0, Number(currentFee.amountPaid) - amountNum);
@@ -271,6 +354,22 @@ export default function Fees({
         lastPaymentDate: latestReceipt?.date || null,
         receiptNo: latestReceipt?.receiptNo || null
       };
+      targetFee = updatedFees[feeIndex];
+    } else {
+      const student = students.find(s => s.id === sId);
+      const monthlyFee = Number(student?.monthlyFee || 2000);
+      targetFee = {
+        id: generateNextId(updatedFees),
+        studentId: sId,
+        monthYear: mYear,
+        amountDue: monthlyFee,
+        amountPaid: 0,
+        balance: monthlyFee,
+        status: 'PENDING',
+        lastPaymentDate: null,
+        receiptNo: null
+      };
+      updatedFees.push(targetFee);
     }
 
     // 3. Immediately save updated data
@@ -280,12 +379,24 @@ export default function Fees({
       receipts: updatedReceipts
     });
 
-    // 4. Also delete from Supabase in background if receiptNo exists
+    // 4. Directly update Supabase PostgreSQL fee_records table
+    try {
+      await updateFeeRecordPaymentInSupabase(
+        sId, 
+        targetFee?.monthYear || mYear, 
+        targetFee ? targetFee.amountPaid : 0, 
+        targetFee ? targetFee.status : 'PENDING'
+      );
+    } catch (err) {
+      console.warn('Direct Supabase fee update error:', err);
+    }
+
+    // 5. Also delete from Supabase in background if receiptNo exists
     if (receiptToUndo.receiptNo && !receiptToUndo.isSynthesized) {
       deletePaymentReceiptFromSupabase(receiptToUndo.receiptNo).catch(() => {});
     }
 
-    // 5. Audit logger
+    // 6. Audit logger
     logger.action(
       currentUser,
       'UNDO_FEE_PAYMENT',
@@ -297,7 +408,7 @@ export default function Fees({
       }
     );
 
-    // 6. Close modals
+    // 7. Close modals
     setUndoModalData(null);
     if (activeReceipt && (activeReceipt.receiptNo === receiptToUndo.receiptNo || activeReceipt.id === receiptToUndo.id)) {
       setActiveReceipt(null);
@@ -695,7 +806,7 @@ export default function Fees({
                               <button 
                                 className="undo-action-btn"
                                 title="Undo Mistaken Payment"
-                                onClick={() => handleRequestUndoForStudent(item.studentId, item.cycleMonth)}
+                                onClick={() => handleRequestUndoForStudent(item.studentId, item.monthYearLabel || item.cycleMonth || currentMonth)}
                               >
                                 <RotateCcw size={12} />
                                 <span>Undo</span>
