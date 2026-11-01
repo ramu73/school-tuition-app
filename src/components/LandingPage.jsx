@@ -401,7 +401,7 @@ export default function LandingPage({
             {/* Desktop-only description & CTAs (Shown on desktop alongside slider) */}
             <div className="hero-desktop-content-block">
               <p className="hero-description">
-                <strong>Hayagriva Tutorials &amp; Tuitions</strong> provides specialized coaching from <strong>Class 1 to +2 / Intermediate (SSC, CBSE &amp; Inter)</strong> with special focus on <strong>Mathematics &amp; Sciences</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
+                <strong>Hayagriva Tutorials &amp; Tuitions</strong> provides specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics &amp; Sciences</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
               </p>
 
               <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
@@ -410,7 +410,7 @@ export default function LandingPage({
                   className="btn btn-primary btn-lg flex items-center gap-2.5 hero-primary-cta cta-glow-btn"
                 >
                   <BookOpen size={18} />
-                  <span>Explore Class 1 to +2</span>
+                  <span>Explore Classes 1 to 10</span>
                   <ArrowRight size={16} />
                 </a>
 
@@ -430,7 +430,7 @@ export default function LandingPage({
               <div className="hero-trust-badges">
                 <div className="trust-badge-item">
                   <CheckCircle2 size={16} className="text-emerald" />
-                  <span>Class 1 to +2 (SSC, CBSE &amp; Inter)</span>
+                  <span>Classes 1 to 10 (SSC &amp; CBSE)</span>
                 </div>
                 <div className="trust-badge-item">
                   <Video size={16} className="text-sky" />
@@ -1186,7 +1186,7 @@ export default function LandingPage({
                     <span className="brand-name-hayagriva">HAYAGRIVA</span>
                     <span className="brand-name-tutorials">TUTORIALS</span>
                   </span>
-                  <span className="footer-brand-badge">Class 1 to +2 • SSC, CBSE &amp; Inter</span>
+                  <span className="footer-brand-badge">Classes 1–10 • SSC &amp; CBSE</span>
                 </div>
               </div>
 
