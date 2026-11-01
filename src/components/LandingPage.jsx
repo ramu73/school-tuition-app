@@ -390,12 +390,14 @@ export default function LandingPage({
             </div>
 
             <h1 className="hero-headline">
-              <span className="hero-brand-supertitle block text-xs md:text-sm font-extrabold uppercase tracking-widest text-amber-400 mb-2">
+              <span className="hero-brand-supertitle">
                 HAYAGRIVA TUTORIALS
               </span>
-              Building Strong <br />
-              <span className="text-gradient-gold">Foundations</span> for <br />
-              <span className="text-gradient-primary">Brighter Futures</span>
+              <span className="hero-main-title">
+                Building Strong <br />
+                <span className="text-gradient-gold">Foundations</span> for <br />
+                <span className="text-gradient-primary">Brighter Futures</span>
+              </span>
             </h1>
 
             {/* Desktop-only description & CTAs (Shown on desktop alongside slider) */}
@@ -1765,6 +1767,21 @@ export default function LandingPage({
           box-shadow: 0 0 8px #F59E0B;
           animation: pulse 1.5s infinite;
         }
+        .hero-brand-supertitle {
+          display: block;
+          width: 100%;
+          font-family: var(--font-heading);
+          font-size: 0.88rem;
+          line-height: 1.3;
+          font-weight: 800;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #FBBF24;
+          margin-bottom: 10px;
+        }
+        .hero-main-title {
+          display: block;
+        }
         .hero-headline {
           font-family: var(--font-heading);
           font-size: 1.85rem;
@@ -1775,9 +1792,19 @@ export default function LandingPage({
           letter-spacing: -0.025em;
         }
         @media (min-width: 640px) {
+          .hero-brand-supertitle {
+            font-size: 0.96rem;
+            letter-spacing: 0.18em;
+            margin-bottom: 12px;
+          }
           .hero-headline { font-size: 2.3rem; }
         }
         @media (min-width: 1024px) {
+          .hero-brand-supertitle {
+            font-size: 1.05rem;
+            letter-spacing: 0.2em;
+            margin-bottom: 14px;
+          }
           .hero-headline { font-size: 3.1rem; }
         }
         .text-gradient-gold {
@@ -3087,6 +3114,11 @@ export default function LandingPage({
           }
         }
         @media (max-width: 480px) {
+          .hero-brand-supertitle {
+            font-size: 0.78rem;
+            letter-spacing: 0.14em;
+            margin-bottom: 8px;
+          }
           .hero-headline {
             font-size: 1.75rem;
           }

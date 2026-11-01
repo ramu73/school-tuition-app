@@ -158,6 +158,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Common Flexbox & Grid Utilities */
+.block { display: block; }
 .flex { display: flex; }
 .inline-flex { display: inline-flex; }
 .flex-col { flex-direction: column; }
@@ -217,6 +218,10 @@ h1, h2, h3, h4, h5, h6 {
 .text-primary { color: var(--primary-500); }
 .text-emerald { color: #10B981; }
 .text-amber { color: #F59E0B; }
+.text-amber-300 { color: #FCD34D; }
+.text-amber-400 { color: #FBBF24; }
+.uppercase { text-transform: uppercase; }
+.tracking-widest { letter-spacing: 0.15em; }
 .text-rose { color: #F43F5E; }
 .text-sky { color: #0EA5E9; }
 .text-purple { color: #A855F7; }
