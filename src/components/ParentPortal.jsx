@@ -181,6 +181,19 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     return map;
   }, [attendance, currentStudent?.id]);
 
+  // Map of all declared tuition holidays across the center
+  const centerHolidayMap = useMemo(() => {
+    const map = new Map();
+    (attendance || []).forEach(a => {
+      if ((a.status === 'HOLIDAY' || a.status === 'NO_CLASS') && a.date) {
+        if (!map.has(a.date)) {
+          map.set(a.date, a.remarks || 'Tuition Holiday');
+        }
+      }
+    });
+    return map;
+  }, [attendance]);
+
   // Selected Month Attendance Calculations
   // In Hayagriva Tutorials, classes run Mon–Sat and students are PRESENT by default unless marked ABSENT
   const {
@@ -201,7 +214,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       const isFuture = dateStr > todayStr;
       const isBeforeAdmission = Boolean(admissionDateStr && dateStr < admissionDateStr);
       const rec = studentAttendanceMap.get(dateStr);
-      const isHoliday = rec && (rec.status === 'HOLIDAY' || rec.status === 'NO_CLASS');
+      const centerHol = centerHolidayMap.get(dateStr);
+      const isHoliday = Boolean(centerHol) || (rec && (rec.status === 'HOLIDAY' || rec.status === 'NO_CLASS'));
       const hasSundayClass = isSunday && rec && (rec.status === 'PRESENT' || rec.status === 'ABSENT' || rec.status === 'LATE');
 
       if (!isFuture && !isBeforeAdmission && !isHoliday) {
@@ -226,7 +240,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       monthPercentage: pct,
       monthAbsenceList: absList
     };
-  }, [calYear, calMonth, daysInCalMonth, todayStr, admissionDateStr, studentAttendanceMap]);
+  }, [calYear, calMonth, daysInCalMonth, todayStr, admissionDateStr, studentAttendanceMap, centerHolidayMap]);
 
   // All-time attendance & recent attendance roll call history
   const { presentDays, absentDays, totalMarkedDays, attendanceRate, recentAttendance } = useMemo(() => {
@@ -244,7 +258,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       const isSun = dayOfWeek === 0;
       const dStr = curr.toISOString().split('T')[0];
       const rec = studentAttendanceMap.get(dStr);
-      const isHol = rec && (rec.status === 'HOLIDAY' || rec.status === 'NO_CLASS');
+      const centerHol = centerHolidayMap.get(dStr);
+      const isHol = Boolean(centerHol) || (rec && (rec.status === 'HOLIDAY' || rec.status === 'NO_CLASS'));
       const hasSunClass = isSun && rec && (rec.status === 'PRESENT' || rec.status === 'ABSENT' || rec.status === 'LATE');
 
       if (!isHol) {
@@ -269,11 +284,13 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       const dayOfWeek = checkDate.getDay();
       const dStr = checkDate.toISOString().split('T')[0];
       const rec = studentAttendanceMap.get(dStr);
+      const centerHol = centerHolidayMap.get(dStr);
+      const isHol = Boolean(centerHol) || (rec && (rec.status === 'HOLIDAY' || rec.status === 'NO_CLASS'));
       const isSun = dayOfWeek === 0;
       const hasSunClass = isSun && rec && (rec.status === 'PRESENT' || rec.status === 'ABSENT' || rec.status === 'LATE');
       const isBeforeAdm = admissionDateStr && dStr < admissionDateStr;
 
-      if (!isBeforeAdm && (!isSun || hasSunClass)) {
+      if (!isBeforeAdm && !isHol && (!isSun || hasSunClass)) {
         recent.push({
           date: dStr,
           status: rec?.status === 'ABSENT' ? 'ABSENT' : 'PRESENT',
@@ -1079,7 +1096,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                   const isBeforeAdmission = Boolean(admissionDateStr && dateStr < admissionDateStr);
                   const record = studentAttendanceMap.get(dateStr);
                   const isAbsent = record && record.status === 'ABSENT';
-                  const isHoliday = record && (record.status === 'HOLIDAY' || record.status === 'NO_CLASS');
+                  const centerHolidayTitle = centerHolidayMap.get(dateStr);
+                  const isHoliday = Boolean(centerHolidayTitle) || (record && (record.status === 'HOLIDAY' || record.status === 'NO_CLASS'));
+                  const holidayTitle = centerHolidayTitle || (record && record.remarks) || 'Tuition Holiday';
                   const hasSundayClass = isSunday && record && (record.status === 'PRESENT' || record.status === 'LATE' || record.status === 'ABSENT');
                   
                   // In Hayagriva Tutorials, students are PRESENT by default on all scheduled class days (Mon-Sat)
@@ -1090,7 +1109,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                   );
 
                   let cellClass = 'cal-cell';
-                  if (isAbsent) cellClass += ' cell-absent';
+                  if (isHoliday) cellClass += ' cell-holiday';
+                  else if (isAbsent) cellClass += ' cell-absent';
                   else if (hasSundayClass && isPresent) cellClass += ' cell-present cell-extra-class';
                   else if (isPresent) cellClass += ' cell-present';
                   else if (isSunday) cellClass += ' cell-weekend';
@@ -1109,7 +1129,14 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                       </div>
 
                       <div className="cell-status-content">
-                        {isAbsent ? (
+                        {isHoliday ? (
+                          <div className="holiday-marker-box" title={`Tuition Holiday: ${holidayTitle}`}>
+                            <span className="status-pill-holiday">
+                              <span className="status-icon">🌴</span>
+                              <span className="status-text">{holidayTitle}</span>
+                            </span>
+                          </div>
+                        ) : isAbsent ? (
                           <div className="absent-marker-box">
                             <span className="status-pill-absent" title={record?.remarks || (hasSundayClass ? 'Absent for Sunday Extra Class' : 'Absent')}>
                               <span className="status-icon">✕</span>
@@ -1131,12 +1158,6 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                               <span className="status-text">{hasSundayClass ? 'Extra Class' : 'Present'}</span>
                             </span>
                           </div>
-                        ) : isHoliday ? (
-                          <div className="holiday-marker-box">
-                            <span className="status-pill-holiday" title="Holiday / No Class">
-                              <span className="status-text">Holiday</span>
-                            </span>
-                          </div>
                         ) : isSunday ? (
                           <span className="cell-dim-label">Sun / Off</span>
                         ) : null}
@@ -1151,6 +1172,10 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                 <div className="legend-item">
                   <span className="legend-dot dot-present" />
                   <span>Present (Class Attended)</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-dot dot-holiday" />
+                  <span style={{ color: '#FBBF24', fontWeight: 600 }}>🌴 Tuition Holiday (No Class)</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-dot dot-extra-class" />
@@ -2478,25 +2503,35 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
         }
 
         /* Holiday Cell */
+        .cell-holiday {
+          background: rgba(245, 158, 11, 0.08) !important;
+          border: 1px solid rgba(245, 158, 11, 0.45) !important;
+        }
         .holiday-marker-box {
           width: 100%;
           min-width: 0;
         }
         .status-pill-holiday {
-          background: rgba(148, 163, 184, 0.15);
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          color: #94A3B8;
+          background: rgba(245, 158, 11, 0.22);
+          border: 1px solid rgba(245, 158, 11, 0.55);
+          color: #FDE68A;
           font-size: 0.6rem;
           font-weight: 700;
           padding: 2px 4px;
           border-radius: 4px;
           display: inline-flex;
           align-items: center;
+          gap: 3px;
           justify-content: center;
           width: 100%;
           box-sizing: border-box;
           overflow: hidden;
+          text-overflow: ellipsis;
           white-space: nowrap;
+        }
+        .dot-holiday { 
+          background: #F59E0B; 
+          box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
         }
 
         /* Weekend / Future */

@@ -120,6 +120,10 @@ export default function Dashboard({
   const todayDateObj = new Date();
   const isTodaySunday = todayDateObj.getDay() === 0;
   const todayStr = todayDateObj.toISOString().split('T')[0];
+  const todayHolidayRec = attendance.find(a => a.date === todayStr && (a.status === 'HOLIDAY' || a.status === 'NO_CLASS'));
+  const isTodayHoliday = Boolean(todayHolidayRec);
+  const todayHolidayTitle = todayHolidayRec?.remarks || 'Tuition Holiday';
+
   const todayAttendance = attendance.filter(a => {
     if (a.date !== todayStr) return false;
     if (isTeacher) {
@@ -386,7 +390,9 @@ export default function Dashboard({
             </div>
           </div>
           <div className="kpi-value">
-            {isTodaySunday && todayAttendance.length === 0 ? (
+            {isTodayHoliday ? (
+              <span style={{ fontSize: '1.2rem', color: '#FBBF24' }}>Holiday</span>
+            ) : isTodaySunday && todayAttendance.length === 0 ? (
               <span style={{ fontSize: '1.25rem', color: '#A5B4FC' }}>Sunday Off</span>
             ) : todayAttendance.length > 0 ? (
               `${attendanceRate}%`
@@ -395,12 +401,18 @@ export default function Dashboard({
             )}
           </div>
           <div className="kpi-footer">
-            {isTodaySunday && todayAttendance.length === 0 ? (
+            {isTodayHoliday ? (
+              <span className="kpi-tag tag-warning" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#FBBF24', border: '1px solid rgba(245, 158, 11, 0.4)', fontWeight: 600 }}>
+                🌴 {todayHolidayTitle}
+              </span>
+            ) : isTodaySunday && todayAttendance.length === 0 ? (
               <span className="kpi-tag tag-sky">🌴 Weekly Holiday</span>
             ) : (
               <span className="kpi-tag tag-success">{presentCount} Present</span>
             )}
-            {isTodaySunday && todayAttendance.length > 0 ? (
+            {isTodayHoliday ? (
+              <span className="kpi-note">Tuition Closed Today →</span>
+            ) : isTodaySunday && todayAttendance.length > 0 ? (
               <span className="kpi-tag tag-success" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontWeight: 600 }}>
                 ⚡ Extra Class
               </span>

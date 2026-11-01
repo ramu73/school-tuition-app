@@ -18,7 +18,9 @@ import {
   Sparkles,
   ListChecks,
   CheckCheck,
-  UserCheck
+  UserCheck,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
@@ -81,6 +83,94 @@ export default function Attendance({
   const yesterdayDateStr = yesterdayDateObj.toISOString().split('T')[0];
 
   const [selectedDate, setSelectedDate] = useState(todayDateStr);
+
+  const formattedSelectedDate = useMemo(() => {
+    if (!selectedDate) return '';
+    try {
+      return new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch {
+      return selectedDate;
+    }
+  }, [selectedDate]);
+
+  // Holiday Declaration Modal State
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [holidayModalDate, setHolidayModalDate] = useState(todayDateStr);
+  const [holidayModalReason, setHolidayModalReason] = useState('');
+
+  // Declared Center Holiday detection for selected date
+  const declaredHolidayRec = useMemo(() => {
+    return (attendance || []).find(a => a.date === selectedDate && (a.status === 'HOLIDAY' || a.status === 'NO_CLASS'));
+  }, [attendance, selectedDate]);
+
+  const isDeclaredHoliday = Boolean(declaredHolidayRec);
+  const activeHolidayTitle = declaredHolidayRec?.remarks || 'Tuition Holiday';
+
+  // Map of all declared tuition holidays across the center
+  const centerHolidaysMap = useMemo(() => {
+    const map = new Map();
+    (attendance || []).forEach(a => {
+      if ((a.status === 'HOLIDAY' || a.status === 'NO_CLASS') && a.date) {
+        if (!map.has(a.date)) {
+          map.set(a.date, a.remarks || 'Tuition Holiday');
+        }
+      }
+    });
+    return map;
+  }, [attendance]);
+
+  // Calendar View Specific States
+  const [calDate, setCalDate] = useState(() => new Date());
+  const calYear = calDate.getFullYear();
+  const calMonth = calDate.getMonth();
+  const daysInCalMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const startDayOfWeek = new Date(calYear, calMonth, 1).getDay();
+  const calMonthLabel = calDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Monthly stats for Calendar view
+  const calendarMonthStats = useMemo(() => {
+    let workingDays = 0;
+    let holidayDays = 0;
+    let sundayExtraClasses = 0;
+    let totalAbsences = 0;
+
+    for (let d = 1; d <= daysInCalMonth; d++) {
+      const dStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayOfWeek = new Date(calYear, calMonth, d).getDay();
+      const isSun = dayOfWeek === 0;
+      const isDeclaredHol = centerHolidaysMap.has(dStr);
+      const dayRecords = (attendance || []).filter(a => a.date === dStr);
+      const hasSundayExtra = isSun && dayRecords.some(a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'ABSENT');
+
+      if (isDeclaredHol) {
+        holidayDays++;
+      } else if (isSun) {
+        if (hasSundayExtra) {
+          sundayExtraClasses++;
+          workingDays++;
+        }
+      } else {
+        workingDays++;
+      }
+
+      if (!isDeclaredHol && (!isSun || hasSundayExtra)) {
+        const absCount = dayRecords.filter(a => a.status === 'ABSENT').length;
+        totalAbsences += absCount;
+      }
+    }
+
+    return {
+      workingDays,
+      holidayDays,
+      sundayExtraClasses,
+      totalAbsences
+    };
+  }, [calYear, calMonth, daysInCalMonth, centerHolidaysMap, attendance]);
 
   // Compute sensible default batch ID
   const defaultBatchId = useMemo(() => {
@@ -158,11 +248,15 @@ export default function Attendance({
   }, [selectedDate]);
 
   const isSundayExtraClass = isSelectedDateSunday && (hasSundayRecords || sundayExtraClassActive);
+  const isTuitionHoliday = isDeclaredHoliday || (isSelectedDateSunday && !isSundayExtraClass);
 
   // Helper: Get student status on selected date
   const getStudentStatus = (studentId) => {
     const record = attendance.find(a => a.studentId === studentId && a.date === selectedDate);
     if (record) return record.status || 'PRESENT';
+    if (isDeclaredHoliday) {
+      return 'HOLIDAY';
+    }
     if (isSelectedDateSunday && !isSundayExtraClass) {
       return 'HOLIDAY';
     }
@@ -288,12 +382,65 @@ export default function Attendance({
     }
   };
 
+  // Declare center-wide holiday on a specific date
+  const handleDeclareHoliday = (dateToDeclare, holidayReason) => {
+    const targetDate = dateToDeclare || selectedDate;
+    const reason = (holidayReason || 'Tuition Holiday').trim();
+
+    // Filter out previous records for that date
+    let updated = attendance.filter(a => a.date !== targetDate);
+
+    // Create holiday records for active students so that per-student queries reflect the holiday
+    const activeStudentsList = students.filter(s => s.status === 'ACTIVE');
+    if (activeStudentsList.length === 0) {
+      updated.push({
+        id: generateNextId(updated),
+        studentId: 'CENTER_WIDE',
+        date: targetDate,
+        status: 'HOLIDAY',
+        remarks: reason
+      });
+    } else {
+      activeStudentsList.forEach(st => {
+        updated.push({
+          id: generateNextId(updated),
+          studentId: st.id,
+          batchId: st.batchId,
+          classCode: st.classCode,
+          date: targetDate,
+          status: 'HOLIDAY',
+          remarks: reason
+        });
+      });
+    }
+
+    onSaveData({ ...data, attendance: updated });
+    triggerSaveIndicator();
+    setHolidayModalOpen(false);
+  };
+
+  // Revert declared holiday back to regular working day
+  const handleRevertHoliday = (dateToRevert) => {
+    const targetDate = dateToRevert || selectedDate;
+    const dateFormatted = new Date(targetDate + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    if (window.confirm(`Revert ${dateFormatted} to normal working day? All students will be marked Present by default.`)) {
+      const remainingAttendance = attendance.filter(a => !(a.date === targetDate && (a.status === 'HOLIDAY' || a.status === 'NO_CLASS')));
+      onSaveData({ ...data, attendance: remainingAttendance });
+      triggerSaveIndicator();
+    }
+  };
+
   // ==========================================
   // MASTER "ALL ABSENTEES" CALCULATIONS
   // ==========================================
   const activeStudentsTotal = accessibleStudents.filter(s => s.status === 'ACTIVE').length;
 
-  const allAbsenteesForDate = (isSelectedDateSunday && !isSundayExtraClass) 
+  const allAbsenteesForDate = isTuitionHoliday 
     ? []
     : attendance
         .filter(a => a.date === selectedDate && a.status === 'ABSENT')
@@ -316,7 +463,7 @@ export default function Attendance({
         .filter(Boolean);
 
   const overallTurnout = activeStudentsTotal > 0 
-    ? (isSelectedDateSunday && !isSundayExtraClass ? null : Math.max(0, Math.round(((activeStudentsTotal - allAbsenteesForDate.length) / activeStudentsTotal) * 100)))
+    ? (isTuitionHoliday ? null : Math.max(0, Math.round(((activeStudentsTotal - allAbsenteesForDate.length) / activeStudentsTotal) * 100)))
     : 100;
 
   // Filtered All Absentees list for table
@@ -415,21 +562,14 @@ export default function Attendance({
   const batchAbsentStudents = eligibleBatchStudents.filter(s => getStudentStatus(s.id) === 'ABSENT');
   const batchLateStudents = eligibleBatchStudents.filter(s => getStudentStatus(s.id) === 'LATE');
   const batchPresentStudents = eligibleBatchStudents.filter(s => getStudentStatus(s.id) === 'PRESENT');
-  const batchPresentCount = isSelectedDateSunday && !isSundayExtraClass ? 0 : batchPresentStudents.length;
-  const batchAbsentCount = batchAbsentStudents.length;
-  const batchLateCount = batchLateStudents.length;
+  const batchPresentCount = isTuitionHoliday ? 0 : batchPresentStudents.length;
+  const batchAbsentCount = isTuitionHoliday ? 0 : batchAbsentStudents.length;
+  const batchLateCount = isTuitionHoliday ? 0 : batchLateStudents.length;
   const batchAttendancePercentage = eligibleBatchStudents.length > 0 
-    ? (isSelectedDateSunday && !isSundayExtraClass ? null : Math.round((batchPresentCount / eligibleBatchStudents.length) * 100))
+    ? (isTuitionHoliday ? null : Math.round((batchPresentCount / eligibleBatchStudents.length) * 100))
     : 100;
 
   const displayBatchStudents = eligibleBatchStudents;
-
-  const formattedSelectedDate = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
 
   return (
     <div className="attendance-page">
@@ -454,7 +594,11 @@ export default function Attendance({
         <div className="header-meta-left">
           <div className="flex items-center gap-2">
             <h1 className="page-title">
-              {currentViewMode === 'all-absentees' ? 'All Absentees Register' : 'Daily Roll Call'}
+              {currentViewMode === 'calendar'
+                ? 'Tuition Calendar & Schedule'
+                : currentViewMode === 'all-absentees'
+                ? 'All Absentees Register'
+                : 'Daily Roll Call'}
             </h1>
             {saveIndicator && (
               <span className="save-badge-pill animate-fade-in">
@@ -463,7 +607,9 @@ export default function Attendance({
             )}
           </div>
           <p className="page-subtitle mb-0">
-            {currentViewMode === 'all-absentees'
+            {currentViewMode === 'calendar'
+              ? 'Monthly calendar schedule, declared tuition holidays, and Sunday extra classes.'
+              : currentViewMode === 'all-absentees'
               ? 'Consolidated single view of every student marked absent across all classes and batches.'
               : 'Fast roll call: All students default to Present. Tap any student to mark them Absent.'}
           </p>
@@ -493,6 +639,21 @@ export default function Attendance({
             <ListChecks size={15} />
             <span>Take Batch Attendance</span>
           </button>
+
+          <button
+            type="button"
+            className={`mode-btn ${currentViewMode === 'calendar' ? 'active' : ''}`}
+            onClick={() => setViewMode('calendar')}
+            title="Tuition Attendance & Schedule Calendar with Holidays"
+          >
+            <Calendar size={15} />
+            <span>Tuition Calendar &amp; Holidays</span>
+            {calendarMonthStats.holidayDays > 0 && (
+              <span className="mode-badge badge-amber" title={`${calendarMonthStats.holidayDays} holidays this month`}>
+                🌴 {calendarMonthStats.holidayDays}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -501,6 +662,46 @@ export default function Attendance({
       {/* ========================================================================= */}
       {currentViewMode === 'all-absentees' && (
         <div className="all-absentees-container">
+          {/* Declared Holiday Banner if current date is holiday */}
+          {isDeclaredHoliday && (
+            <div className="holiday-declared-banner glass-card mb-3">
+              <div className="banner-content-row flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="holiday-banner-icon">🌴</div>
+                  <div>
+                    <h3 className="text-sm font-bold text-amber-300 mb-0.5">
+                      Tuition Holiday Declared: {activeHolidayTitle}
+                    </h3>
+                    <p className="text-xs text-secondary mb-0">
+                      Tuition classes are closed on <strong>{formattedSelectedDate}</strong>. Students are not counted absent, and this date is marked on all student calendars.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                    onClick={() => {
+                      setHolidayModalDate(selectedDate);
+                      setHolidayModalReason(activeHolidayTitle);
+                      setHolidayModalOpen(true);
+                    }}
+                  >
+                    Edit Reason
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-warning btn-sm flex items-center gap-1.5"
+                    onClick={() => handleRevertHoliday(selectedDate)}
+                  >
+                    <RotateCcw size={13} />
+                    <span>Revert to Working Day</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Date Selector & Center-wide Stats Card */}
           <div className="glass-card absentees-toolbar-card">
             <div className="toolbar-top-row">
@@ -538,7 +739,21 @@ export default function Attendance({
               </div>
 
               {/* Action Buttons */}
-              <div className="toolbar-actions-group">
+              <div className="toolbar-actions-group flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  className="btn btn-sm btn-secondary flex items-center gap-1.5"
+                  onClick={() => {
+                    setHolidayModalDate(selectedDate);
+                    setHolidayModalReason(isDeclaredHoliday ? activeHolidayTitle : '');
+                    setHolidayModalOpen(true);
+                  }}
+                  title="Declare or manage tuition holiday for this date"
+                >
+                  <span>🌴</span>
+                  <span>{isDeclaredHoliday ? 'Holiday Set' : 'Declare Holiday'}</span>
+                </button>
+
                 <button
                   type="button"
                   className={`btn btn-sm ${copiedSummary ? 'btn-success' : 'btn-secondary'}`}
@@ -579,15 +794,24 @@ export default function Attendance({
               </div>
 
               <div className="metric-pill">
-                <CheckCircle2 size={15} className={isSelectedDateSunday && !isSundayExtraClass ? 'text-amber' : 'text-emerald'} />
+                <CheckCircle2 size={15} className={isTuitionHoliday ? 'text-amber' : 'text-emerald'} />
                 <span>
-                  Center Turnout: <strong>{isSelectedDateSunday && !isSundayExtraClass ? 'Weekly Holiday' : `${overallTurnout}%`}</strong>
+                  Center Turnout:{' '}
+                  <strong>
+                    {isDeclaredHoliday
+                      ? `🌴 Holiday (${activeHolidayTitle})`
+                      : isSelectedDateSunday && !isSundayExtraClass
+                      ? '🌴 Weekly Holiday'
+                      : `${overallTurnout}%`}
+                  </strong>
                 </span>
               </div>
 
               <div className="metric-pill text-muted text-xs">
                 <span>
-                  {isSelectedDateSunday && !isSundayExtraClass
+                  {isDeclaredHoliday
+                    ? `🌴 Tuition Closed: ${activeHolidayTitle}`
+                    : isSelectedDateSunday && !isSundayExtraClass
                     ? '🌴 Sunday Default Holiday (No classes scheduled)'
                     : `${accessibleClasses.filter(c => allAbsenteesForDate.some(a => a.classCode === c.code)).length} of ${accessibleClasses.length} classes have absentees`
                   }
@@ -717,24 +941,39 @@ export default function Attendance({
           {allAbsenteesForDate.length === 0 ? (
             <div className="glass-card perfect-attendance-card">
               <div className="celebration-icon-box">
-                {isSelectedDateSunday && !isSundayExtraClass ? (
+                {isDeclaredHoliday ? (
+                  <span style={{ fontSize: '42px', lineHeight: 1 }}>🌴</span>
+                ) : isSelectedDateSunday && !isSundayExtraClass ? (
                   <span style={{ fontSize: '42px', lineHeight: 1 }}>🌴</span>
                 ) : (
                   <CheckCircle2 size={46} className="text-emerald" />
                 )}
               </div>
               <h2 className="celebration-title">
-                {isSelectedDateSunday && !isSundayExtraClass
+                {isDeclaredHoliday
+                  ? `Tuition Holiday — ${activeHolidayTitle}`
+                  : isSelectedDateSunday && !isSundayExtraClass
                   ? `Sunday Weekly Holiday (${formattedSelectedDate})`
                   : `100% Attendance on ${formattedSelectedDate}!`}
               </h2>
               <p className="celebration-subtitle">
-                {isSelectedDateSunday && !isSundayExtraClass
+                {isDeclaredHoliday
+                  ? `Tuition classes are closed on ${formattedSelectedDate} for ${activeHolidayTitle}. No absences recorded and students are not penalized.`
+                  : isSelectedDateSunday && !isSundayExtraClass
                   ? 'Sundays are configured as weekly holidays for all tuition batches. Attendance is not marked and students are not marked absent.'
                   : 'No students across Classes 1 to 10 are marked absent for this date. All enrolled students are marked Present.'}
               </p>
               <div className="celebration-actions">
-                {isSelectedDateSunday && !isSundayExtraClass ? (
+                {isDeclaredHoliday ? (
+                  <button 
+                    type="button" 
+                    className="btn btn-warning flex items-center gap-1.5"
+                    onClick={() => handleRevertHoliday(selectedDate)}
+                  >
+                    <RotateCcw size={15} />
+                    <span>Revert to Working Day</span>
+                  </button>
+                ) : isSelectedDateSunday && !isSundayExtraClass ? (
                   <button 
                     type="button" 
                     className="btn btn-primary"
@@ -876,6 +1115,35 @@ export default function Attendance({
       {/* ========================================================================= */}
       {currentViewMode === 'batch' && (
         <div className="batch-attendance-container">
+          {/* Declared Holiday Banner if current date is holiday */}
+          {isDeclaredHoliday && (
+            <div className="holiday-declared-banner glass-card mb-3">
+              <div className="banner-content-row flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="holiday-banner-icon">🌴</div>
+                  <div>
+                    <h3 className="text-sm font-bold text-amber-300 mb-0.5">
+                      Tuition Holiday Declared: {activeHolidayTitle}
+                    </h3>
+                    <p className="text-xs text-secondary mb-0">
+                      Tuition classes are closed on <strong>{formattedSelectedDate}</strong>. Batch roll call is paused and students are not penalized.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-warning btn-sm flex items-center gap-1.5"
+                    onClick={() => handleRevertHoliday(selectedDate)}
+                  >
+                    <RotateCcw size={13} />
+                    <span>Revert to Working Day</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Sunday Extra Class Active Notice */}
           {isSelectedDateSunday && isSundayExtraClass && (
             <div className="sunday-active-banner glass-card mb-3">
@@ -1017,7 +1285,21 @@ export default function Attendance({
                 <span>Turnout: <strong>{isSelectedDateSunday && !isSundayExtraClass ? 'Weekly Off' : `${batchAttendancePercentage}%`}</strong></span>
               </div>
 
-              <div className="batch-actions-right ml-auto">
+              <div className="batch-actions-right ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                  onClick={() => {
+                    setHolidayModalDate(selectedDate);
+                    setHolidayModalReason(isDeclaredHoliday ? activeHolidayTitle : '');
+                    setHolidayModalOpen(true);
+                  }}
+                  title="Declare or edit holiday for this date"
+                >
+                  <span>🌴</span>
+                  <span>{isDeclaredHoliday ? 'Holiday Set' : 'Declare Holiday'}</span>
+                </button>
+
                 <button 
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -1056,8 +1338,44 @@ export default function Attendance({
             )}
           </div>
 
-          {/* Conditional: Sunday Weekly Holiday Card vs Active Roll Call */}
-          {isSelectedDateSunday && !isSundayExtraClass ? (
+          {/* Conditional: Declared Holiday Card vs Sunday Weekly Holiday Card vs Active Roll Call */}
+          {isDeclaredHoliday ? (
+            <div className="glass-card sunday-batch-holiday-card">
+              <div className="sunday-card-icon-box">
+                <span style={{ fontSize: '44px', lineHeight: 1 }}>🌴</span>
+              </div>
+              <div className="sunday-card-content">
+                <div className="sunday-pill-tag" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}>
+                  Tuition Holiday Declared
+                </div>
+                <h2 className="sunday-card-title">{activeHolidayTitle}</h2>
+                <p className="sunday-card-desc">
+                  Tuition classes are closed on <strong>{formattedSelectedDate}</strong> for {activeHolidayTitle}. All batch sessions are suspended and students are not marked absent.
+                </p>
+                <div className="sunday-card-actions flex items-center gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-warning flex items-center gap-1.5"
+                    onClick={() => handleRevertHoliday(selectedDate)}
+                  >
+                    <RotateCcw size={15} />
+                    <span>Revert to Working Day</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary flex items-center gap-1.5"
+                    onClick={() => {
+                      setHolidayModalDate(selectedDate);
+                      setHolidayModalReason(activeHolidayTitle);
+                      setHolidayModalOpen(true);
+                    }}
+                  >
+                    <span>Edit Holiday Name</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : isSelectedDateSunday && !isSundayExtraClass ? (
             <div className="glass-card sunday-batch-holiday-card">
               <div className="sunday-card-icon-box">
                 <span style={{ fontSize: '44px', lineHeight: 1 }}>🌴</span>
@@ -1308,9 +1626,637 @@ export default function Attendance({
       )}
 
       {/* ========================================================================= */}
+      {/* VIEW 3: TUITION CALENDAR & SCHEDULE                                       */}
+      {/* ========================================================================= */}
+      {currentViewMode === 'calendar' && (
+        <div className="calendar-view-container">
+          {/* Controls Card: Month Navigation & Quick Actions */}
+          <div className="glass-card calendar-toolbar-card mb-4">
+            <div className="cal-top-bar flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setCalDate(new Date(calYear, calMonth - 1, 1))}
+                  title="Previous Month"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <h2 className="cal-month-title text-base font-bold text-white mb-0 px-2">
+                  {calMonthLabel}
+                </h2>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setCalDate(new Date(calYear, calMonth + 1, 1))}
+                  title="Next Month"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs ml-2"
+                  onClick={() => setCalDate(new Date())}
+                >
+                  Current Month
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm flex items-center gap-1.5"
+                  onClick={() => {
+                    setHolidayModalDate(selectedDate || todayDateStr);
+                    setHolidayModalReason('');
+                    setHolidayModalOpen(true);
+                  }}
+                >
+                  <span>🌴</span>
+                  <span>Declare Tuition Holiday</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Monthly KPIs Bar */}
+            <div className="cal-kpis-grid mt-4">
+              <div className="cal-kpi-box">
+                <span className="cal-kpi-label">Working Class Days</span>
+                <span className="cal-kpi-value text-emerald font-bold">{calendarMonthStats.workingDays}</span>
+              </div>
+              <div className="cal-kpi-box">
+                <span className="cal-kpi-label">Tuition Holidays</span>
+                <span className="cal-kpi-value text-amber-400 font-bold">
+                  🌴 {calendarMonthStats.holidayDays}
+                </span>
+              </div>
+              <div className="cal-kpi-box">
+                <span className="cal-kpi-label">Sunday Extra Classes</span>
+                <span className="cal-kpi-value text-sky font-bold">⚡ {calendarMonthStats.sundayExtraClasses}</span>
+              </div>
+              <div className="cal-kpi-box">
+                <span className="cal-kpi-label">Total Absences Recorded</span>
+                <span className="cal-kpi-value text-rose font-bold">{calendarMonthStats.totalAbsences}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Calendar Grid Card */}
+          <div className="glass-card cal-grid-card p-4">
+            {/* Weekday Headers */}
+            <div className="cal-weekdays-row">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, idx) => (
+                <div key={d} className={`cal-weekday-header ${idx === 0 ? 'text-rose-header' : ''}`}>
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Days Grid */}
+            <div className="cal-month-grid">
+              {/* Offset cells for month start */}
+              {Array.from({ length: startDayOfWeek }).map((_, idx) => (
+                <div key={`offset-${idx}`} className="cal-cell-slot cal-cell-empty" />
+              ))}
+
+              {/* Month Day Cells */}
+              {Array.from({ length: daysInCalMonth }).map((_, i) => {
+                const dayNum = i + 1;
+                const dStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const dayOfWeek = new Date(calYear, calMonth, dayNum).getDay();
+                const isSun = dayOfWeek === 0;
+                const isToday = dStr === todayDateStr;
+                const isDeclaredHol = centerHolidaysMap.has(dStr);
+                const holName = centerHolidaysMap.get(dStr);
+                const dayRecords = (attendance || []).filter(a => a.date === dStr);
+                const hasExtraClass = isSun && dayRecords.some(a => a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'ABSENT');
+                const absentCount = isDeclaredHol || (isSun && !hasExtraClass) ? 0 : dayRecords.filter(a => a.status === 'ABSENT').length;
+                const isPastOrToday = dStr <= todayDateStr;
+
+                let cellClass = 'cal-day-cell';
+                if (isDeclaredHol) cellClass += ' cell-declared-holiday';
+                else if (hasExtraClass) cellClass += ' cell-has-extra';
+                else if (isSun) cellClass += ' cell-sunday-off';
+                if (isToday) cellClass += ' cell-today';
+
+                return (
+                  <div key={dStr} className={cellClass}>
+                    <div className="cal-day-top flex items-center justify-between">
+                      <span className={`cal-day-num ${isToday ? 'today-circle' : ''}`}>
+                        {dayNum}
+                      </span>
+                      {isToday && <span className="today-chip">Today</span>}
+                      {isDeclaredHol ? (
+                        <button
+                          type="button"
+                          className="cal-day-icon-btn text-amber-300"
+                          onClick={() => handleRevertHoliday(dStr)}
+                          title={`Holiday: ${holName}. Click to revert to normal class.`}
+                        >
+                          <RotateCcw size={12} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="cal-day-icon-btn text-muted hover-show"
+                          onClick={() => {
+                            setHolidayModalDate(dStr);
+                            setHolidayModalReason('');
+                            setHolidayModalOpen(true);
+                          }}
+                          title={`Declare Holiday for ${dStr}`}
+                        >
+                          +🌴
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="cal-day-body">
+                      {isDeclaredHol ? (
+                        <div className="cal-holiday-tag" title={holName}>
+                          <span className="hol-icon">🌴</span>
+                          <span className="hol-name">{holName}</span>
+                        </div>
+                      ) : hasExtraClass ? (
+                        <div className="cal-extra-tag">
+                          <span>⚡ Extra Class</span>
+                          {absentCount > 0 ? (
+                            <span className="cal-absent-subtag">{absentCount} absent</span>
+                          ) : (
+                            <span className="cal-present-subtag">All attended</span>
+                          )}
+                        </div>
+                      ) : isSun ? (
+                        <div className="cal-sunday-label">
+                          <span>Sunday Off</span>
+                        </div>
+                      ) : isPastOrToday ? (
+                        absentCount > 0 ? (
+                          <div 
+                            className="cal-absent-tag cursor-pointer"
+                            onClick={() => {
+                              setSelectedDate(dStr);
+                              setViewMode('all-absentees');
+                            }}
+                            title={`${absentCount} absent. Click to open Register.`}
+                          >
+                            <AlertTriangle size={11} />
+                            <span>{absentCount} Absent</span>
+                          </div>
+                        ) : (
+                          <div 
+                            className="cal-present-tag cursor-pointer"
+                            onClick={() => {
+                              setSelectedDate(dStr);
+                              setViewMode('all-absentees');
+                            }}
+                            title="Classes conducted, all attended. Click to view."
+                          >
+                            <Check size={11} />
+                            <span>Normal Class</span>
+                          </div>
+                        )
+                      ) : (
+                        <div className="cal-future-label">
+                          <span>Class Scheduled</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick footer action to jump to this date's roll call */}
+                    <div className="cal-day-footer">
+                      <button
+                        type="button"
+                        className="cal-view-date-link"
+                        onClick={() => {
+                          setSelectedDate(dStr);
+                          setViewMode('all-absentees');
+                        }}
+                      >
+                        Roll Call →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Calendar Legend */}
+            <div className="cal-legend-row flex items-center flex-wrap gap-4 pt-4 mt-4 border-t border-slate-800 text-xs text-secondary">
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded" style={{ background: 'rgba(16, 185, 129, 0.4)', border: '1px solid #10B981' }} />
+                <span>Normal Class Attended</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded" style={{ background: 'rgba(245, 158, 11, 0.3)', border: '1px solid #F59E0B' }} />
+                <span className="font-semibold text-amber-300">🌴 Declared Tuition Holiday</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded" style={{ background: 'rgba(245, 158, 11, 0.15)', border: '1px dashed #F59E0B' }} />
+                <span>⚡ Sunday Extra Class</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded" style={{ background: 'rgba(244, 63, 94, 0.3)', border: '1px solid #F43F5E' }} />
+                <span className="text-rose font-medium">Recorded Absences</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded" style={{ background: 'rgba(15, 23, 42, 0.4)', border: '1px solid var(--border-subtle)' }} />
+                <span>Sunday Weekly Off</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded" style={{ background: '#6366F1' }} />
+                <span>Today</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* HOLIDAY DECLARATION MODAL                                                 */}
+      {/* ========================================================================= */}
+      {holidayModalOpen && (
+        <div className="modal-overlay" onClick={() => setHolidayModalOpen(false)}>
+          <div className="modal-content glass-card holiday-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🌴</span>
+                <h3 className="modal-title text-base font-bold text-white mb-0">Declare Tuition Holiday</h3>
+              </div>
+              <button 
+                type="button" 
+                className="modal-close-btn text-muted hover:text-white" 
+                onClick={() => setHolidayModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body py-4">
+              <p className="text-xs text-secondary mb-3">
+                Tuition will be marked as closed on this date. Students will not be penalized or counted absent, and the Tuition Calendar &amp; Parent Portal will update automatically.
+              </p>
+
+              <div className="form-group mb-3">
+                <label className="form-label text-xs font-semibold text-white">Holiday Date</label>
+                <input 
+                  type="date" 
+                  className="form-input" 
+                  value={holidayModalDate} 
+                  onChange={e => setHolidayModalDate(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group mb-3">
+                <label className="form-label text-xs font-semibold text-white">Quick Occasion Presets</label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {[
+                    'Diwali',
+                    'Pongal / Sankranti',
+                    'Dussehra / Navratri',
+                    'Independence Day',
+                    'Republic Day',
+                    'Gandhi Jayanti',
+                    'Eid / Ramzan',
+                    'Christmas',
+                    'Maha Shivaratri',
+                    'Ganesh Chaturthi',
+                    'Monsoon / Heavy Rain Holiday',
+                    'Center Maintenance',
+                    'Exam Preparation Break'
+                  ].map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`btn btn-xs ${holidayModalReason === preset ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setHolidayModalReason(preset)}
+                      style={{ fontSize: '0.72rem', borderRadius: '6px' }}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group mb-4">
+                <label className="form-label text-xs font-semibold text-white">Holiday Name / Occasion</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. Diwali Holiday, Pongal Vacation, Center Closed"
+                  value={holidayModalReason} 
+                  onChange={e => setHolidayModalReason(e.target.value)} 
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => setHolidayModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
+                onClick={() => handleDeclareHoliday(holidayModalDate, holidayModalReason)}
+              >
+                <span>🌴</span>
+                <span>Confirm &amp; Declare Holiday</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* STYLES                                                                    */}
       {/* ========================================================================= */}
       <style>{`
+        .badge-amber {
+          background: rgba(245, 158, 11, 0.25);
+          color: #FDE68A;
+          border: 1px solid rgba(245, 158, 11, 0.45);
+        }
+
+        /* Holiday Declared Banner */
+        .holiday-declared-banner {
+          background: rgba(245, 158, 11, 0.1);
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          padding: 14px 20px;
+          border-radius: var(--radius-lg);
+        }
+        .holiday-banner-icon {
+          font-size: 28px;
+          line-height: 1;
+        }
+
+        /* Calendar View Styles */
+        .calendar-view-container {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        .calendar-toolbar-card {
+          padding: 18px 22px;
+        }
+        .cal-kpis-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 12px;
+        }
+        .cal-kpi-box {
+          background: rgba(15, 23, 42, 0.45);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 10px 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .cal-kpi-label {
+          font-size: 0.72rem;
+          color: var(--text-secondary);
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+        }
+        .cal-kpi-value {
+          font-size: 1.25rem;
+          font-weight: 700;
+        }
+
+        .cal-weekdays-row {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+        .cal-weekday-header {
+          text-align: center;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: var(--text-secondary);
+          padding: 6px 0;
+          text-transform: uppercase;
+        }
+        .text-rose-header {
+          color: #FB7185;
+        }
+
+        .cal-month-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 8px;
+        }
+        .cal-cell-slot {
+          min-height: 100px;
+          border-radius: var(--radius-md);
+        }
+        .cal-cell-empty {
+          background: rgba(15, 23, 42, 0.15);
+          opacity: 0.25;
+        }
+        .cal-day-cell {
+          min-height: 105px;
+          background: rgba(15, 23, 42, 0.45);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 8px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          transition: all 0.15s ease;
+          position: relative;
+        }
+        .cal-day-cell:hover {
+          border-color: rgba(255, 255, 255, 0.2);
+          background: rgba(15, 23, 42, 0.65);
+        }
+        .cal-day-cell:hover .hover-show {
+          opacity: 1;
+        }
+        .cell-declared-holiday {
+          background: rgba(245, 158, 11, 0.08) !important;
+          border: 1px solid rgba(245, 158, 11, 0.4) !important;
+        }
+        .cell-has-extra {
+          background: rgba(245, 158, 11, 0.05);
+          border: 1px dashed rgba(245, 158, 11, 0.4);
+        }
+        .cell-sunday-off {
+          background: rgba(15, 23, 42, 0.25);
+          opacity: 0.7;
+        }
+        .cell-today {
+          border-color: #6366F1 !important;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+        }
+
+        .cal-day-num {
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: white;
+        }
+        .today-circle {
+          background: #6366F1;
+          color: white;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.75rem;
+        }
+        .today-chip {
+          font-size: 0.625rem;
+          background: rgba(99, 102, 241, 0.2);
+          color: #A5B4FC;
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-weight: 600;
+        }
+        .cal-day-icon-btn {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 2px 4px;
+          border-radius: 4px;
+          font-size: 0.7rem;
+        }
+        .hover-show {
+          opacity: 0;
+          transition: opacity 0.15s ease;
+        }
+
+        .cal-day-body {
+          margin: 6px 0;
+          min-height: 38px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        .cal-holiday-tag {
+          background: rgba(245, 158, 11, 0.22);
+          border: 1px solid rgba(245, 158, 11, 0.5);
+          color: #FDE68A;
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 2px 5px;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .cal-extra-tag {
+          background: rgba(245, 158, 11, 0.15);
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          color: #FBBF24;
+          font-size: 0.625rem;
+          padding: 2px 4px;
+          border-radius: 4px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .cal-absent-subtag {
+          color: #FB7185;
+          font-weight: 700;
+        }
+        .cal-present-subtag {
+          color: #34D399;
+          font-weight: 600;
+        }
+        .cal-sunday-label {
+          font-size: 0.65rem;
+          color: #64748B;
+          text-align: center;
+          font-weight: 600;
+        }
+        .cal-future-label {
+          font-size: 0.625rem;
+          color: #475569;
+          text-align: center;
+        }
+        .cal-absent-tag {
+          background: rgba(244, 63, 94, 0.18);
+          border: 1px solid rgba(244, 63, 94, 0.45);
+          color: #FB7185;
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 2px 4px;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+        }
+        .cal-present-tag {
+          background: rgba(16, 185, 129, 0.12);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          color: #34D399;
+          font-size: 0.65rem;
+          font-weight: 600;
+          padding: 2px 4px;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+        }
+        .cal-day-footer {
+          display: flex;
+          justify-content: flex-end;
+        }
+        .cal-view-date-link {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          font-size: 0.625rem;
+          cursor: pointer;
+          padding: 0;
+          transition: color 0.15s ease;
+        }
+        .cal-view-date-link:hover {
+          color: var(--primary);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.72);
+          backdrop-filter: blur(6px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 16px;
+        }
+        .modal-content.holiday-modal {
+          max-width: 500px;
+          width: 100%;
+          background: rgba(15, 23, 42, 0.95);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: var(--radius-xl);
+          padding: 22px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+        }
+        .modal-close-btn {
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+        }
+
         .attendance-page {
           display: flex;
           flex-direction: column;
