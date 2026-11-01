@@ -391,7 +391,7 @@ export default function LandingPage({
 
             <h1 className="hero-headline">
               <span className="hero-brand-supertitle block text-xs md:text-sm font-extrabold uppercase tracking-widest text-amber-400 mb-2">
-                HAYAGRIVA TUTORIALS &amp; TUITIONS • PREMIER SCHOOL COACHING
+                HAYAGRIVA TUTORIALS
               </span>
               Building Strong <br />
               <span className="text-gradient-gold">Foundations</span> for <br />
@@ -401,7 +401,7 @@ export default function LandingPage({
             {/* Desktop-only description & CTAs (Shown on desktop alongside slider) */}
             <div className="hero-desktop-content-block">
               <p className="hero-description">
-                <strong>Hayagriva Tutorials &amp; Tuitions</strong> provides specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics &amp; Sciences</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
+                <strong>Hayagriva Tutorials</strong> provides specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics &amp; Sciences</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
               </p>
 
               <div className="hero-actions-cluster flex items-center flex-wrap gap-3 mb-6">
@@ -1287,7 +1287,7 @@ export default function LandingPage({
           {/* Bottom Copyright & Navigation Bar */}
           <div className="footer-bottom-bar">
             <div className="footer-copyright-text">
-              &copy; {new Date().getFullYear()} <strong className="footer-brand-highlight">HAYAGRIVA TUTORIALS &amp; TUITIONS</strong>. All rights reserved.
+              &copy; {new Date().getFullYear()} <strong className="footer-brand-highlight">HAYAGRIVA TUTORIALS</strong>. All rights reserved.
               <span className="footer-city-tag">• Srinagar Colony, Hyderabad, Telangana</span>
             </div>
 
