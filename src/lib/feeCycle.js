@@ -96,6 +96,35 @@ export function calculateStudentFeeCycle(
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const monthYearLabel = `${monthNames[activeDueDate.getMonth()]} ${activeDueDate.getFullYear()}`;
 
+  const isInactive = String(student.status || '').toUpperCase() === 'INACTIVE';
+  if (isInactive) {
+    const rawBalance = feeRecord ? Number(feeRecord.balance !== undefined ? feeRecord.balance : (Number(feeRecord.amountDue || 0) - Number(feeRecord.amountPaid || 0))) : 0;
+    const finalBalance = Math.max(0, rawBalance);
+    return {
+      studentId: Number(student.id),
+      studentName: student.name,
+      classCode: student.classCode || student.class_code,
+      admissionNo: student.admissionNo || student.admission_no,
+      parentName: student.parentName || student.parent_name,
+      parentPhone: student.parentPhone || student.parent_phone,
+      joiningDate: joiningDateStr,
+      cycleDay: activeDueDate.getDate(),
+      dueDateStr,
+      formattedDueDate: 'Paused (Inactive)',
+      monthYearLabel,
+      cycleMonth: monthYearLabel,
+      amountDue: feeRecord ? Number(feeRecord.amountDue || 0) : 0,
+      amountPaid,
+      balance: finalBalance,
+      cycleStatus: finalBalance > 0 ? 'OVERDUE' : 'INACTIVE',
+      daysDiff: 0,
+      isPaid: finalBalance === 0,
+      isInactive: true,
+      inactiveReason: student.inactiveReason || 'Temporary Break / Discontinued',
+      lastPaymentDate: payDateStr
+    };
+  }
+
   return {
     studentId: Number(student.id),
     studentName: student.name,
@@ -129,7 +158,8 @@ export function computeFinancialSummary(
   receipts = [], 
   referenceDate = new Date()
 ) {
-  const activeStudents = (students || []).filter(s => s.status === 'ACTIVE');
+  const activeStudents = (students || []).filter(s => (s.status || 'ACTIVE') === 'ACTIVE');
+  const inactiveStudents = (students || []).filter(s => s.status === 'INACTIVE');
   const currentMonth = referenceDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const refYear = referenceDate.getFullYear();
   const refMonth = referenceDate.getMonth();
@@ -189,6 +219,80 @@ export function computeFinancialSummary(
     return cycleInfo;
   });
 
+  // 3. Process inactive students (No current month fee billed; capture past unpaid dues)
+  const inactiveFeeCycles = inactiveStudents.map(student => {
+    const sId = Number(student.id);
+
+    // Inactive student fee record in current month (if any)
+    const feeRecord = (fees || []).find(f => {
+      const fStudentId = Number(f.studentId || f.student_id);
+      const fMonth = f.monthYear || f.month_year;
+      return fStudentId === sId && fMonth === currentMonth;
+    });
+
+    // Check all historical fee records for any past unpaid balance
+    const studentPastFees = (fees || []).filter(f => Number(f.studentId || f.student_id) === sId);
+    const pastPendingBalance = studentPastFees.reduce((sum, f) => {
+      const b = Number(f.balance !== undefined ? f.balance : (Number(f.amountDue || 0) - Number(f.amountPaid || 0)));
+      return sum + Math.max(0, b);
+    }, 0);
+
+    // Receipts in current month
+    const sReceipts = (receipts || []).filter(r => {
+      const rStudentId = Number(r.studentId || r.student_id);
+      if (rStudentId !== sId) return false;
+      if (r.monthYear === currentMonth || r.month_year === currentMonth) return true;
+      const dateStr = r.date || r.payment_date;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        return d.getFullYear() === refYear && d.getMonth() === refMonth;
+      }
+      return false;
+    });
+    const receiptsAmountForMonth = sReceipts.reduce((sum, r) => sum + (Number(r.amount) || Number(r.amount_paid) || 0), 0);
+
+    const allStudentReceipts = (receipts || [])
+      .filter(r => Number(r.studentId || r.student_id) === sId && (r.date || r.payment_date))
+      .sort((a, b) => new Date(b.date || b.payment_date) - new Date(a.date || a.payment_date));
+    const lastPaymentDate = allStudentReceipts[0]?.date || allStudentReceipts[0]?.payment_date || feeRecord?.lastPaymentDate || null;
+
+    const cycleInfo = calculateStudentFeeCycle(
+      student,
+      feeRecord,
+      referenceDate,
+      lastPaymentDate,
+      receiptsAmountForMonth
+    );
+
+    // Inactive students are NOT billed current month fee: amountDue = 0
+    cycleInfo.amountDue = feeRecord ? Number(feeRecord.amountDue || 0) : 0;
+    cycleInfo.balance = pastPendingBalance;
+    cycleInfo.isPaid = pastPendingBalance === 0;
+    cycleInfo.isInactive = true;
+    cycleInfo.inactiveReason = student.inactiveReason || 'Temporary Break / Discontinued';
+    cycleInfo.cycleStatus = pastPendingBalance > 0 ? 'OVERDUE' : 'INACTIVE';
+    cycleInfo.formattedDueDate = 'Paused (Inactive)';
+
+    return cycleInfo;
+  });
+
+  // Also include current month receipts from inactive students (in case an inactive student paid past dues)
+  const allCurrentMonthReceipts = (receipts || []).reduce((sum, r) => {
+    if (r.monthYear === currentMonth || r.month_year === currentMonth) {
+      return sum + (Number(r.amount) || Number(r.amount_paid) || 0);
+    }
+    const dateStr = r.date || r.payment_date;
+    if (dateStr) {
+      const d = new Date(dateStr);
+      if (d.getFullYear() === refYear && d.getMonth() === refMonth) {
+        return sum + (Number(r.amount) || Number(r.amount_paid) || 0);
+      }
+    }
+    return sum;
+  }, 0);
+
+  monthlyCollected = Math.max(monthlyCollected, allCurrentMonthReceipts);
+
   const monthlyPending = Math.max(monthlyBilled - monthlyCollected, 0);
   const collectionRate = monthlyBilled > 0 ? Math.round((monthlyCollected / monthlyBilled) * 100) : 0;
 
@@ -200,22 +304,31 @@ export function computeFinancialSummary(
   const dueOrOverdue = studentFeeCycles.filter(c => c.cycleStatus === 'DUE' || c.cycleStatus === 'DUE_TODAY' || c.cycleStatus === 'OVERDUE');
   const defaultersCount = dueOrOverdue.length;
 
+  const inactiveWithDues = inactiveFeeCycles.filter(c => c.balance > 0);
+
   return {
     currentMonth,
     activeStudents,
+    inactiveStudents,
+    totalStudentsCount: students.length,
+    activeStudentsCount: activeStudents.length,
+    inactiveStudentsCount: inactiveStudents.length,
     monthlyBilled,
     monthlyCollected,
     monthlyPending,
     collectionRate,
     allTimeCollected,
     studentFeeCycles,
+    inactiveFeeCycles,
+    allStudentFeeCycles: [...studentFeeCycles, ...inactiveFeeCycles],
     dueOrOverdue,
     defaultersCount,
     overdueCycles,
     dueCycles,
     dueTodayCycles,
     upcomingCycles,
-    paidCycles
+    paidCycles,
+    inactiveWithDues
   };
 }
 

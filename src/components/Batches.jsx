@@ -947,9 +947,14 @@ export default function Batches({ data, currentUser, onSaveData, setActiveTab, s
                     <div key={student.id} className="roster-item">
                       <span className="roster-idx font-mono text-muted">{idx + 1}.</span>
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-white">{student.name}</span>
                           <span className="badge badge-class text-xs">{sClass?.name || student.classCode}</span>
+                          {student.status === 'INACTIVE' && (
+                            <span className="badge badge-warning text-3xs" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                              PAUSED
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-muted mt-0.5">
                           {student.school || 'School unspecified'}

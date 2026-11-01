@@ -45,6 +45,7 @@ export default function Fees({
   const [viewMode, setViewMode] = useState('cycles'); // 'cycles', 'ledger', or 'receipts'
   const [cycleFilter, setCycleFilter] = useState('ALL'); // ALL, OVERDUE, DUE_TODAY, UPCOMING, PAID
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, DEFAULTERS, PARTIAL, PAID
+  const [studentStatusFilter, setStudentStatusFilter] = useState('ACTIVE'); // 'ACTIVE', 'INACTIVE', 'ALL'
   const [selectedLedgerMonth, setSelectedLedgerMonth] = useState('CURRENT'); // 'CURRENT' or 'ALL'
   const [classFilter, setClassFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,11 +70,14 @@ export default function Fees({
   const {
     currentMonth,
     activeStudents,
+    inactiveStudents,
     monthlyBilled: totalBilled,
     monthlyCollected,
     monthlyPending: totalOutstanding,
     collectionRate,
     studentFeeCycles,
+    inactiveFeeCycles,
+    allStudentFeeCycles,
     dueOrOverdue,
     defaultersCount,
     overdueCycles,
@@ -87,12 +91,12 @@ export default function Fees({
   const handleStudentSelect = (studentId) => {
     const sId = Number(studentId);
     setSelectedStudentId(sId);
-    const cycle = studentFeeCycles.find(c => c.studentId === sId);
+    const cycle = (allStudentFeeCycles || studentFeeCycles).find(c => c.studentId === sId);
     if (cycle && cycle.balance > 0) {
       setPaymentAmount(cycle.balance);
     } else {
       const student = students.find(s => s.id === sId);
-      setPaymentAmount(student?.monthlyFee || 2000);
+      setPaymentAmount(student?.status === 'INACTIVE' ? 0 : (student?.monthlyFee || 2000));
     }
   };
 
@@ -132,7 +136,11 @@ export default function Fees({
     const receiptNumber = `REC-2026-${Math.floor(100 + Math.random() * 900)}`;
 
     let updatedFees = [...fees];
-    const feeIndex = updatedFees.findIndex(f => f.studentId === sId && f.monthYear === currentMonth);
+    let feeIndex = updatedFees.findIndex(f => f.studentId === sId && f.monthYear === currentMonth);
+    if (feeIndex === -1) {
+      // Look for latest unpaid historical fee record for this student (e.g. past dues before taking break)
+      feeIndex = updatedFees.findIndex(f => f.studentId === sId && Number(f.balance || 0) > 0);
+    }
 
     if (feeIndex >= 0) {
       const currentFee = updatedFees[feeIndex];
@@ -415,29 +423,39 @@ export default function Fees({
     }
   };
 
+  const displayedCyclesSource = studentStatusFilter === 'INACTIVE' 
+    ? (inactiveFeeCycles || [])
+    : (studentStatusFilter === 'ALL' ? (allStudentFeeCycles || studentFeeCycles) : studentFeeCycles);
+
   // Filter cycles
-  const filteredCycles = studentFeeCycles.filter(item => {
+  const filteredCycles = displayedCyclesSource.filter(item => {
     if (classFilter !== 'ALL' && item.classCode !== classFilter) return false;
     if (cycleFilter !== 'ALL') {
       if ((cycleFilter === 'DUE' || cycleFilter === 'DUE_TODAY') && (item.cycleStatus !== 'DUE_TODAY' && item.cycleStatus !== 'DUE')) return false;
       if (cycleFilter === 'OVERDUE' && item.cycleStatus !== 'OVERDUE') return false;
       if (cycleFilter === 'UPCOMING' && (item.cycleStatus !== 'UPCOMING' || item.daysDiff > 5)) return false;
       if (cycleFilter === 'PAID' && item.cycleStatus !== 'PAID') return false;
+      if (cycleFilter === 'INACTIVE' && item.cycleStatus !== 'INACTIVE') return false;
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = item.studentName.toLowerCase().includes(q);
-      const matchParent = item.parentName.toLowerCase().includes(q);
-      const matchPhone = item.parentPhone.includes(q);
+      const matchName = (item.studentName || '').toLowerCase().includes(q);
+      const matchParent = (item.parentName || '').toLowerCase().includes(q);
+      const matchPhone = (item.parentPhone || '').includes(q);
       return matchName || matchParent || matchPhone;
     }
     return true;
   });
 
   // Construct Ledger Items (Current Month dynamic ledger vs Historical raw records)
-  const currentMonthLedgerItems = activeStudents.map(student => {
+  const ledgerStudentsList = studentStatusFilter === 'INACTIVE' 
+    ? (inactiveStudents || [])
+    : (studentStatusFilter === 'ALL' ? students : activeStudents);
+
+  const currentMonthLedgerItems = ledgerStudentsList.map(student => {
     const sId = Number(student.id);
-    const cycle = studentFeeCycles.find(c => c.studentId === sId);
+    const isInactiveStudent = student.status === 'INACTIVE';
+    const cycle = (allStudentFeeCycles || studentFeeCycles).find(c => c.studentId === sId);
     const feeRecord = fees.find(f => f.studentId === sId && f.monthYear === currentMonth);
     const studentReceipt = (receipts || []).find(r => {
       if (Number(r.studentId) !== sId) return false;
@@ -449,10 +467,12 @@ export default function Fees({
       return false;
     });
 
-    const amountDue = cycle?.amountDue || Number(student.monthlyFee || 2000);
+    const amountDue = isInactiveStudent ? (feeRecord ? Number(feeRecord.amountDue || 0) : 0) : (cycle?.amountDue || Number(student.monthlyFee || 2000));
     const amountPaid = cycle?.amountPaid || 0;
     const balance = cycle?.balance !== undefined ? cycle.balance : amountDue;
-    const status = balance === 0 && amountPaid > 0 ? 'PAID' : (amountPaid > 0 ? 'PARTIAL' : 'PENDING');
+    const status = isInactiveStudent 
+      ? (balance > 0 ? 'OVERDUE' : 'INACTIVE')
+      : (balance === 0 && amountPaid > 0 ? 'PAID' : (amountPaid > 0 ? 'PARTIAL' : 'PENDING'));
 
     return {
       id: feeRecord?.id || `cur-${sId}`,
@@ -463,10 +483,12 @@ export default function Fees({
       amountPaid,
       balance,
       status,
+      isInactive: isInactiveStudent,
+      inactiveReason: student.inactiveReason || 'Temporary Break',
       receipt: studentReceipt,
       receiptNo: studentReceipt?.receiptNo || feeRecord?.receiptNo || null,
       cycleDay: cycle?.cycleDay || 1,
-      cycleStatus: cycle?.cycleStatus || 'DUE'
+      cycleStatus: cycle?.cycleStatus || (isInactiveStudent ? 'INACTIVE' : 'DUE')
     };
   });
 
@@ -611,13 +633,45 @@ export default function Fees({
         <div className="cycles-view-container">
           {/* Cycle Filters Bar */}
           <div className="glass-card fee-filters-card">
+            <div className="fee-student-status-tabs mb-2.5 flex items-center justify-between gap-2 border-b pb-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  className={`pill-btn ${studentStatusFilter === 'ACTIVE' ? 'active' : ''}`}
+                  onClick={() => setStudentStatusFilter('ACTIVE')}
+                  style={studentStatusFilter === 'ACTIVE' ? { borderColor: '#10B981', color: '#10B981' } : {}}
+                >
+                  <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: '#10B981' }}></span>
+                  Active Students ({studentFeeCycles.length})
+                </button>
+                <button
+                  className={`pill-btn ${studentStatusFilter === 'INACTIVE' ? 'active' : ''}`}
+                  onClick={() => setStudentStatusFilter('INACTIVE')}
+                  style={studentStatusFilter === 'INACTIVE' ? { borderColor: '#F59E0B', color: '#F59E0B' } : {}}
+                >
+                  <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: '#F59E0B' }}></span>
+                  Inactive / Paused ({inactiveFeeCycles?.length || 0})
+                </button>
+                <button
+                  className={`pill-btn ${studentStatusFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setStudentStatusFilter('ALL')}
+                >
+                  All ({allStudentFeeCycles?.length || students.length})
+                </button>
+              </div>
+              {studentStatusFilter === 'INACTIVE' && (
+                <span className="text-3xs text-amber-400 hidden sm:inline">
+                  Paused students: ₹0 current month tuition billed. Past unpaid dues remain collectable.
+                </span>
+              )}
+            </div>
+
             <div className="filters-row">
               <div className="status-pills">
                 <button 
                   className={`pill-btn ${cycleFilter === 'ALL' ? 'active' : ''}`}
                   onClick={() => setCycleFilter('ALL')}
                 >
-                  All ({studentFeeCycles.length})
+                  All ({displayedCyclesSource.length})
                 </button>
                 <button 
                   className={`pill-btn pill-danger ${cycleFilter === 'OVERDUE' ? 'active' : ''}`}
@@ -707,7 +761,14 @@ export default function Fees({
                     return (
                       <tr key={item.studentId}>
                         <td>
-                          <div className="font-semibold">{item.studentName}</div>
+                          <div className="font-semibold flex items-center gap-1.5">
+                            <span>{item.studentName}</span>
+                            {item.isInactive && (
+                              <span className="badge badge-warning text-3xs" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                                INACTIVE
+                              </span>
+                            )}
+                          </div>
                           <span className="badge badge-class">{className}</span>
                         </td>
                         <td>
@@ -734,24 +795,32 @@ export default function Fees({
                           )}
                         </td>
                         <td>
-                          {item.cycleStatus === 'PAID' && (
-                            <span className="badge badge-success">Paid for Cycle</span>
-                          )}
-                          {item.cycleStatus === 'DUE_TODAY' && (
-                            <span className="badge badge-warning pulse-badge">Due Today ({item.cycleDay}th)</span>
-                          )}
-                          {item.cycleStatus === 'DUE' && (
-                            <span className="badge badge-warning">Due ({item.cycleDay}th)</span>
-                          )}
-                          {item.cycleStatus === 'OVERDUE' && (
-                            <span className="badge badge-danger">
-                              {Math.abs(item.daysDiff)} Day(s) Overdue
+                          {item.isInactive ? (
+                            <span className="badge badge-warning" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                              {item.balance > 0 ? `Paused (Past Due: ₹${item.balance})` : 'Paused (₹0 Billed)'}
                             </span>
-                          )}
-                          {item.cycleStatus === 'UPCOMING' && (
-                            <span className="badge badge-class">
-                              In {item.daysDiff} Day(s)
-                            </span>
+                          ) : (
+                            <>
+                              {item.cycleStatus === 'PAID' && (
+                                <span className="badge badge-success">Paid for Cycle</span>
+                              )}
+                              {item.cycleStatus === 'DUE_TODAY' && (
+                                <span className="badge badge-warning pulse-badge">Due Today ({item.cycleDay}th)</span>
+                              )}
+                              {item.cycleStatus === 'DUE' && (
+                                <span className="badge badge-warning">Due ({item.cycleDay}th)</span>
+                              )}
+                              {item.cycleStatus === 'OVERDUE' && (
+                                <span className="badge badge-danger">
+                                  {Math.abs(item.daysDiff)} Day(s) Overdue
+                                </span>
+                              )}
+                              {item.cycleStatus === 'UPCOMING' && (
+                                <span className="badge badge-class">
+                                  In {item.daysDiff} Day(s)
+                                </span>
+                              )}
+                            </>
                           )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
@@ -1165,15 +1234,32 @@ export default function Fees({
                   }}
                 >
                   <option value="">Choose student...</option>
-                  {students.filter(s => s.status === 'ACTIVE').map(s => {
-                    const cls = classes.find(c => c.code === s.classCode)?.name;
-                    const cycleDay = s.admissionDate ? new Date(s.admissionDate).getDate() : 1;
-                    return (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({cls}) — Cycle: {cycleDay}th of month
-                      </option>
-                    );
-                  })}
+                  <optgroup label="Active Enrolled Students">
+                    {students.filter(s => (s.status || 'ACTIVE') === 'ACTIVE').map(s => {
+                      const cls = classes.find(c => c.code === s.classCode)?.name;
+                      const cycle = (allStudentFeeCycles || studentFeeCycles).find(c => c.studentId === s.id);
+                      const bal = cycle ? cycle.balance : s.monthlyFee;
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({cls}) {bal > 0 ? `— Due: ₹${bal}` : '— Cleared'}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                  {students.some(s => s.status === 'INACTIVE') && (
+                    <optgroup label="Inactive / Paused Students (Historical / Past Dues)">
+                      {students.filter(s => s.status === 'INACTIVE').map(s => {
+                        const cls = classes.find(c => c.code === s.classCode)?.name;
+                        const cycle = (allStudentFeeCycles || studentFeeCycles).find(c => c.studentId === s.id);
+                        const pastBal = cycle ? cycle.balance : 0;
+                        return (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({cls}) [INACTIVE{pastBal > 0 ? ` • Past Due: ₹${pastBal}` : ' • ₹0 Due'}]
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
                 </select>
                 {feeErrors.selectedStudentId && (
                   <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>

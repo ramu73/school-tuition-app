@@ -111,8 +111,10 @@ export default function Dashboard({
   };
 
   // 1. Calculations
-  const activeStudents = accessibleStudents.filter(s => s.status === 'ACTIVE');
+  const activeStudents = accessibleStudents.filter(s => (s.status || 'ACTIVE') === 'ACTIVE');
+  const inactiveStudents = accessibleStudents.filter(s => s.status === 'INACTIVE');
   const totalStudents = activeStudents.length;
+  const inactiveStudentsCount = inactiveStudents.length;
 
   // Today's attendance (scoped to teacher's students if teacher)
   const todayDateObj = new Date();
@@ -347,9 +349,23 @@ export default function Dashboard({
             </div>
           </div>
           <div className="kpi-value">{totalStudents}</div>
-          <div className="kpi-footer">
-            <span className="kpi-tag tag-success">10 Standards</span>
-            <span className="kpi-note">Across primary, middle & high</span>
+          <div className="kpi-footer flex items-center justify-between">
+            <span className="kpi-tag tag-success">{totalStudents} Active</span>
+            {inactiveStudentsCount > 0 ? (
+              <span 
+                className="kpi-tag tag-warning"
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  setSelectedClassFilter('ALL');
+                  setActiveTab('students');
+                }}
+                title="Click to view Inactive / Paused students"
+              >
+                {inactiveStudentsCount} Inactive (Paused)
+              </span>
+            ) : (
+              <span className="kpi-note">Across primary, middle & high</span>
+            )}
           </div>
         </div>
 

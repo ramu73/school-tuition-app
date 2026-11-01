@@ -15,7 +15,10 @@ import {
   IndianRupee,
   Award,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  PauseCircle,
+  PlayCircle,
+  Clock
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { logger, LOG_CATEGORIES } from '../lib/logger';
@@ -38,6 +41,10 @@ export default function Students({
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [editingStudent, setEditingStudent] = useState(null);
   const [feedbackStudent, setFeedbackStudent] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', 'ACTIVE', 'INACTIVE'
+  const [deactivateModalStudent, setDeactivateModalStudent] = useState(null);
+  const [deactivateReason, setDeactivateReason] = useState('Taking 2 months break / Temporary break');
+  const [deleteConfirmStudent, setDeleteConfirmStudent] = useState(null);
 
   const [formErrors, setFormErrors] = useState({});
 
@@ -65,6 +72,8 @@ export default function Students({
     parentName: '',
     parentPhone: '',
     monthlyFee: 500,
+    status: 'ACTIVE',
+    inactiveReason: '',
     admissionDate: new Date().toISOString().split('T')[0],
     address: ''
   });
@@ -157,14 +166,87 @@ export default function Students({
     setFormErrors({});
 
     if (editingStudent) {
-      // Update
+      const prevStatus = editingStudent.status || 'ACTIVE';
+      const newStatus = formData.status || 'ACTIVE';
+      const statusChanged = prevStatus !== newStatus;
+      const mFee = Number(formData.monthlyFee) || Number(editingStudent.monthlyFee) || 1000;
+      const todayDateStr = new Date().toISOString().split('T')[0];
+
+      // Update student
       const updatedStudents = students.map(s => 
         s.id === editingStudent.id 
-          ? { ...s, ...formData, monthlyFee: Number(formData.monthlyFee), status: editingStudent.status || s.status || 'ACTIVE' }
+          ? { 
+              ...s, 
+              ...formData, 
+              monthlyFee: mFee, 
+              status: newStatus,
+              inactiveReason: newStatus === 'INACTIVE' ? (formData.inactiveReason || s.inactiveReason || 'Temporary Break / Discontinued') : null,
+              inactiveDate: newStatus === 'INACTIVE' ? (s.inactiveDate || todayDateStr) : null
+            }
           : s
       );
-      onSaveData({ ...data, students: updatedStudents });
-      logger.action(LOG_CATEGORIES.DATABASE, `Updated student details: ${formData.name}`, { id: editingStudent.id, admissionNo: formData.admissionNo });
+
+      // Synchronize current month fees if status changed
+      let updatedFees = [...fees];
+      if (statusChanged) {
+        const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        const sId = Number(editingStudent.id);
+        const feeIndex = updatedFees.findIndex(f => f.studentId === sId && f.monthYear === currentMonthYear);
+
+        if (newStatus === 'INACTIVE') {
+          // If inactive for this month: fee should NOT be charged for inactive month
+          if (feeIndex >= 0) {
+            const currentFee = updatedFees[feeIndex];
+            const paid = Number(currentFee.amountPaid || 0);
+            updatedFees[feeIndex] = {
+              ...currentFee,
+              amountDue: paid,
+              balance: 0,
+              status: paid > 0 ? 'PAID' : 'INACTIVE',
+              remarks: formData.inactiveReason || 'Student Inactive / Paused this month'
+            };
+          } else {
+            updatedFees.push({
+              id: generateNextId(fees),
+              studentId: sId,
+              monthYear: currentMonthYear,
+              amountDue: 0,
+              amountPaid: 0,
+              balance: 0,
+              status: 'INACTIVE',
+              remarks: formData.inactiveReason || 'Student Inactive / Paused this month'
+            });
+          }
+        } else if (newStatus === 'ACTIVE') {
+          // Reactivated: bill current month fee
+          if (feeIndex >= 0) {
+            const currentFee = updatedFees[feeIndex];
+            const paid = Number(currentFee.amountPaid || 0);
+            const balance = Math.max(0, mFee - paid);
+            updatedFees[feeIndex] = {
+              ...currentFee,
+              amountDue: mFee,
+              balance,
+              status: balance === 0 ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
+              remarks: 'Reactivated'
+            };
+          } else {
+            updatedFees.push({
+              id: generateNextId(fees),
+              studentId: sId,
+              monthYear: currentMonthYear,
+              amountDue: mFee,
+              amountPaid: 0,
+              balance: mFee,
+              status: 'PENDING',
+              lastPaymentDate: null
+            });
+          }
+        }
+      }
+
+      onSaveData({ ...data, students: updatedStudents, fees: updatedFees });
+      logger.action(LOG_CATEGORIES.DATABASE, `Updated student details: ${formData.name}`, { id: editingStudent.id, admissionNo: formData.admissionNo, status: newStatus });
       setEditingStudent(null);
     } else {
       // Create new
@@ -180,20 +262,21 @@ export default function Students({
         parentName: formData.parentName.trim(),
         parentPhone: formData.parentPhone.trim(),
         monthlyFee: Number(formData.monthlyFee) || 1000,
-        status: 'ACTIVE',
+        status: formData.status || 'ACTIVE',
+        inactiveReason: formData.status === 'INACTIVE' ? (formData.inactiveReason || 'Temporary Break / Discontinued') : null,
         admissionDate: formData.admissionDate || new Date().toISOString().split('T')[0]
       };
 
-      // Also create current month fee record for this student
+      // Also create current month fee record for this student if active
       const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       const newFeeRecord = {
         id: generateNextId(fees),
         studentId: newId,
         monthYear: currentMonthYear,
-        amountDue: newStudent.monthlyFee,
+        amountDue: newStudent.status === 'ACTIVE' ? newStudent.monthlyFee : 0,
         amountPaid: 0,
-        balance: newStudent.monthlyFee,
-        status: 'PENDING',
+        balance: newStudent.status === 'ACTIVE' ? newStudent.monthlyFee : 0,
+        status: newStudent.status === 'ACTIVE' ? 'PENDING' : 'INACTIVE',
         lastPaymentDate: null
       };
 
@@ -216,11 +299,100 @@ export default function Students({
       parentName: '',
       parentPhone: '',
       monthlyFee: 1250,
+      status: 'ACTIVE',
+      inactiveReason: '',
       admissionDate: new Date().toISOString().split('T')[0],
       address: ''
     });
     setFormErrors({});
     setAdmitModalOpen(false);
+  };
+
+  // Direct toggle between ACTIVE and INACTIVE with automatic fee synchronization
+  const handleToggleStudentStatus = (student, newStatus, reason = '') => {
+    const sId = Number(student.id);
+    const currentMonthYear = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const todayDateStr = new Date().toISOString().split('T')[0];
+
+    const updatedStudents = students.map(s => {
+      if (s.id === sId) {
+        return {
+          ...s,
+          status: newStatus,
+          inactiveReason: newStatus === 'INACTIVE' ? (reason || s.inactiveReason || 'Temporary Break / Discontinued') : null,
+          inactiveDate: newStatus === 'INACTIVE' ? todayDateStr : null
+        };
+      }
+      return s;
+    });
+
+    let updatedFees = [...fees];
+    const feeIndex = updatedFees.findIndex(f => f.studentId === sId && f.monthYear === currentMonthYear);
+
+    if (newStatus === 'INACTIVE') {
+      // Inactive for this month: fee is NOT charged
+      if (feeIndex >= 0) {
+        const currentFee = updatedFees[feeIndex];
+        const paid = Number(currentFee.amountPaid || 0);
+        updatedFees[feeIndex] = {
+          ...currentFee,
+          amountDue: paid,
+          balance: 0,
+          status: paid > 0 ? 'PAID' : 'INACTIVE',
+          remarks: reason || 'Student Inactive / Paused this month'
+        };
+      } else {
+        updatedFees.push({
+          id: generateNextId(fees),
+          studentId: sId,
+          monthYear: currentMonthYear,
+          amountDue: 0,
+          amountPaid: 0,
+          balance: 0,
+          status: 'INACTIVE',
+          remarks: reason || 'Student Inactive / Paused this month'
+        });
+      }
+    } else {
+      // Reactivate to ACTIVE: resume billing
+      const mFee = Number(student.monthlyFee || 1000);
+      if (feeIndex >= 0) {
+        const currentFee = updatedFees[feeIndex];
+        const paid = Number(currentFee.amountPaid || 0);
+        const balance = Math.max(0, mFee - paid);
+        updatedFees[feeIndex] = {
+          ...currentFee,
+          amountDue: mFee,
+          balance,
+          status: balance === 0 ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING'),
+          remarks: 'Reactivated'
+        };
+      } else {
+        updatedFees.push({
+          id: generateNextId(fees),
+          studentId: sId,
+          monthYear: currentMonthYear,
+          amountDue: mFee,
+          amountPaid: 0,
+          balance: mFee,
+          status: 'PENDING',
+          lastPaymentDate: null
+        });
+      }
+    }
+
+    onSaveData({
+      ...data,
+      students: updatedStudents,
+      fees: updatedFees
+    });
+
+    logger.action(
+      currentUser,
+      newStatus === 'INACTIVE' ? 'PAUSE_STUDENT' : 'REACTIVATE_STUDENT',
+      `${newStatus === 'INACTIVE' ? 'Marked Inactive (Paused)' : 'Reactivated'} student ${student.name} (${student.admissionNo}). Fees updated accordingly.`,
+      { studentId: sId, reason, status: newStatus }
+    );
   };
 
   const handleEditClick = (student) => {
@@ -235,6 +407,8 @@ export default function Students({
       parentName: student.parentName,
       parentPhone: student.parentPhone,
       monthlyFee: student.monthlyFee,
+      status: student.status || 'ACTIVE',
+      inactiveReason: student.inactiveReason || '',
       admissionDate: student.admissionDate || new Date().toISOString().split('T')[0],
       address: student.address || ''
     });
@@ -242,14 +416,27 @@ export default function Students({
   };
 
   const handleDeleteStudent = (id) => {
-    if (window.confirm('Are you sure you want to remove this student record?')) {
-      const filtered = students.filter(s => s.id !== id);
-      onSaveData({ ...data, students: filtered });
+    const student = students.find(s => s.id === id);
+    if (student) {
+      setDeleteConfirmStudent(student);
     }
   };
 
+  const handlePermanentDelete = (id) => {
+    const filtered = students.filter(s => s.id !== id);
+    onSaveData({ ...data, students: filtered });
+    setDeleteConfirmStudent(null);
+  };
+
+  const activeStudentsCount = students.filter(s => (s.status || 'ACTIVE') === 'ACTIVE').length;
+  const inactiveStudentsCount = students.filter(s => s.status === 'INACTIVE').length;
+
   // Filter students
   const filteredStudents = students.filter(student => {
+    // 0. Status filter
+    if (statusFilter === 'ACTIVE' && student.status === 'INACTIVE') return false;
+    if (statusFilter === 'INACTIVE' && (student.status || 'ACTIVE') !== 'INACTIVE') return false;
+
     // 1. Class filter
     if (selectedClassFilter !== 'ALL') {
       if (selectedClassFilter === 'PRIMARY') {
@@ -304,6 +491,8 @@ export default function Students({
               parentName: '',
               parentPhone: '',
               monthlyFee: matchedClass?.defaultFee || 500,
+              status: 'ACTIVE',
+              inactiveReason: '',
               admissionDate: new Date().toISOString().split('T')[0],
               address: ''
             });
@@ -317,6 +506,39 @@ export default function Students({
 
       {/* Filter Bar & Search */}
       <div className="glass-card filters-card">
+        {/* Status Category Tabs: All, Active, Inactive */}
+        <div className="status-filter-row mb-3 flex items-center justify-between gap-2 border-b pb-2.5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button 
+              className={`pill-btn ${statusFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('ALL')}
+            >
+              All Students ({students.length})
+            </button>
+            <button 
+              className={`pill-btn ${statusFilter === 'ACTIVE' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('ACTIVE')}
+              style={statusFilter === 'ACTIVE' ? { borderColor: '#10B981', color: '#10B981' } : {}}
+            >
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: '#10B981' }}></span>
+              Active ({activeStudentsCount})
+            </button>
+            <button 
+              className={`pill-btn ${statusFilter === 'INACTIVE' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('INACTIVE')}
+              style={statusFilter === 'INACTIVE' ? { borderColor: '#F59E0B', color: '#F59E0B' } : {}}
+            >
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: '#F59E0B' }}></span>
+              Inactive / Paused ({inactiveStudentsCount})
+            </button>
+          </div>
+          {inactiveStudentsCount > 0 && (
+            <span className="text-3xs text-muted hidden sm:inline">
+              ✓ Inactive students are preserved with ₹0 billed for inactive months.
+            </span>
+          )}
+        </div>
+
         <div className="filters-flex">
           {/* Class Category Pills */}
           <div className="category-pills">
@@ -460,10 +682,50 @@ export default function Students({
                       </span>
                     </td>
                     <td>
-                      <span className="badge badge-success">{student.status}</span>
+                      {student.status === 'INACTIVE' ? (
+                        <span 
+                          className="badge badge-warning flex items-center gap-1"
+                          title={student.inactiveReason ? `Reason: ${student.inactiveReason}` : 'Inactive / On Leave'}
+                          style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.3)' }}
+                        >
+                          <Clock size={11} />
+                          <span>INACTIVE</span>
+                        </span>
+                      ) : (
+                        <span className="badge badge-success flex items-center gap-1">
+                          <CheckCircle size={11} />
+                          <span>ACTIVE</span>
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       <div className="action-buttons-flex">
+                        {student.status === 'INACTIVE' ? (
+                          <button 
+                            className="btn-icon" 
+                            title="Reactivate Student (Resume enrollment & billing)"
+                            style={{ color: '#10B981', borderColor: 'rgba(16, 185, 129, 0.3)' }}
+                            onClick={() => {
+                              if (window.confirm(`Reactivate ${student.name} (${student.admissionNo}) as Active? Current month tuition fee will be billed.`)) {
+                                handleToggleStudentStatus(student, 'ACTIVE');
+                              }
+                            }}
+                          >
+                            <PlayCircle size={15} />
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn-icon" 
+                            title="Pause / Mark Student Inactive (Preserves all records & skips fee for break)"
+                            style={{ color: '#F59E0B', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+                            onClick={() => {
+                              setDeactivateModalStudent(student);
+                              setDeactivateReason('Taking 2 months break / Temporary break');
+                            }}
+                          >
+                            <PauseCircle size={15} />
+                          </button>
+                        )}
                         <button 
                           className="btn-icon" 
                           title="3-Tap Monthly Feedback & Goal"
@@ -488,7 +750,7 @@ export default function Students({
                         </button>
                         <button 
                           className="btn-icon btn-icon-danger" 
-                          title="Delete Student"
+                          title="Remove Student"
                           onClick={() => handleDeleteStudent(student.id)}
                         >
                           <Trash2 size={15} />
@@ -707,6 +969,43 @@ export default function Students({
                 </div>
               </div>
 
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Enrollment Status</label>
+                  <select 
+                    className="form-select"
+                    value={formData.status || 'ACTIVE'}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  >
+                    <option value="ACTIVE">Active (Enrolled & Billed)</option>
+                    <option value="INACTIVE">Inactive (Paused / Taking Break - ₹0 Billed)</option>
+                  </select>
+                </div>
+                {formData.status === 'INACTIVE' ? (
+                  <div className="form-group">
+                    <label className="form-label">Reason for Inactive / Break</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. Taking 2 months break, exam prep"
+                      value={formData.inactiveReason || ''}
+                      onChange={(e) => setFormData({ ...formData, inactiveReason: e.target.value })}
+                    />
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label className="form-label">Residential Address</label>
+                    <input 
+                      type="text"
+                      className="form-input"
+                      placeholder="City / Locality"
+                      value={formData.address || ''}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="modal-actions-flex">
                 <button type="button" className="btn btn-secondary" onClick={() => {
                   setFormErrors({});
@@ -738,15 +1037,60 @@ export default function Students({
               <div className="avatar-circle-lg">{selectedStudent.name.charAt(0)}</div>
               <div>
                 <h3 className="profile-student-name">{selectedStudent.name}</h3>
-                <div className="profile-meta-tags">
+                <div className="profile-meta-tags flex items-center gap-2 flex-wrap">
                   <span className="badge badge-class">
                     {classes.find(c => c.code === selectedStudent.classCode)?.name}
                   </span>
                   <span className="text-muted text-xs font-mono">{selectedStudent.admissionNo}</span>
-                  <span className="badge badge-success">{selectedStudent.status}</span>
+                  {selectedStudent.status === 'INACTIVE' ? (
+                    <span className="badge badge-warning flex items-center gap-1" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                      <Clock size={11} />
+                      <span>INACTIVE (PAUSED)</span>
+                    </span>
+                  ) : (
+                    <span className="badge badge-success flex items-center gap-1">
+                      <CheckCircle size={11} />
+                      <span>ACTIVE</span>
+                    </span>
+                  )}
+                  {selectedStudent.status === 'INACTIVE' ? (
+                    <button 
+                      className="btn btn-xs btn-success flex items-center gap-1"
+                      onClick={() => {
+                        handleToggleStudentStatus(selectedStudent, 'ACTIVE');
+                        setSelectedStudent(prev => ({ ...prev, status: 'ACTIVE', inactiveReason: null }));
+                      }}
+                    >
+                      <PlayCircle size={13} />
+                      <span>Reactivate Student</span>
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn btn-xs btn-secondary flex items-center gap-1 text-amber"
+                      onClick={() => {
+                        setDeactivateModalStudent(selectedStudent);
+                        setDeactivateReason('Taking 2 months break / Temporary break');
+                      }}
+                    >
+                      <PauseCircle size={13} />
+                      <span>Mark Inactive</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
+
+            {selectedStudent.status === 'INACTIVE' && (
+              <div className="p-2.5 rounded-lg text-xs mt-3 mb-2" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#F59E0B' }}>
+                <div className="font-semibold flex items-center gap-1.5">
+                  <Clock size={13} />
+                  <span>Student currently paused: {selectedStudent.inactiveReason || 'Temporary break / discontinued'}</span>
+                </div>
+                <span className="block text-muted text-3xs mt-1">
+                  All past attendance, exam marks, and fee receipts are preserved. Current month fee is waived (₹0 billed). Reactivate whenever the student resumes.
+                </span>
+              </div>
+            )}
 
             <div className="profile-details-grid">
               <div className="profile-field">
@@ -803,20 +1147,32 @@ export default function Students({
                     </div>
                   )}
 
-                  {fees.filter(f => f.studentId === selectedStudent.id).map(fee => (
-                    <div key={fee.id} className="ledger-row">
-                      <div>
-                        <span className="font-semibold">{fee.monthYear}</span>
-                        <div className="text-xs text-muted">Status: {fee.status}</div>
+                  {fees.filter(f => f.studentId === selectedStudent.id).map(fee => {
+                    const isFeeInactive = fee.status === 'INACTIVE' || Number(fee.amountDue) === 0;
+                    return (
+                      <div key={fee.id} className="ledger-row">
+                        <div>
+                          <span className="font-semibold">{fee.monthYear}</span>
+                          <div className="text-xs text-muted flex items-center gap-1.5">
+                            <span>Status: {fee.status}</span>
+                            {isFeeInactive && (
+                              <span className="badge badge-warning text-3xs" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                                PAUSED / ₹0 BILLED
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="font-semibold text-emerald">Paid: ₹{fee.amountPaid}</div>
+                          {fee.balance > 0 ? (
+                            <div className="text-xs text-danger font-bold">Due: ₹{fee.balance}</div>
+                          ) : (
+                            isFeeInactive && <div className="text-3xs text-muted">No Fee Due</div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div className="font-semibold text-emerald">Paid: ₹{fee.amountPaid}</div>
-                        {fee.balance > 0 && (
-                          <div className="text-xs text-danger">Due: ₹{fee.balance}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {selReceipts.length > 0 && (
                     <div className="p-2 border-t border-slate-800">
@@ -915,6 +1271,150 @@ export default function Students({
           }}
           onClose={() => setFeedbackStudent(null)}
         />
+      )}
+
+      {/* Mark Inactive / Pause Enrollment Modal */}
+      {deactivateModalStudent && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <div className="flex items-center gap-2">
+                <PauseCircle size={20} className="text-amber" />
+                <h2 className="modal-title">Pause Enrollment / Mark Inactive</h2>
+              </div>
+              <button className="close-btn" onClick={() => setDeactivateModalStudent(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-slate-200 mb-2">
+                Are you marking <strong>{deactivateModalStudent.name}</strong> ({deactivateModalStudent.admissionNo}) as <strong>Inactive</strong>?
+              </p>
+              <div className="p-3 rounded-lg text-xs mb-3" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#FCD34D' }}>
+                <p className="font-semibold mb-1">💡 What happens when marked Inactive:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-300">
+                  <li><strong>Record preserved:</strong> Student profile, exam marks, and past attendance remain completely intact.</li>
+                  <li><strong>No fee billed:</strong> Current month tuition fee will be updated to ₹0 so no fees accumulate during their break.</li>
+                  <li><strong>Historical dues safe:</strong> Any unpaid past fees remain saved on their ledger.</li>
+                  <li><strong>Easy return:</strong> You can reactivate them anytime when they resume classes.</li>
+                </ul>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Reason for break / inactivity (Optional)</label>
+                <input 
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Taking 2 months break, school exams, personal leave"
+                  value={deactivateReason}
+                  onChange={(e) => setDeactivateReason(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions-flex">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setDeactivateModalStudent(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-warning"
+                onClick={() => {
+                  handleToggleStudentStatus(deactivateModalStudent, 'INACTIVE', deactivateReason);
+                  if (selectedStudent?.id === deactivateModalStudent.id) {
+                    setSelectedStudent(prev => ({ ...prev, status: 'INACTIVE', inactiveReason: deactivateReason }));
+                  }
+                  setDeactivateModalStudent(null);
+                }}
+              >
+                Confirm Mark Inactive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Student Confirmation Modal (Deactivate vs Delete) */}
+      {deleteConfirmStudent && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={20} className="text-rose" />
+                <h2 className="modal-title">Remove Student Record</h2>
+              </div>
+              <button className="close-btn" onClick={() => setDeleteConfirmStudent(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-slate-200 mb-3">
+                How would you like to handle <strong>{deleteConfirmStudent.name}</strong> ({deleteConfirmStudent.admissionNo})?
+              </p>
+
+              <div className="space-y-3">
+                {/* Option 1: Mark Inactive */}
+                <div 
+                  className="p-3.5 rounded-lg border cursor-pointer hover:border-amber-400 transition-all"
+                  style={{ background: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.3)' }}
+                  onClick={() => {
+                    handleToggleStudentStatus(deleteConfirmStudent, 'INACTIVE', 'Taking break / Inactive');
+                    setDeleteConfirmStudent(null);
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+                      <PauseCircle size={15} />
+                      Mark Inactive / On Leave (Recommended)
+                    </span>
+                    <span className="badge badge-warning text-3xs">Safe</span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Keeps the student available in your system. Preserves past fee receipts, attendance, and exam marks. Current month tuition fee is set to ₹0. You can reactivate anytime.
+                  </p>
+                </div>
+
+                {/* Option 2: Permanent Delete */}
+                <div 
+                  className="p-3.5 rounded-lg border cursor-pointer hover:border-rose-400 transition-all"
+                  style={{ background: 'rgba(244, 63, 94, 0.08)', borderColor: 'rgba(244, 63, 94, 0.25)' }}
+                  onClick={() => {
+                    if (window.confirm(`Are you absolutely sure you want to permanently delete ${deleteConfirmStudent.name}? This will remove all their records from PostgreSQL.`)) {
+                      handlePermanentDelete(deleteConfirmStudent.id);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-rose-400 text-sm flex items-center gap-1.5">
+                      <Trash2 size={15} />
+                      Permanently Delete
+                    </span>
+                    <span className="badge badge-danger text-3xs">Irreversible</span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Completely removes this student record from Supabase. Use only if entered by mistake.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions-flex">
+              <button 
+                type="button" 
+                className="btn btn-secondary w-full" 
+                onClick={() => setDeleteConfirmStudent(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style>{`
