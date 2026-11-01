@@ -390,6 +390,9 @@ export default function LandingPage({
             </div>
 
             <h1 className="hero-headline">
+              <span className="hero-brand-supertitle block text-xs md:text-sm font-extrabold uppercase tracking-widest text-amber-400 mb-2">
+                HAYAGRIVA TUTORIALS • PREMIER SCHOOL TUITION
+              </span>
               Building Strong <br />
               <span className="text-gradient-gold">Foundations</span> for <br />
               <span className="text-gradient-primary">Brighter Futures</span>
@@ -471,7 +474,7 @@ export default function LandingPage({
                   >
                     <img 
                       src={slide.image} 
-                      alt={slide.title}
+                      alt={`Hayagriva Tutorials - ${slide.title}`}
                       className="slide-image" 
                       loading={index === 0 ? 'eager' : 'lazy'}
                     />
@@ -818,7 +821,7 @@ export default function LandingPage({
                 <div className="feature-image-container">
                   <img 
                     src={featureShowcaseTabs[activeFeatureTab].image} 
-                    alt={featureShowcaseTabs[activeFeatureTab].title}
+                    alt={`Hayagriva Tutorials - ${featureShowcaseTabs[activeFeatureTab].title}`}
                     className="feature-img"
                   />
                   <div className="feature-image-overlay" />

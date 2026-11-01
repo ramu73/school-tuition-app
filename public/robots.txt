@@ -1,0 +1,6 @@
+# Hayagriva Tutorials - Search Engine Crawling Directives
+User-agent: *
+Allow: /
+
+# Search Engine Sitemap
+Sitemap: https://hayagrivatutorials.com/sitemap.xml
