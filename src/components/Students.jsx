@@ -1204,7 +1204,11 @@ export default function Students({
                       <div className="text-xs text-muted">{exam?.subject} ({exam?.date})</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span className="badge badge-class">{mark.marksObtained} / {exam?.totalMarks}</span>
+                      {mark.isAbsent || mark.marksObtained === 'AB' ? (
+                        <span className="badge badge-warning" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}>Absent</span>
+                      ) : (
+                        <span className="badge badge-class">{mark.marksObtained} / {exam?.totalMarks}</span>
+                      )}
                     </div>
                   </div>
                 );

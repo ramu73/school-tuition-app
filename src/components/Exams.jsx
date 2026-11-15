@@ -66,11 +66,17 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
        || accessibleClasses[0]?.code 
        || 'CLASS_10');
 
+  // Helper to compute next upcoming Saturday date for the Saturday weekly test template
+  const getNextSaturdayDate = () => {
+    const d = new Date();
+    const day = d.getDay(); // 0 is Sunday, 6 is Saturday
+    const diff = day === 6 ? 0 : (6 - day);
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  };
+
   const [selectedClass, setSelectedClass] = useState(initialClassCode);
-  const [selectedExamId, setSelectedExamId] = useState(() => {
-    const firstExamForClass = exams.find(e => e.classCode === initialClassCode);
-    return firstExamForClass ? firstExamForClass.id : '';
-  });
+  const [examTabFilter, setExamTabFilter] = useState('ACTIVE'); // 'ACTIVE' | 'COMPLETED' | 'ALL'
   const [newExamModalOpen, setNewExamModalOpen] = useState(false);
   const [editExamModalOpen, setEditExamModalOpen] = useState(false);
   const [deleteConfirmExam, setDeleteConfirmExam] = useState(null);
@@ -79,6 +85,36 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
 
+  // Input refs for Excel-like ArrowDown / Enter key navigation
+  const markInputsRef = React.useRef({});
+
+  // All exams for the currently selected class
+  const allClassExams = useMemo(() => {
+    return exams.filter(e => e.classCode === selectedClass);
+  }, [exams, selectedClass]);
+
+  // Active tests (tests needing marks entry or currently ongoing)
+  const activeClassExams = useMemo(() => {
+    return allClassExams.filter(e => (e.status || 'ACTIVE') !== 'COMPLETED');
+  }, [allClassExams]);
+
+  // Completed & Concluded tests (read-only historical archives)
+  const completedClassExams = useMemo(() => {
+    return allClassExams.filter(e => e.status === 'COMPLETED');
+  }, [allClassExams]);
+
+  // Exams matching the active tab filter
+  const classExams = useMemo(() => {
+    if (examTabFilter === 'ACTIVE') return activeClassExams;
+    if (examTabFilter === 'COMPLETED') return completedClassExams;
+    return allClassExams;
+  }, [examTabFilter, activeClassExams, completedClassExams, allClassExams]);
+
+  const [selectedExamId, setSelectedExamId] = useState(() => {
+    const firstExamForClass = classExams[0] || allClassExams[0];
+    return firstExamForClass ? firstExamForClass.id : '';
+  });
+
   // New Exam Form
   const [newExamData, setNewExamData] = useState({
     title: '',
@@ -86,28 +122,39 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     subject: 'Mathematics',
     totalMarks: 50,
     passingMarks: 18,
-    date: new Date().toISOString().split('T')[0]
+    date: getNextSaturdayDate()
   });
 
   // Edit Exam Form
   const [editExamData, setEditExamData] = useState(null);
 
-  // Filter exams strictly by the selected class!
-  const classExams = exams.filter(e => e.classCode === selectedClass);
-  // Guarantee currentExam belongs to the selected class only (never leak across classes!)
-  const currentExam = classExams.find(e => e.id === Number(selectedExamId)) || classExams[0] || null;
+  // Guarantee currentExam belongs to the selected class (never leak across classes!)
+  const currentExam = useMemo(() => {
+    if (classExams.length > 0) {
+      return classExams.find(e => e.id === Number(selectedExamId)) || classExams[0];
+    }
+    if (allClassExams.length > 0) {
+      return allClassExams.find(e => e.id === Number(selectedExamId)) || allClassExams[0];
+    }
+    return null;
+  }, [classExams, allClassExams, selectedExamId]);
 
-  // Keep selectedExamId strictly synchronized with the selected class exams
+  // Keep selectedExamId strictly synchronized with the selected class exams and tab filter
   useEffect(() => {
     if (classExams.length > 0) {
       const exists = classExams.some(e => e.id === Number(selectedExamId));
       if (!exists) {
         setSelectedExamId(classExams[0].id);
       }
+    } else if (allClassExams.length > 0) {
+      const existsInAll = allClassExams.some(e => e.id === Number(selectedExamId));
+      if (!existsInAll) {
+        setSelectedExamId(allClassExams[0].id);
+      }
     } else {
       setSelectedExamId('');
     }
-  }, [selectedClass, exams]);
+  }, [selectedClass, examTabFilter, exams]);
 
   // Helper to get normalized subjects available for any class
   const getSubjectsForClass = useCallback((classCode) => {
@@ -141,6 +188,54 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const examStudents = currentExam 
     ? accessibleStudents.filter(s => s.classCode === currentExam.classCode && s.status === 'ACTIVE')
     : [];
+
+  // Summary performance statistics for the current exam
+  const examStats = useMemo(() => {
+    if (!currentExam || examStudents.length === 0) return null;
+    let graded = 0;
+    let absent = 0;
+    let totalScore = 0;
+    let highest = -1;
+    let highestStudent = null;
+    let passed = 0;
+
+    examStudents.forEach(s => {
+      const m = marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
+      if (!m) return;
+      if (m.isAbsent || m.marksObtained === 'AB') {
+        absent++;
+      } else if (m.marksObtained !== '' && m.marksObtained !== null && !isNaN(Number(m.marksObtained))) {
+        graded++;
+        const score = Number(m.marksObtained);
+        totalScore += score;
+        if (score >= currentExam.passingMarks) {
+          passed++;
+        }
+        if (score > highest) {
+          highest = score;
+          highestStudent = s.name;
+        }
+      }
+    });
+
+    const pending = examStudents.length - graded - absent;
+    const avgScore = graded > 0 ? (totalScore / graded).toFixed(1) : 0;
+    const avgPct = graded > 0 && currentExam.totalMarks > 0 ? Math.round((Number(avgScore) / currentExam.totalMarks) * 100) : 0;
+    const passRate = graded > 0 ? Math.round((passed / graded) * 100) : 0;
+
+    return {
+      total: examStudents.length,
+      graded,
+      absent,
+      pending,
+      avgScore,
+      avgPct,
+      highest: highest >= 0 ? highest : null,
+      highestStudent,
+      passed,
+      passRate
+    };
+  }, [currentExam, examStudents, marks]);
 
   const handleCreateExam = (e) => {
     e.preventDefault();
@@ -178,7 +273,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       subject: newExamData.subject.trim(),
       totalMarks: tot || 50,
       passingMarks: pass || 18,
-      date: newExamData.date
+      date: newExamData.date,
+      status: 'ACTIVE'
     };
 
     onSaveData({
@@ -193,17 +289,80 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     });
 
     setSelectedClass(newExamData.classCode);
+    setExamTabFilter('ACTIVE'); // Ensure newly created test is visible in Active tab
     setSelectedExamId(createdId);
     setNewExamModalOpen(false);
     setExamErrors({});
     setNewExamData({
       title: '',
-      classCode: 'CLASS_10',
+      classCode: newExamData.classCode,
       subject: 'Mathematics',
       totalMarks: 50,
       passingMarks: 18,
-      date: new Date().toISOString().split('T')[0]
+      date: getNextSaturdayDate()
     });
+  };
+
+  // 1-Click Template Quick Filler for New Tests
+  const handleApplyTemplate = (templateType) => {
+    const subjects = getSubjectsForClass(newExamData.classCode);
+    const chosenSubject = newExamData.subject || subjects[0] || 'Mathematics';
+
+    if (templateType === 'WEEKLY') {
+      setNewExamData(prev => ({
+        ...prev,
+        title: `Saturday Weekly Test - ${chosenSubject}`,
+        subject: chosenSubject,
+        totalMarks: 50,
+        passingMarks: 18,
+        date: getNextSaturdayDate()
+      }));
+    } else if (templateType === 'SLIP') {
+      setNewExamData(prev => ({
+        ...prev,
+        title: `Slip Test - ${chosenSubject}`,
+        subject: chosenSubject,
+        totalMarks: 25,
+        passingMarks: 9,
+        date: new Date().toISOString().split('T')[0]
+      }));
+    } else if (templateType === 'MONTHLY') {
+      setNewExamData(prev => ({
+        ...prev,
+        title: `Monthly Assessment - ${chosenSubject}`,
+        subject: chosenSubject,
+        totalMarks: 100,
+        passingMarks: 35,
+        date: new Date().toISOString().split('T')[0]
+      }));
+    }
+    setExamErrors({});
+  };
+
+  // Toggle Exam Completion Lifecycle Status
+  const handleToggleExamStatus = (examToToggle) => {
+    if (!examToToggle) return;
+    const isCompleted = examToToggle.status === 'COMPLETED';
+    const newStatus = isCompleted ? 'ACTIVE' : 'COMPLETED';
+
+    const updatedExams = exams.map(e => {
+      if (e.id === examToToggle.id) {
+        return { ...e, status: newStatus };
+      }
+      return e;
+    });
+
+    onSaveData({
+      ...data,
+      exams: updatedExams
+    });
+
+    logger.action(
+      currentUser,
+      'UPDATE_EXAM_STATUS',
+      `${newStatus === 'COMPLETED' ? 'Marked as Completed & Archived' : 'Reopened for grading'} test "${examToToggle.title}"`,
+      { examId: examToToggle.id, status: newStatus }
+    );
   };
 
   // Open Edit Exam Modal
@@ -216,7 +375,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       subject: exam.subject || 'Mathematics',
       totalMarks: exam.totalMarks || 50,
       passingMarks: exam.passingMarks || 18,
-      date: exam.date || new Date().toISOString().split('T')[0]
+      date: exam.date || new Date().toISOString().split('T')[0],
+      status: exam.status || 'ACTIVE'
     });
     setExamErrors({});
     setEditExamModalOpen(true);
@@ -264,7 +424,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           subject: newSubject,
           totalMarks: tot,
           passingMarks: pass,
-          date: editExamData.date
+          date: editExamData.date,
+          status: editExamData.status || ex.status || 'ACTIVE'
         };
       }
       return ex;
@@ -312,20 +473,35 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     setDeleteConfirmExam(null);
   };
 
-  // Update marks for a student
+  // Update marks for a student (supports numbers, blank, or 'AB' for Absent)
   const handleMarkChange = (studentId, marksObtained) => {
     if (!currentExam) return;
 
     const existingIndex = marks.findIndex(m => m.examId === currentExam.id && m.studentId === studentId);
     let updatedMarks = [...marks];
 
-    const val = marksObtained === '' ? '' : Math.min(Number(marksObtained), currentExam.totalMarks);
+    let val = marksObtained;
+    const isAbsent = val === 'AB';
+
+    if (!isAbsent && val !== '' && val !== null) {
+      const num = Number(val);
+      if (!isNaN(num)) {
+        val = Math.max(0, Math.min(num, currentExam.totalMarks));
+      }
+    }
+
+    const remarks = isAbsent
+      ? 'Absent'
+      : (val !== '' && val !== null && Number(val) >= currentExam.passingMarks)
+        ? 'Passed'
+        : (val !== '' && val !== null) ? 'Needs improvement' : 'Pending';
 
     if (existingIndex >= 0) {
       updatedMarks[existingIndex] = {
         ...updatedMarks[existingIndex],
         marksObtained: val,
-        remarks: (val !== '' && Number(val) >= currentExam.passingMarks) ? 'Passed' : 'Needs improvement'
+        isAbsent,
+        remarks
       };
     } else {
       updatedMarks.push({
@@ -334,7 +510,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         studentId,
         subject: currentExam.subject,
         marksObtained: val,
-        remarks: (val !== '' && Number(val) >= currentExam.passingMarks) ? 'Passed' : 'Needs improvement'
+        isAbsent,
+        remarks
       });
     }
 
@@ -347,6 +524,89 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     setTimeout(() => {
       setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
     }, 2500);
+  };
+
+  // 1-Click Toggle Absent for a Student
+  const handleToggleAbsent = (studentId) => {
+    if (!currentExam) return;
+    const existing = marks.find(m => m.examId === currentExam.id && m.studentId === studentId);
+    const currentlyAbsent = existing?.isAbsent || existing?.marksObtained === 'AB';
+
+    if (currentlyAbsent) {
+      // Toggle back to empty / active
+      handleMarkChange(studentId, '');
+    } else {
+      // Mark as Absent
+      handleMarkChange(studentId, 'AB');
+    }
+  };
+
+  // Mark all remaining ungraded students as Absent
+  const handleMarkUnmarkedAbsent = () => {
+    if (!currentExam) return;
+    const unmarkedStudents = examStudents.filter(s => {
+      const m = marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
+      return !m || m.marksObtained === '' || m.marksObtained === null;
+    });
+
+    if (unmarkedStudents.length === 0) {
+      alert('All students in this standard already have marks or are marked absent.');
+      return;
+    }
+
+    if (!window.confirm(`Mark remaining ${unmarkedStudents.length} ungraded student(s) as Absent for this test?`)) {
+      return;
+    }
+
+    let updatedMarks = [...marks];
+    unmarkedStudents.forEach(s => {
+      const existingIdx = updatedMarks.findIndex(m => m.examId === currentExam.id && m.studentId === s.id);
+      if (existingIdx >= 0) {
+        updatedMarks[existingIdx] = {
+          ...updatedMarks[existingIdx],
+          marksObtained: 'AB',
+          isAbsent: true,
+          remarks: 'Absent'
+        };
+      } else {
+        updatedMarks.push({
+          id: generateNextId(updatedMarks),
+          examId: currentExam.id,
+          studentId: s.id,
+          subject: currentExam.subject,
+          marksObtained: 'AB',
+          isAbsent: true,
+          remarks: 'Absent'
+        });
+      }
+    });
+
+    onSaveData({
+      ...data,
+      marks: updatedMarks
+    });
+
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2500);
+  };
+
+  // Excel-like keyboard navigation (Enter or ArrowDown to next row, ArrowUp to previous row)
+  const handleKeyDownMarks = (e, studentIndex) => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextStudent = examStudents[studentIndex + 1];
+      if (nextStudent && markInputsRef.current[nextStudent.id]) {
+        markInputsRef.current[nextStudent.id].focus();
+        markInputsRef.current[nextStudent.id].select();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevStudent = examStudents[studentIndex - 1];
+      if (prevStudent && markInputsRef.current[prevStudent.id]) {
+        markInputsRef.current[prevStudent.id].focus();
+        markInputsRef.current[prevStudent.id].select();
+      }
+    }
   };
 
   const handleSaveAllMarks = () => {
@@ -448,15 +708,16 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
   // Build clean text message for parent WhatsApp
   const buildScorecardTextMessage = (student, exam, mark) => {
-    const marksObtained = mark ? Number(mark.marksObtained) : 0;
+    const isAbsent = mark?.isAbsent || mark?.marksObtained === 'AB';
+    const marksObtained = mark ? (isAbsent ? 'AB' : Number(mark.marksObtained)) : 0;
     const totalMarks = Number(exam.totalMarks) || 50;
     const passingMarks = Number(exam.passingMarks) || 18;
-    const pct = Math.round((marksObtained / totalMarks) * 100);
-    const isPassed = marksObtained >= passingMarks;
+    const pct = isAbsent ? 'Absent' : `${Math.round((Number(marksObtained) / totalMarks) * 100)}%`;
+    const isPassed = !isAbsent && Number(marksObtained) >= passingMarks;
     const studentSubject = mark?.subject || exam.subject;
-    const grade = getGrade(marksObtained, totalMarks).grade;
+    const grade = isAbsent ? 'Absent' : `Grade ${getGrade(Number(marksObtained), totalMarks).grade}`;
     const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
-    const remarks = mark?.remarks || (isPassed ? 'Good effort! Continue consistent daily problem practice.' : 'Needs improvement');
+    const remarks = mark?.remarks || (isAbsent ? 'Student was absent for this test.' : (isPassed ? 'Good effort! Continue consistent daily problem practice.' : 'Needs improvement'));
 
     return [
       `*HAYAGRIVA TUTORIALS*`,
@@ -469,9 +730,9 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       ``,
       `*Test:* ${exam.title}`,
       `*Subject:* ${studentSubject} (${exam.date})`,
-      `*Marks Obtained:* ${marksObtained} / ${totalMarks} (${pct}%)`,
-      `*Grade:* Grade ${grade}`,
-      `*Status:* ${isPassed ? 'PASSED' : 'Needs Revision'}`,
+      isAbsent ? `*Score:* ABSENT (Leave Recorded)` : `*Marks Obtained:* ${marksObtained} / ${totalMarks} (${pct})`,
+      `*Grade:* ${grade}`,
+      `*Status:* ${isAbsent ? 'ABSENT' : (isPassed ? 'PASSED' : 'Needs Revision')}`,
       ``,
       `*Tutor Remarks:* ${remarks}`,
       ``,
@@ -539,15 +800,16 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   // Clean text message without broken surrogate symbols
   const handleCleanWhatsAppText = (student, exam, mark) => {
     if (!student || !exam) return;
-    const marksObtained = mark ? Number(mark.marksObtained) : 0;
+    const isAbsent = mark?.isAbsent || mark?.marksObtained === 'AB';
+    const marksObtained = mark ? (isAbsent ? 'AB' : Number(mark.marksObtained)) : 0;
     const totalMarks = Number(exam.totalMarks) || 50;
     const passingMarks = Number(exam.passingMarks) || 18;
-    const pct = Math.round((marksObtained / totalMarks) * 100);
-    const isPassed = marksObtained >= passingMarks;
+    const pct = isAbsent ? 'Absent' : `${Math.round((Number(marksObtained) / totalMarks) * 100)}%`;
+    const isPassed = !isAbsent && Number(marksObtained) >= passingMarks;
     const studentSubject = mark?.subject || exam.subject;
-    const grade = getGrade(marksObtained, totalMarks).grade;
+    const grade = isAbsent ? 'Absent' : `Grade ${getGrade(Number(marksObtained), totalMarks).grade}`;
     const className = classes.find(c => c.code === student.classCode)?.name || student.classCode;
-    const remarks = mark?.remarks || (isPassed ? 'Good effort! Continue consistent practice.' : 'Needs focused revision and mistake practice.');
+    const remarks = mark?.remarks || (isAbsent ? 'Student was absent for this test.' : (isPassed ? 'Good effort! Continue consistent practice.' : 'Needs focused revision and mistake practice.'));
 
     const lines = [
       `*HAYAGRIVA TUTORIALS*`,
@@ -561,10 +823,9 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       `*Subject:* ${studentSubject}`,
       `*Exam Date:* ${exam.date}`,
       ``,
-      `*Marks Obtained:* ${marksObtained} / ${totalMarks}`,
-      `*Percentage:* ${pct}%`,
-      `*Grade:* Grade ${grade}`,
-      `*Status:* ${isPassed ? 'PASSED' : 'Needs Support / Revision'}`,
+      isAbsent ? `*Score:* ABSENT (Leave Recorded)` : `*Marks Obtained:* ${marksObtained} / ${totalMarks} (${pct})`,
+      `*Grade:* ${grade}`,
+      `*Status:* ${isAbsent ? 'ABSENT' : (isPassed ? 'PASSED' : 'Needs Support / Revision')}`,
       ``,
       `*Tutor Remarks:* ${remarks}`,
       ``,
@@ -622,6 +883,43 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         </div>
       )}
 
+      {/* Exam Lifecycle Status Tabs */}
+      <div className="exam-lifecycle-tabs-card glass-card">
+        <div className="exam-tabs-row">
+          <div className="exam-tabs-pills">
+            <button
+              type="button"
+              className={`exam-tab-pill ${examTabFilter === 'ACTIVE' ? 'active' : ''}`}
+              onClick={() => setExamTabFilter('ACTIVE')}
+            >
+              <span className="tab-pill-dot active-dot" />
+              <span>Active Tests (Grading)</span>
+              <span className="tab-pill-count">{activeClassExams.length}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`exam-tab-pill ${examTabFilter === 'COMPLETED' ? 'active' : ''}`}
+              onClick={() => setExamTabFilter('COMPLETED')}
+            >
+              <CheckCircle2 size={13} className="text-emerald" />
+              <span>Completed & Graded (Archives)</span>
+              <span className="tab-pill-count">{completedClassExams.length}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`exam-tab-pill ${examTabFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => setExamTabFilter('ALL')}
+            >
+              <FileText size={13} />
+              <span>All Tests</span>
+              <span className="tab-pill-count">{allClassExams.length}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Selectors Bar */}
       <div className="glass-card exam-selectors-card">
         <div className="exam-selectors-grid">
@@ -644,17 +942,28 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           </div>
 
           <div className="form-group mb-0" style={{ minWidth: '260px', flex: 1 }}>
-            <label className="form-label">Select Test / Exam</label>
+            <label className="form-label">
+              Select Test / Exam
+              {examTabFilter === 'ACTIVE' && <span className="text-3xs text-amber-300 ml-1.5">(Showing Active)</span>}
+              {examTabFilter === 'COMPLETED' && <span className="text-3xs text-emerald ml-1.5">(Showing Completed)</span>}
+            </label>
             <select 
               className="form-select"
               value={currentExam?.id || ''}
               onChange={(e) => setSelectedExamId(e.target.value)}
             >
               {classExams.length === 0 ? (
-                <option value="">No tests created yet for this class</option>
+                <option value="">
+                  {examTabFilter === 'ACTIVE' 
+                    ? 'No active tests pending grading (check Completed tab)' 
+                    : examTabFilter === 'COMPLETED'
+                      ? 'No completed tests archived yet'
+                      : 'No tests created yet for this class'}
+                </option>
               ) : (
                 classExams.map(ex => (
                   <option key={ex.id} value={ex.id}>
+                    {ex.status === 'COMPLETED' ? '✓ [Done] ' : '⚡ [Active] '}
                     {ex.title} - {ex.subject} ({ex.date})
                   </option>
                 ))
@@ -675,18 +984,63 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 <span>Pass: <strong>{currentExam.passingMarks}</strong></span>
               </div>
 
+              {/* Lifecycle Status Pill */}
+              <div className="exam-meta-tag" style={{
+                background: currentExam.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                borderColor: currentExam.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)',
+                color: currentExam.status === 'COMPLETED' ? '#34D399' : '#FBBF24',
+                fontWeight: 700
+              }}>
+                {currentExam.status === 'COMPLETED' ? (
+                  <>
+                    <CheckCircle2 size={13} />
+                    <span>Concluded</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="pulsing-badge-dot" style={{ width: '6px', height: '6px' }} />
+                    <span>Grading / Active</span>
+                  </>
+                )}
+              </div>
+
               {/* Save Status & Action Buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {saveStatus === 'saved' ? (
                   <span className="badge badge-success text-xs font-semibold flex items-center gap-1">
                     <CheckCircle size={12} />
-                    <span>Saved to Database</span>
+                    <span>Saved to Cloud</span>
                   </span>
                 ) : saveStatus === 'saving' ? (
                   <span className="badge badge-warning text-xs font-semibold flex items-center gap-1">
                     <span>Saving to DB...</span>
                   </span>
                 ) : null}
+
+                {/* Mark as Completed / Reopen Toggle */}
+                {currentExam.status === 'COMPLETED' ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleToggleExamStatus(currentExam)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                    title="Reopen this test for editing and grading"
+                  >
+                    <Sparkles size={13} className="text-amber" />
+                    <span>Reopen Test</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm"
+                    onClick={() => handleToggleExamStatus(currentExam)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#059669', borderColor: '#10B981' }}
+                    title="Finish test & move to completed archives (Preserves marks 100%)"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Mark as Completed</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -704,7 +1058,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   className="btn btn-secondary btn-sm"
                   onClick={() => handleOpenEditExam(currentExam)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  title="Edit Test Details"
+                  title="Edit Test Details (Name, Date, Max Marks)"
                 >
                   <Edit size={13} />
                   <span>Edit</span>
@@ -714,7 +1068,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   className="btn btn-danger btn-sm"
                   onClick={() => setDeleteConfirmExam(currentExam)}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  title="Delete this Test and marks"
+                  title="Delete this test (shows safety warning if marks exist)"
                 >
                   <Trash2 size={13} />
                   <span>Delete</span>
@@ -725,9 +1079,81 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         </div>
       </div>
 
+      {/* Class Exam Performance Statistics Header Bar */}
+      {currentExam && examStats && (
+        <div className="glass-card exam-stats-banner">
+          <div className="exam-stat-item">
+            <div className="stat-label flex items-center justify-between">
+              <span>Class Students</span>
+              <span className="text-3xs text-secondary font-mono">
+                {examStats.graded}/{examStats.total} Graded
+              </span>
+            </div>
+            <div className="stat-value text-white">
+              {examStats.total} <span className="stat-subtext">Students</span>
+            </div>
+            <div className="stat-footnote">
+              {examStats.absent > 0 && <span className="text-amber font-semibold">{examStats.absent} Absent • </span>}
+              {examStats.pending > 0 ? (
+                <span className="text-rose font-medium">{examStats.pending} Ungraded</span>
+              ) : (
+                <span className="text-emerald font-medium">✓ All Graded</span>
+              )}
+            </div>
+          </div>
+
+          <div className="exam-stat-item">
+            <div className="stat-label">Class Average Score</div>
+            <div className="stat-value text-white">
+              {examStats.avgScore} <span className="stat-subtext">/ {currentExam.totalMarks}</span>
+            </div>
+            <div className="stat-footnote">
+              <span className="text-sky font-semibold">{examStats.avgPct}% Average</span> across class
+            </div>
+          </div>
+
+          <div className="exam-stat-item">
+            <div className="stat-label">Highest Score</div>
+            <div className="stat-value text-amber-400">
+              {examStats.highest !== null ? `${examStats.highest} / ${currentExam.totalMarks}` : '—'}
+            </div>
+            <div className="stat-footnote truncate">
+              {examStats.highestStudent ? `Top: ${examStats.highestStudent}` : 'Pending marks'}
+            </div>
+          </div>
+
+          <div className="exam-stat-item">
+            <div className="stat-label flex items-center justify-between">
+              <span>Pass Rate</span>
+              {examStats.pending > 0 && (
+                <button
+                  type="button"
+                  className="quick-absent-fill-link"
+                  onClick={handleMarkUnmarkedAbsent}
+                  title="Automatically mark all remaining ungraded students as Absent"
+                >
+                  Mark {examStats.pending} as Absent
+                </button>
+              )}
+            </div>
+            <div className="stat-value text-emerald">
+              {examStats.passRate}%
+            </div>
+            <div className="stat-footnote">
+              <span className="font-semibold">{examStats.passed}</span> of {examStats.graded} evaluated passed
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Marks Entry Table */}
       {currentExam ? (
         <div className="table-container">
+          <div className="table-hints-bar">
+            <span className="hint-pill">💡 <strong>Excel Navigation:</strong> Press <code>Enter</code> or <code>↓</code> to jump to next student.</span>
+            <span className="hint-pill">🌴 <strong>Absent:</strong> Click <code>AB</code> to mark student absent without giving 0%.</span>
+          </div>
+
           <table className="data-table">
             <thead>
               <tr>
@@ -735,7 +1161,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 <th>Student Name</th>
                 <th>Exam Subject (Customizable)</th>
                 <th>School</th>
-                <th style={{ width: '160px' }}>Marks (/{currentExam.totalMarks})</th>
+                <th style={{ width: '180px' }}>Marks (/{currentExam.totalMarks})</th>
                 <th>Percentage</th>
                 <th>Grade</th>
                 <th style={{ textAlign: 'center' }}>Scorecard & Share</th>
@@ -749,10 +1175,11 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   </td>
                 </tr>
               ) : (
-                examStudents.map(student => {
+                examStudents.map((student, idx) => {
                   const markRecord = marks.find(m => m.examId === currentExam.id && m.studentId === student.id);
-                  const marksVal = markRecord ? markRecord.marksObtained : '';
-                  const hasMarks = markRecord !== undefined && markRecord.marksObtained !== null && markRecord.marksObtained !== '';
+                  const isAbsent = markRecord?.isAbsent || markRecord?.marksObtained === 'AB';
+                  const marksVal = markRecord ? (isAbsent ? '' : markRecord.marksObtained) : '';
+                  const hasMarks = !isAbsent && markRecord !== undefined && markRecord.marksObtained !== null && markRecord.marksObtained !== '' && !isNaN(Number(markRecord.marksObtained));
                   const pct = hasMarks ? Math.round((Number(marksVal) / currentExam.totalMarks) * 100) : null;
                   const gradeInfo = hasMarks ? getGrade(Number(marksVal), currentExam.totalMarks) : null;
                   const studentSubject = markRecord?.subject || currentExam.subject;
@@ -804,25 +1231,52 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                       <td className="text-xs text-secondary">{student.school || '—'}</td>
                       <td>
-                        <input 
-                          type="number"
-                          className="form-input mark-input-cell"
-                          min="0"
-                          max={currentExam.totalMarks}
-                          placeholder="Marks..."
-                          value={marksVal}
-                          onChange={(e) => handleMarkChange(student.id, e.target.value)}
-                        />
+                        <div className="mark-input-group">
+                          <input 
+                            ref={el => (markInputsRef.current[student.id] = el)}
+                            type="text"
+                            inputMode="numeric"
+                            className={`form-input mark-input-cell ${isAbsent ? 'input-absent' : ''}`}
+                            placeholder={isAbsent ? 'AB' : '0'}
+                            disabled={isAbsent}
+                            value={isAbsent ? 'AB' : marksVal}
+                            onKeyDown={(e) => handleKeyDownMarks(e, idx)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val.toUpperCase() === 'AB') {
+                                handleToggleAbsent(student.id);
+                              } else {
+                                handleMarkChange(student.id, val);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className={`btn-absent-toggle ${isAbsent ? 'active' : ''}`}
+                            onClick={() => handleToggleAbsent(student.id)}
+                            title={isAbsent ? 'Click to unmark absent' : 'Mark student as Absent'}
+                          >
+                            {isAbsent ? 'ABS' : 'AB'}
+                          </button>
+                        </div>
                       </td>
                       <td>
-                        {pct !== null ? (
+                        {isAbsent ? (
+                          <span className="badge badge-warning" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.35)' }}>
+                            Absent
+                          </span>
+                        ) : pct !== null ? (
                           <span className="font-bold text-white">{pct}%</span>
                         ) : (
                           <span className="text-muted text-xs">—</span>
                         )}
                       </td>
                       <td>
-                        {gradeInfo ? (
+                        {isAbsent ? (
+                          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
+                            Leave
+                          </span>
+                        ) : gradeInfo ? (
                           <span 
                             className="badge" 
                             style={{ 
@@ -906,7 +1360,10 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h2 className="modal-title">Schedule New Test / Exam</h2>
+              <div>
+                <h2 className="modal-title">Schedule New Test / Exam</h2>
+                <p className="text-3xs text-muted mt-0.5">Use a 1-click template or customize your weekly test parameters</p>
+              </div>
               <button className="close-btn" onClick={() => setNewExamModalOpen(false)}>
                 <X size={20} />
               </button>
@@ -930,12 +1387,46 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 </div>
               )}
 
+              {/* 1-Click Quick Exam Templates Bar */}
+              <div className="exam-templates-section mb-3" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 'var(--radius-md)', padding: '10px 12px' }}>
+                <label className="form-label mb-1.5 flex items-center gap-1.5 text-xs text-amber-300 font-bold">
+                  <Sparkles size={13} className="text-amber" />
+                  <span>1-Click Quick Templates (Auto-fills marks, date & title):</span>
+                </label>
+                <div className="template-pills-row flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    className="template-pill-btn"
+                    onClick={() => handleApplyTemplate('WEEKLY')}
+                    title="Saturday test (50 Marks, 18 Pass, upcoming Saturday date)"
+                  >
+                    ⚡ Saturday Weekly Test (50 M)
+                  </button>
+                  <button
+                    type="button"
+                    className="template-pill-btn"
+                    onClick={() => handleApplyTemplate('SLIP')}
+                    title="Chapter slip test (25 Marks, 9 Pass, today's date)"
+                  >
+                    ⚡ Unit Slip Test (25 M)
+                  </button>
+                  <button
+                    type="button"
+                    className="template-pill-btn"
+                    onClick={() => handleApplyTemplate('MONTHLY')}
+                    title="Monthly board mock test (100 Marks, 35 Pass, today's date)"
+                  >
+                    ⚡ Monthly Assessment (100 M)
+                  </button>
+                </div>
+              </div>
+
               <div className="form-group">
                 <label className="form-label">Test Title *</label>
                 <input 
                   type="text"
                   className={`form-input ${examErrors.title ? 'input-error' : ''}`}
-                  placeholder="e.g. Unit Test 2 - Quadratic Equations"
+                  placeholder="e.g. Saturday Weekly Test - Mathematics"
                   value={newExamData.title}
                   onChange={(e) => {
                     setNewExamData({ ...newExamData, title: e.target.value });
@@ -1233,56 +1724,96 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         </div>
       )}
 
-      {/* Delete Exam Confirmation Modal */}
-      {deleteConfirmExam && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '440px' }}>
-            <div className="modal-header">
-              <div className="flex items-center gap-2 text-rose">
-                <AlertTriangle size={20} />
-                <h3 className="modal-title text-rose">Delete Test?</h3>
-              </div>
-              <button className="close-btn" onClick={() => setDeleteConfirmExam(null)}>
-                <X size={20} />
-              </button>
-            </div>
+      {/* Delete Exam Confirmation Modal with History Protection */}
+      {deleteConfirmExam && (() => {
+        const marksInDeleteExam = marks.filter(m => m.examId === deleteConfirmExam.id && m.marksObtained !== '' && m.marksObtained !== null);
+        const hasScores = marksInDeleteExam.length > 0;
 
-            <div style={{ padding: '16px 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-              <p className="mb-2">
-                Are you sure you want to delete <strong>"{deleteConfirmExam.title}"</strong> ({deleteConfirmExam.subject})?
-              </p>
-              <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
-                ⚠️ Warning: Deleting this test will also remove all student score records entered for it.
+        return (
+          <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: '460px' }}>
+              <div className="modal-header">
+                <div className="flex items-center gap-2 text-rose">
+                  <AlertTriangle size={20} />
+                  <h3 className="modal-title text-rose">Delete Test?</h3>
+                </div>
+                <button className="close-btn" onClick={() => setDeleteConfirmExam(null)}>
+                  <X size={20} />
+                </button>
               </div>
-            </div>
 
-            <div className="modal-actions-flex">
-              <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirmExam(null)}>
-                Cancel
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-danger"
-                onClick={() => handleDeleteExam(deleteConfirmExam)}
-              >
-                Yes, Delete Test
-              </button>
+              <div style={{ padding: '16px 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                <p className="mb-2">
+                  Are you sure you want to delete <strong>"{deleteConfirmExam.title}"</strong> ({deleteConfirmExam.subject})?
+                </p>
+                
+                {hasScores ? (
+                  <>
+                    <div style={{ padding: '12px 14px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.45)', borderRadius: '8px', color: '#f87171', fontSize: '0.85rem', marginBottom: '12px' }}>
+                      <div className="font-bold mb-1 flex items-center gap-1.5">
+                        <AlertTriangle size={15} />
+                        <span>DANGER: {marksInDeleteExam.length} student scores recorded!</span>
+                      </div>
+                      <span>Deleting this test will permanently destroy all student marks and report card histories for this test.</span>
+                    </div>
+
+                    <div style={{ padding: '10px 12px', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '8px', color: '#FCD34D', fontSize: '0.8rem', marginBottom: '12px' }}>
+                      💡 <strong>Recommended:</strong> Instead of deleting, click <em>"Archive as Completed"</em>. It will keep all student scores 100% safe while clearing this test from your active list.
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
+                    No marks have been recorded for this test yet. Safe to delete draft.
+                  </div>
+                )}
+              </div>
+
+              <div className="modal-actions-flex" style={{ flexDirection: 'column', gap: '8px' }}>
+                {hasScores && (
+                  <button 
+                    type="button" 
+                    className="btn btn-success"
+                    onClick={() => {
+                      handleToggleExamStatus(deleteConfirmExam);
+                      setDeleteConfirmExam(null);
+                    }}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    <CheckCircle2 size={15} />
+                    <span>Archive as Completed (Keep Marks Safe)</span>
+                  </button>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                  <button type="button" className="btn btn-secondary flex-1" onClick={() => setDeleteConfirmExam(null)}>
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-danger flex-1"
+                    onClick={() => handleDeleteExam(deleteConfirmExam)}
+                  >
+                    {hasScores ? 'Delete & Erase Marks' : 'Yes, Delete Test'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Student Performance Scorecard Modal */}
       {reportCardStudent && (() => {
         const student = reportCardStudent.student;
         const exam = reportCardStudent.exam;
         const mark = reportCardStudent.mark;
-        const marksObtained = mark ? Number(mark.marksObtained) : 0;
+        const isAbsent = mark?.isAbsent || mark?.marksObtained === 'AB';
+        const marksObtained = isAbsent ? 'AB' : (mark ? Number(mark.marksObtained) : 0);
         const totalMarks = Number(exam.totalMarks) || 50;
         const passingMarks = Number(exam.passingMarks) || 18;
-        const pct = Math.round((marksObtained / totalMarks) * 100);
-        const isPassed = marksObtained >= passingMarks;
-        const gradeInfo = getGrade(marksObtained, totalMarks);
+        const pct = isAbsent ? null : Math.round((Number(marksObtained) / totalMarks) * 100);
+        const isPassed = !isAbsent && Number(marksObtained) >= passingMarks;
+        const gradeInfo = !isAbsent ? getGrade(Number(marksObtained), totalMarks) : null;
         const studentSubject = mark?.subject || exam.subject;
         const standardName = classes.find(c => c.code === student.classCode)?.name || student.classCode;
 
@@ -1314,8 +1845,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 {/* Test & Performance Highlight Box */}
                 <div className="scorecard-marks-highlight">
-                  <div className="score-circle">
-                    <div className="score-num">{marksObtained}</div>
+                  <div className="score-circle" style={isAbsent ? { background: '#D97706' } : {}}>
+                    <div className="score-num" style={isAbsent ? { fontSize: '1.25rem' } : {}}>{marksObtained}</div>
                     <div className="score-denom">/ {totalMarks}</div>
                   </div>
 
@@ -1328,26 +1859,37 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                     </div>
 
                     <div className="mt-2 flex items-center gap-2">
-                      <span 
-                        className="badge"
-                        style={{ 
-                          background: `${gradeInfo.color}20`, 
-                          color: gradeInfo.color,
-                          borderColor: `${gradeInfo.color}40`,
-                          fontWeight: 700,
-                          fontSize: '0.75rem',
-                          padding: '3px 10px'
-                        }}
-                      >
-                        Grade {gradeInfo.grade}
-                      </span>
+                      {isAbsent ? (
+                        <span className="badge badge-warning" style={{ background: '#F59E0B25', color: '#D97706', borderColor: '#F59E0B50' }}>
+                          Status: ABSENT (Leave Recorded)
+                        </span>
+                      ) : gradeInfo ? (
+                        <>
+                          <span 
+                            className="badge"
+                            style={{ 
+                              background: `${gradeInfo.color}20`, 
+                              color: gradeInfo.color,
+                              borderColor: `${gradeInfo.color}40`,
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              padding: '3px 10px'
+                            }}
+                          >
+                            Grade {gradeInfo.grade}
+                          </span>
+                          <span className="text-xs font-bold text-slate-700">
+                            {isPassed ? 'Status: PASSED' : 'Status: Needs Revision'}
+                          </span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>
 
                 {/* Tutor Remarks */}
                 <div className="scorecard-teacher-remarks">
-                  <strong>Tutor Remarks:</strong> {mark?.remarks || (isPassed ? 'Good effort! Continue consistent practice.' : 'Needs improvement')}
+                  <strong>Tutor Remarks:</strong> {mark?.remarks || (isAbsent ? 'Student was absent for this test.' : isPassed ? 'Good effort! Continue consistent practice.' : 'Needs improvement')}
                 </div>
               </div>
 
@@ -1424,6 +1966,199 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           flex-wrap: wrap;
           gap: 16px;
         }
+
+        /* Exam Lifecycle Tabs */
+        .exam-lifecycle-tabs-card {
+          padding: 8px 12px;
+          border-radius: var(--radius-md);
+        }
+        .exam-tabs-pills {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .exam-tab-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 14px;
+          border-radius: var(--radius-full);
+          border: 1px solid var(--border-subtle);
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-secondary);
+          font-size: 0.8125rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .exam-tab-pill:hover {
+          background: rgba(255, 255, 255, 0.07);
+          color: #FFFFFF;
+        }
+        .exam-tab-pill.active {
+          background: rgba(99, 102, 241, 0.18);
+          border-color: rgba(99, 102, 241, 0.5);
+          color: #A5B4FC;
+          box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+        }
+        .tab-pill-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #F59E0B;
+        }
+        .active-dot {
+          box-shadow: 0 0 8px #F59E0B;
+          animation: pulse 1.5s infinite;
+        }
+        .tab-pill-count {
+          padding: 1px 7px;
+          border-radius: var(--radius-full);
+          background: rgba(255, 255, 255, 0.08);
+          font-size: 0.72rem;
+          font-weight: 700;
+        }
+
+        /* Class Exam Performance Summary Banner */
+        .exam-stats-banner {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+          gap: 16px;
+          padding: 14px 18px;
+          border-radius: var(--radius-md);
+          background: rgba(17, 24, 39, 0.6);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .exam-stat-item {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          border-right: 1px solid rgba(255, 255, 255, 0.06);
+          padding-right: 12px;
+        }
+        .exam-stat-item:last-child {
+          border-right: none;
+        }
+        .stat-label {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+        }
+        .stat-value {
+          font-size: 1.35rem;
+          font-weight: 800;
+          font-family: var(--font-heading);
+          line-height: 1.2;
+        }
+        .stat-subtext {
+          font-size: 0.78rem;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+        .stat-footnote {
+          font-size: 0.72rem;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .quick-absent-fill-link {
+          background: transparent;
+          border: none;
+          color: #FCD34D;
+          font-size: 0.68rem;
+          font-weight: 600;
+          text-decoration: underline;
+          cursor: pointer;
+          padding: 0;
+        }
+        .quick-absent-fill-link:hover {
+          color: #F59E0B;
+        }
+
+        /* Table Navigation & Hint Bar */
+        .table-hints-bar {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 8px 14px;
+          background: rgba(255, 255, 255, 0.025);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: var(--radius-sm);
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+        .hint-pill {
+          font-size: 0.72rem;
+          color: var(--text-secondary);
+        }
+        .hint-pill code {
+          background: rgba(255, 255, 255, 0.1);
+          color: #FCD34D;
+          padding: 1px 5px;
+          border-radius: 4px;
+          font-family: var(--font-mono);
+          font-size: 0.7rem;
+        }
+
+        /* Excel-like Mark Input & Absent Toggle */
+        .mark-input-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn-absent-toggle {
+          padding: 4px 7px;
+          border-radius: 6px;
+          font-size: 0.68rem;
+          font-weight: 700;
+          border: 1px solid var(--border-subtle);
+          background: rgba(255, 255, 255, 0.04);
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .btn-absent-toggle:hover {
+          background: rgba(245, 158, 11, 0.15);
+          color: #FCD34D;
+          border-color: rgba(245, 158, 11, 0.35);
+        }
+        .btn-absent-toggle.active {
+          background: rgba(245, 158, 11, 0.25);
+          color: #FCD34D;
+          border-color: rgba(245, 158, 11, 0.55);
+          box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+        }
+        .input-absent {
+          background: rgba(245, 158, 11, 0.1) !important;
+          color: #FCD34D !important;
+          border-color: rgba(245, 158, 11, 0.35) !important;
+          font-weight: 800;
+          letter-spacing: 0.05em;
+        }
+
+        /* 1-Click Quick Exam Templates */
+        .template-pills-row {
+          margin-top: 4px;
+        }
+        .template-pill-btn {
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(245, 158, 11, 0.35);
+          color: #FCD34D;
+          font-size: 0.75rem;
+          font-weight: 700;
+          padding: 5px 11px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .template-pill-btn:hover {
+          background: rgba(245, 158, 11, 0.2);
+          border-color: #F59E0B;
+          transform: translateY(-1px);
+        }
+
         .exam-selectors-card {
           padding: 16px;
         }
@@ -1452,8 +2187,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           color: var(--text-secondary);
         }
         .mark-input-cell {
-          width: 90px;
-          padding: 6px 10px;
+          width: 80px;
+          padding: 6px 8px;
           text-align: center;
           font-weight: 700;
         }

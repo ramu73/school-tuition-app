@@ -324,16 +324,21 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     };
   });
 
-  const testsCount = studentMarks.length;
-  const passedTests = studentMarks.filter(m => m.marksObtained >= m.passingMarks).length;
+  const evaluatedMarks = studentMarks.filter(m => !m.isAbsent && m.marksObtained !== 'AB' && m.marksObtained !== '' && m.marksObtained !== null && !isNaN(Number(m.marksObtained)));
+  const testsCount = evaluatedMarks.length;
+  const passedTests = evaluatedMarks.filter(m => Number(m.marksObtained) >= m.passingMarks).length;
   const avgPercentage = testsCount > 0 
-    ? Math.round(studentMarks.reduce((sum, m) => sum + (m.marksObtained / m.totalMarks) * 100, 0) / testsCount)
+    ? Math.round(evaluatedMarks.reduce((sum, m) => sum + (Number(m.marksObtained) / m.totalMarks) * 100, 0) / testsCount)
     : null;
 
   const latestTest = studentMarks.length > 0 ? studentMarks[studentMarks.length - 1] : null;
-  const latestPct = latestTest ? Math.round((latestTest.marksObtained / latestTest.totalMarks) * 100) : null;
+  const latestPct = latestTest && !latestTest.isAbsent && latestTest.marksObtained !== 'AB' && latestTest.marksObtained !== ''
+    ? Math.round((Number(latestTest.marksObtained) / latestTest.totalMarks) * 100) 
+    : null;
   const prevTest = studentMarks.length >= 2 ? studentMarks[studentMarks.length - 2] : null;
-  const prevPct = prevTest ? Math.round((prevTest.marksObtained / prevTest.totalMarks) * 100) : null;
+  const prevPct = prevTest && !prevTest.isAbsent && prevTest.marksObtained !== 'AB' && prevTest.marksObtained !== ''
+    ? Math.round((Number(prevTest.marksObtained) / prevTest.totalMarks) * 100) 
+    : null;
   const scoreDiff = (latestPct !== null && prevPct !== null) ? (latestPct - prevPct) : null;
 
   // Tutor Feedback & Child Improvement Plan
@@ -826,8 +831,10 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               </div>
             ) : (
               studentMarks.map((test, idx) => {
-                const percentage = Math.round((test.marksObtained / test.totalMarks) * 100);
-                const isPassed = test.marksObtained >= test.passingMarks;
+                const isAbsent = test.isAbsent || test.marksObtained === 'AB';
+                const hasValidScore = !isAbsent && test.marksObtained !== '' && test.marksObtained !== null && !isNaN(Number(test.marksObtained));
+                const percentage = hasValidScore ? Math.round((Number(test.marksObtained) / test.totalMarks) * 100) : null;
+                const isPassed = hasValidScore && Number(test.marksObtained) >= test.passingMarks;
 
                 return (
                   <div key={idx} className="parent-test-item">
@@ -841,10 +848,20 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
 
                     <div className="test-score-col">
                       <div className="flex items-center gap-2">
-                        <div className={`score-badge ${isPassed ? 'score-pass' : 'score-fail'}`}>
-                          {test.marksObtained} / {test.totalMarks}
-                        </div>
-                        <span className="text-xs text-white font-bold">{percentage}%</span>
+                        {isAbsent ? (
+                          <div className="score-badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}>
+                            ABSENT
+                          </div>
+                        ) : (
+                          <div className={`score-badge ${isPassed ? 'score-pass' : 'score-fail'}`}>
+                            {test.marksObtained} / {test.totalMarks}
+                          </div>
+                        )}
+                        {percentage !== null ? (
+                          <span className="text-xs text-white font-bold">{percentage}%</span>
+                        ) : isAbsent ? (
+                          <span className="text-xs text-amber-400 font-medium">Leave</span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
                         <button
@@ -1359,8 +1376,8 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               </div>
 
               <div className="scorecard-marks-highlight">
-                <div className="score-circle">
-                  <div className="score-num">{activeScorecard.test.marksObtained}</div>
+                <div className="score-circle" style={activeScorecard.test.isAbsent || activeScorecard.test.marksObtained === 'AB' ? { background: '#D97706' } : {}}>
+                  <div className="score-num">{activeScorecard.test.isAbsent || activeScorecard.test.marksObtained === 'AB' ? 'AB' : activeScorecard.test.marksObtained}</div>
                   <div className="score-denom">/ {activeScorecard.test.totalMarks}</div>
                 </div>
                 <div className="score-summary">
@@ -1369,12 +1386,20 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
                     Subject: <strong>{activeScorecard.test.subject}</strong> • Date: {activeScorecard.test.date}
                   </div>
                   <div className="mt-2 flex items-center gap-2">
-                    <span className="badge badge-success">
-                      Score: {Math.round((activeScorecard.test.marksObtained / activeScorecard.test.totalMarks) * 100)}%
-                    </span>
-                    <span className="text-xs font-bold text-slate-700">
-                      {activeScorecard.test.marksObtained >= activeScorecard.test.passingMarks ? 'Status: PASSED' : 'Status: Needs Revision'}
-                    </span>
+                    {activeScorecard.test.isAbsent || activeScorecard.test.marksObtained === 'AB' ? (
+                      <span className="badge badge-warning" style={{ background: '#F59E0B25', color: '#D97706', borderColor: '#F59E0B50' }}>
+                        Status: ABSENT (Leave Recorded)
+                      </span>
+                    ) : (
+                      <>
+                        <span className="badge badge-success">
+                          Score: {Math.round((Number(activeScorecard.test.marksObtained) / activeScorecard.test.totalMarks) * 100)}%
+                        </span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {Number(activeScorecard.test.marksObtained) >= activeScorecard.test.passingMarks ? 'Status: PASSED' : 'Status: Needs Revision'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
