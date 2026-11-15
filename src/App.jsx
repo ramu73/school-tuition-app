@@ -473,6 +473,8 @@ export default function App() {
           onOpenDemo={() => setDemoModalOpen(true)}
           onOpenTeacher={() => setTeacherModalOpen(true)}
           onOpenTeacherInquiry={() => setTeacherModalOpen(true)}
+          attendance={data?.attendance || []}
+          announcements={data?.announcements || []}
         />
 
         {/* Demo Registration Modal */}

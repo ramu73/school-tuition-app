@@ -116,6 +116,12 @@ Attendance is mandatory for all students. Kindly ensure {student_name} attends o
       body: `📢 *HAYAGRIVA TUTORIALS — TIMING REVISION NOTICE*\n\nDear Sir/Mam,\n\nKindly note that starting from this week, the tuition timings for *{batch_name}* have been revised to:\n🕒 *New Timings: 05:30 PM - 07:30 PM*\n\nPlease ensure {student_name} arrives 5 minutes before class starts.\n\nThank you,\nHayagriva Tutorials`
     },
     {
+      id: 'teacher_leave',
+      name: '👨‍🏫 Teacher Leave Notice',
+      title: 'Tuition Closed Today - Teacher Leave',
+      body: `📢 *HAYAGRIVA TUTORIALS — CLASS SUSPENSION NOTICE*\n\nDear Sir/Mam,\n\nPlease note that tuition classes for *{batch_name}* will remain *CLOSED today* due to *teacher unavailability / personal leave*.\n\nRegular batches will resume as scheduled tomorrow. Students are advised to complete their revision homework.\n\nThank you,\nHayagriva Tutorials, Srinagar Colony\n📞 9848266892`
+    },
+    {
       id: 'holiday',
       name: '🏖️ Holiday / Closed Notice',
       title: 'Tuition Holiday Notice',

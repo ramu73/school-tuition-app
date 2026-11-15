@@ -22,6 +22,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import HayagrivaLogo from './HayagrivaLogo';
+import DeclareHolidayModal from './DeclareHolidayModal';
 import { calculateStudentFeeCycle, generateFeeReminderWhatsAppUrl, computeFinancialSummary } from '../lib/feeCycle';
 import { USER_ROLES } from '../lib/auth';
 
@@ -77,6 +78,9 @@ export default function Dashboard({
   const [editFeesModalOpen, setEditFeesModalOpen] = useState(false);
   const [feeFormValues, setFeeFormValues] = useState({});
   const [feeSaveSuccess, setFeeSaveSuccess] = useState(false);
+
+  // State for Declaring Holiday / Teacher Leave
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
 
   const handleOpenEditFees = () => {
     const vals = {};
@@ -240,6 +244,15 @@ export default function Dashboard({
             <button className="btn btn-warning" onClick={() => setActiveTab('notifications')} title="Broadcast custom message or notices to students/parents">
               <Megaphone size={16} />
               <span>Broadcast Notice</span>
+            </button>
+            <button 
+              className={`btn ${isTodayHoliday ? 'btn-warning' : 'btn-secondary'}`}
+              onClick={() => setHolidayModalOpen(true)}
+              title={isTodayHoliday ? `Today is a declared holiday: ${todayHolidayTitle}. Click to manage or revert.` : "Declare today or upcoming date as tuition holiday / teacher personal leave"}
+              style={isTodayHoliday ? { background: 'rgba(245, 158, 11, 0.25)', borderColor: 'rgba(245, 158, 11, 0.6)', color: '#FDE68A', fontWeight: 600 } : {}}
+            >
+              <span>🌴</span>
+              <span>{isTodayHoliday ? 'Holiday Set (Edit)' : 'Declare Leave / Holiday'}</span>
             </button>
           </div>
         </div>
@@ -411,7 +424,18 @@ export default function Dashboard({
               <span className="kpi-tag tag-success">{presentCount} Present</span>
             )}
             {isTodayHoliday ? (
-              <span className="kpi-note">Tuition Closed Today →</span>
+              <button 
+                type="button" 
+                className="btn btn-xs btn-warning ml-auto"
+                style={{ fontSize: '0.72rem', padding: '2px 8px', fontWeight: 600 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHolidayModalOpen(true);
+                }}
+                title="Edit holiday reason or revert back to working day"
+              >
+                Manage Holiday
+              </button>
             ) : isTodaySunday && todayAttendance.length > 0 ? (
               <span className="kpi-tag tag-success" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', fontWeight: 600 }}>
                 ⚡ Extra Class
@@ -423,7 +447,18 @@ export default function Dashboard({
             ) : isTodaySunday ? (
               <span className="kpi-note">Conduct Extra Class →</span>
             ) : (
-              <span className="kpi-note">All Absentees Register →</span>
+              <button
+                type="button"
+                className="btn btn-xs btn-secondary ml-auto hover:text-amber"
+                style={{ fontSize: '0.72rem', padding: '2px 8px', borderColor: 'rgba(245, 158, 11, 0.35)', color: '#FDE68A' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHolidayModalOpen(true);
+                }}
+                title="Declare tuition holiday or teacher personal leave for today"
+              >
+                🌴 Declare Leave
+              </button>
             )}
           </div>
         </div>
@@ -817,6 +852,29 @@ export default function Dashboard({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Declare Holiday / Teacher Personal Leave Modal */}
+      {holidayModalOpen && (
+        <DeclareHolidayModal
+          isOpen={holidayModalOpen}
+          onClose={() => setHolidayModalOpen(false)}
+          initialDate={todayStr}
+          initialReason={isTodayHoliday ? todayHolidayTitle : ''}
+          students={students}
+          attendance={attendance}
+          announcements={data?.announcements || []}
+          currentUser={currentUser}
+          onSaveData={({ attendance: updatedAtt, announcements: updatedAnn }) => {
+            if (typeof onSaveData === 'function') {
+              onSaveData({
+                ...data,
+                attendance: updatedAtt,
+                announcements: updatedAnn
+              });
+            }
+          }}
+        />
       )}
 
       <style>{`

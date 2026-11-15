@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { USER_ROLES } from '../lib/auth';
+import DeclareHolidayModal from './DeclareHolidayModal';
 
 export default function Attendance({ 
   data, 
@@ -1873,102 +1874,30 @@ export default function Attendance({
       )}
 
       {/* ========================================================================= */}
-      {/* HOLIDAY DECLARATION MODAL                                                 */}
+      {/* HOLIDAY DECLARATION MODAL (Shared with Dashboard)                          */}
       {/* ========================================================================= */}
       {holidayModalOpen && (
-        <div className="modal-overlay" onClick={() => setHolidayModalOpen(false)}>
-          <div className="modal-content glass-card holiday-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🌴</span>
-                <h3 className="modal-title text-base font-bold text-white mb-0">Declare Tuition Holiday</h3>
-              </div>
-              <button 
-                type="button" 
-                className="modal-close-btn text-muted hover:text-white" 
-                onClick={() => setHolidayModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body py-4">
-              <p className="text-xs text-secondary mb-3">
-                Tuition will be marked as closed on this date. Students will not be penalized or counted absent, and the Tuition Calendar &amp; Parent Portal will update automatically.
-              </p>
-
-              <div className="form-group mb-3">
-                <label className="form-label text-xs font-semibold text-white">Holiday Date</label>
-                <input 
-                  type="date" 
-                  className="form-input" 
-                  value={holidayModalDate} 
-                  onChange={e => setHolidayModalDate(e.target.value)} 
-                />
-              </div>
-
-              <div className="form-group mb-3">
-                <label className="form-label text-xs font-semibold text-white">Quick Occasion Presets</label>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {[
-                    'Diwali',
-                    'Pongal / Sankranti',
-                    'Dussehra / Navratri',
-                    'Independence Day',
-                    'Republic Day',
-                    'Gandhi Jayanti',
-                    'Eid / Ramzan',
-                    'Christmas',
-                    'Maha Shivaratri',
-                    'Ganesh Chaturthi',
-                    'Monsoon / Heavy Rain Holiday',
-                    'Center Maintenance',
-                    'Exam Preparation Break'
-                  ].map(preset => (
-                    <button
-                      key={preset}
-                      type="button"
-                      className={`btn btn-xs ${holidayModalReason === preset ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setHolidayModalReason(preset)}
-                      style={{ fontSize: '0.72rem', borderRadius: '6px' }}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-group mb-4">
-                <label className="form-label text-xs font-semibold text-white">Holiday Name / Occasion</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. Diwali Holiday, Pongal Vacation, Center Closed"
-                  value={holidayModalReason} 
-                  onChange={e => setHolidayModalReason(e.target.value)} 
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-sm" 
-                onClick={() => setHolidayModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-primary btn-sm flex items-center gap-1.5"
-                onClick={() => handleDeclareHoliday(holidayModalDate, holidayModalReason)}
-              >
-                <span>🌴</span>
-                <span>Confirm &amp; Declare Holiday</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeclareHolidayModal
+          isOpen={holidayModalOpen}
+          onClose={() => setHolidayModalOpen(false)}
+          initialDate={holidayModalDate || selectedDate}
+          initialReason={holidayModalReason}
+          students={students}
+          attendance={attendance}
+          announcements={data?.announcements || []}
+          currentUser={currentUser}
+          onSaveData={({ attendance: updatedAtt, announcements: updatedAnn }) => {
+            onSaveData({
+              ...data,
+              attendance: updatedAtt,
+              announcements: updatedAnn
+            });
+            triggerSaveIndicator();
+          }}
+          onHolidayDeclared={() => {
+            triggerSaveIndicator();
+          }}
+        />
       )}
 
       {/* ========================================================================= */}

@@ -38,10 +38,51 @@ export default function LandingPage({
   onOpenTeacher,
   onOpenTeacherInquiry,
   classes = [],
-  batches = []
+  batches = [],
+  attendance = [],
+  announcements = []
 }) {
   const [selectedStandardTab, setSelectedStandardTab] = useState('ALL');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dismissTopNotice, setDismissTopNotice] = useState(false);
+
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayDateObj = useMemo(() => new Date(), []);
+  const isSunday = todayDateObj.getDay() === 0;
+
+  const todayHolidayRec = useMemo(() => {
+    return (attendance || []).find(a => a.date === todayStr && (a.status === 'HOLIDAY' || a.status === 'NO_CLASS'));
+  }, [attendance, todayStr]);
+
+  const todayFormatted = useMemo(() => {
+    try {
+      return todayDateObj.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+      });
+    } catch {
+      return todayStr;
+    }
+  }, [todayDateObj, todayStr]);
+
+  const topNoticeInfo = useMemo(() => {
+    if (todayHolidayRec) {
+      return {
+        type: 'holiday',
+        badge: '🌴 Tuition Closed Today',
+        text: `Hayagriva Tutorials is closed today (${todayFormatted}) on account of "${todayHolidayRec.remarks || 'Holiday'}". Regular classes resume tomorrow.`
+      };
+    }
+    if (isSunday) {
+      return {
+        type: 'sunday',
+        badge: '🌴 Sunday Weekly Break',
+        text: 'Regular weekday batches do not run on Sundays. Online admissions, brochure downloads & WhatsApp demo bookings are active 24/7.'
+      };
+    }
+    return null;
+  }, [todayHolidayRec, isSunday, todayFormatted]);
 
   // 1. HERO SLIDING WINDOW STATE
   const [currentHeroSlide, setCurrentHeroSlide] = useState(0);
@@ -221,6 +262,29 @@ export default function LandingPage({
 
   return (
     <div className="landing-page-root">
+      {/* Top Center Notice Bar (Shows on Sunday or when Tuition is a Declared Holiday) */}
+      {!dismissTopNotice && topNoticeInfo && (
+        <aside className="landing-top-notice-bar" role="status" aria-label="Center notice">
+          <div className="landing-top-notice-inner">
+            <div className="landing-top-notice-content">
+              <span className="notice-pill-tag">
+                <span>{topNoticeInfo.badge}</span>
+              </span>
+              <span className="notice-message-text">{topNoticeInfo.text}</span>
+            </div>
+            <button
+              type="button"
+              className="notice-dismiss-btn"
+              onClick={() => setDismissTopNotice(true)}
+              title="Dismiss notice"
+              aria-label="Dismiss notice"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </aside>
+      )}
+
       {/* ============================================================== */}
       {/* 1. PUBLIC NAVIGATION BAR */}
       {/* ============================================================== */}
@@ -1342,6 +1406,67 @@ export default function LandingPage({
           .section-container {
             padding: 0 24px;
           }
+        }
+
+        /* Top Notice Banner */
+        .landing-top-notice-bar {
+          background: linear-gradient(90deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.28) 100%);
+          border-bottom: 1px solid rgba(245, 158, 11, 0.4);
+          padding: 8px 16px;
+          width: 100%;
+          position: relative;
+          z-index: 105;
+        }
+        .landing-top-notice-inner {
+          max-width: 1240px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .landing-top-notice-content {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          font-size: 0.84rem;
+          color: #FEF3C7;
+        }
+        .notice-pill-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          background: rgba(245, 158, 11, 0.3);
+          color: #FCD34D;
+          border: 1px solid rgba(245, 158, 11, 0.55);
+          padding: 2px 8px;
+          border-radius: 9999px;
+          font-weight: 700;
+          font-size: 0.72rem;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+        .notice-message-text {
+          color: #FDE68A;
+          line-height: 1.4;
+          font-weight: 500;
+        }
+        .notice-dismiss-btn {
+          background: transparent;
+          border: none;
+          color: #FCD34D;
+          cursor: pointer;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+          opacity: 0.8;
+          transition: opacity 0.2s;
+        }
+        .notice-dismiss-btn:hover {
+          opacity: 1;
         }
 
         /* 1. Navbar */
