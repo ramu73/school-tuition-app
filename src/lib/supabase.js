@@ -455,16 +455,20 @@ export async function syncTuitionDataToSupabase(data) {
 
     // 3. Attendance
     if (data.attendance && data.attendance.length > 0) {
-      const validStudentIds = new Set((data.students || []).map(s => s.id));
-      const validBatchIds = new Set((data.batches || []).map(b => b.id));
+      const validStudentIds = new Set((data.students || []).map(s => String(s.id)));
+      const validBatchIds = new Set((data.batches || []).map(b => String(b.id)));
       const attendanceRows = data.attendance
-        .filter(a => validStudentIds.has(a.studentId))
+        .filter(a => a.studentId !== 'CENTER_WIDE' && validStudentIds.has(String(a.studentId)))
         .map(a => {
-          const student = data.students?.find(s => s.id === a.studentId);
+          const student = data.students?.find(s => String(s.id) === String(a.studentId));
+          const numStudentId = Number(a.studentId) || a.studentId;
+          const numBatchId = (a.batchId && validBatchIds.has(String(a.batchId))) 
+            ? (Number(a.batchId) || a.batchId) 
+            : (student?.batchId ? (Number(student.batchId) || student.batchId) : null);
           return {
             id: a.id,
-            student_id: a.studentId,
-            batch_id: a.batchId && validBatchIds.has(a.batchId) ? a.batchId : (student?.batchId || null),
+            student_id: numStudentId,
+            batch_id: numBatchId,
             class_code: a.classCode || student?.classCode || 'CLASS_10',
             date: a.date,
             status: a.status,

@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  X, 
-  Calendar, 
-  Check, 
-  Copy, 
-  Share2, 
-  RotateCcw, 
-  AlertCircle, 
+import {
+  X,
+  Calendar,
+  Check,
+  Copy,
+  Share2,
+  RotateCcw,
+  AlertCircle,
   Sparkles,
   Send,
   ExternalLink
@@ -145,7 +145,7 @@ export default function DeclareHolidayModal({
     if (alsoAnnounce) {
       // Remove previous duplicate announcement for this date if exists
       updatedAnnouncements = updatedAnnouncements.filter(a => !(a.date === targetDate && a.title?.includes('Tuition Closed')));
-      
+
       const newAnn = {
         id: generateNextId(updatedAnnouncements),
         title: `Tuition Closed: ${holidayTitle}`,
@@ -206,8 +206,8 @@ export default function DeclareHolidayModal({
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
-      <div 
-        className="modal-content glass-card declare-holiday-modal" 
+      <div
+        className="modal-content glass-card declare-holiday-modal"
         onClick={e => e.stopPropagation()}
         style={{
           maxWidth: '560px',
@@ -230,15 +230,15 @@ export default function DeclareHolidayModal({
                 {isSuccessView ? 'Holiday Declared & Ready!' : 'Declare Tuition Holiday / Leave'}
               </h3>
               <p className="text-xs text-slate-400 mb-0">
-                {isSuccessView 
-                  ? 'All students protected • Share WhatsApp notice with parents' 
+                {isSuccessView
+                  ? 'All students protected • Share WhatsApp notice with parents'
                   : 'Classes closed • Students not penalized • Site updates like Sunday'}
               </p>
             </div>
           </div>
-          <button 
-            type="button" 
-            className="modal-close-btn text-muted hover:text-white" 
+          <button
+            type="button"
+            className="modal-close-btn text-muted hover:text-white"
             onClick={onClose}
           >
             <X size={18} />
@@ -250,10 +250,10 @@ export default function DeclareHolidayModal({
           <div className="modal-body py-4 space-y-4">
             {/* If Already A Declared Holiday Alert */}
             {isAlreadyHoliday && (
-              <div 
+              <div
                 className="p-3 rounded-lg flex items-start justify-between gap-3"
-                style={{ 
-                  background: 'rgba(245, 158, 11, 0.15)', 
+                style={{
+                  background: 'rgba(245, 158, 11, 0.15)',
                   border: '1px solid rgba(245, 158, 11, 0.4)',
                   color: '#FEF3C7'
                 }}
@@ -289,7 +289,7 @@ export default function DeclareHolidayModal({
                 <span>Select Holiday Date</span>
                 <span className="text-xs text-amber-400 font-bold">{formattedDate}</span>
               </label>
-              
+
               <div className="flex items-center gap-2 mb-2">
                 <button
                   type="button"
@@ -308,11 +308,11 @@ export default function DeclareHolidayModal({
                   Tomorrow
                 </button>
                 <div className="relative flex-1">
-                  <input 
-                    type="date" 
-                    className="form-input text-xs" 
-                    value={targetDate} 
-                    onChange={e => setTargetDate(e.target.value)} 
+                  <input
+                    type="date"
+                    className="form-input text-xs"
+                    value={targetDate}
+                    onChange={e => setTargetDate(e.target.value)}
                     style={{ padding: '4px 8px', fontSize: '0.8rem' }}
                   />
                 </div>
@@ -325,12 +325,12 @@ export default function DeclareHolidayModal({
                 <span>Quick Presets (1-Tap Selection)</span>
                 <Sparkles size={13} className="text-amber-400" />
               </label>
-              
+
               <div className="space-y-2 mt-1">
                 {PRESET_GROUPS.map((grp, idx) => (
                   <div key={idx} className="preset-group">
-                    <div 
-                      className="text-2xs font-bold uppercase tracking-wider mb-1" 
+                    <div
+                      className="text-2xs font-bold uppercase tracking-wider mb-1"
                       style={{ color: grp.highlight ? '#FBBF24' : '#94A3B8' }}
                     >
                       {grp.label}
@@ -348,21 +348,21 @@ export default function DeclareHolidayModal({
                               fontSize: '0.73rem',
                               borderRadius: '6px',
                               padding: '4px 8px',
-                              background: isSelected 
-                                ? '#3B82F6' 
-                                : grp.highlight 
-                                ? 'rgba(245, 158, 11, 0.12)' 
-                                : 'rgba(51, 65, 85, 0.6)',
-                              borderColor: isSelected 
-                                ? '#60A5FA' 
-                                : grp.highlight 
-                                ? 'rgba(245, 158, 11, 0.35)' 
-                                : 'rgba(71, 85, 105, 0.5)',
-                              color: isSelected 
-                                ? '#FFFFFF' 
-                                : grp.highlight 
-                                ? '#FDE68A' 
-                                : '#E2E8F0'
+                              background: isSelected
+                                ? '#3B82F6'
+                                : grp.highlight
+                                  ? 'rgba(245, 158, 11, 0.12)'
+                                  : 'rgba(51, 65, 85, 0.6)',
+                              borderColor: isSelected
+                                ? '#60A5FA'
+                                : grp.highlight
+                                  ? 'rgba(245, 158, 11, 0.35)'
+                                  : 'rgba(71, 85, 105, 0.5)',
+                              color: isSelected
+                                ? '#FFFFFF'
+                                : grp.highlight
+                                  ? '#FDE68A'
+                                  : '#E2E8F0'
                             }}
                           >
                             {preset}
@@ -380,18 +380,18 @@ export default function DeclareHolidayModal({
               <label className="form-label text-xs font-semibold text-white mb-1">
                 Holiday Reason / Title (shown to parents &amp; on website)
               </label>
-              <input 
-                type="text" 
-                className="form-input text-xs" 
+              <input
+                type="text"
+                className="form-input text-xs"
                 placeholder="e.g. Teacher Unavailable (Personal Reason), Heavy Rain, Pongal Vacation"
-                value={reason} 
-                onChange={e => setReason(e.target.value)} 
+                value={reason}
+                onChange={e => setReason(e.target.value)}
                 style={{ fontSize: '0.85rem' }}
               />
             </div>
 
             {/* Notice Broadcast Checkbox */}
-            <div 
+            <div
               className="p-3 rounded-lg flex items-center justify-between gap-3 cursor-pointer"
               style={{ background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(71, 85, 105, 0.4)' }}
               onClick={() => setAlsoAnnounce(!alsoAnnounce)}
@@ -407,17 +407,17 @@ export default function DeclareHolidayModal({
                   </div>
                 </div>
               </div>
-              <input 
-                type="checkbox" 
-                checked={alsoAnnounce} 
-                onChange={e => setAlsoAnnounce(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={alsoAnnounce}
+                onChange={e => setAlsoAnnounce(e.target.checked)}
                 className="checkbox"
                 style={{ width: '16px', height: '16px', accentColor: '#3B82F6' }}
               />
             </div>
 
             {/* How It Updates The Site (Reassurance) */}
-            <div 
+            <div
               className="p-2.5 rounded-lg text-2xs space-y-1"
               style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', color: '#A7F3D0' }}
             >
@@ -439,11 +439,11 @@ export default function DeclareHolidayModal({
         ) : (
           /* View 2: Success Screen with 1-Click WhatsApp Broadcast */
           <div className="modal-body py-4 space-y-4">
-            <div 
+            <div
               className="p-4 rounded-xl text-center space-y-2"
-              style={{ 
-                background: 'rgba(16, 185, 129, 0.12)', 
-                border: '1px solid rgba(16, 185, 129, 0.35)' 
+              style={{
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.35)'
               }}
             >
               <div className="inline-flex p-2 rounded-full" style={{ background: 'rgba(16, 185, 129, 0.25)' }}>
@@ -467,10 +467,10 @@ export default function DeclareHolidayModal({
                 <span className="text-2xs text-slate-400">Ready to send to parent groups</span>
               </label>
 
-              <div 
+              <div
                 className="p-3 rounded-lg text-xs font-mono text-slate-200 leading-relaxed whitespace-pre-wrap select-all"
-                style={{ 
-                  background: 'rgba(15, 23, 42, 0.9)', 
+                style={{
+                  background: 'rgba(15, 23, 42, 0.9)',
                   border: '1px solid rgba(71, 85, 105, 0.5)',
                   maxHeight: '140px',
                   overflowY: 'auto'
@@ -509,17 +509,17 @@ export default function DeclareHolidayModal({
         <div className="modal-footer flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
           {!isSuccessView ? (
             <>
-              <button 
-                type="button" 
-                className="btn btn-secondary btn-sm" 
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={onClose}
               >
                 Cancel
               </button>
 
               {isAlreadyHoliday && (
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="btn btn-warning btn-sm flex items-center gap-1"
                   onClick={handleRevertHoliday}
                 >
@@ -528,8 +528,8 @@ export default function DeclareHolidayModal({
                 </button>
               )}
 
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-primary btn-sm flex items-center gap-1.5"
                 onClick={handleConfirmHoliday}
                 style={{ background: '#F59E0B', borderColor: '#D97706', color: '#1E293B', fontWeight: 700 }}
@@ -539,9 +539,9 @@ export default function DeclareHolidayModal({
               </button>
             </>
           ) : (
-            <button 
-              type="button" 
-              className="btn btn-primary btn-sm" 
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
               onClick={onClose}
             >
               Done &amp; Close

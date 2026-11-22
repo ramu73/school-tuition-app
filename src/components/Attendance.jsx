@@ -251,9 +251,9 @@ export default function Attendance({
   const isSundayExtraClass = isSelectedDateSunday && (hasSundayRecords || sundayExtraClassActive);
   const isTuitionHoliday = isDeclaredHoliday || (isSelectedDateSunday && !isSundayExtraClass);
 
-  // Helper: Get student status on selected date
+  // Helper: Get student status on selected date (Type-safe ID matching)
   const getStudentStatus = (studentId) => {
-    const record = attendance.find(a => a.studentId === studentId && a.date === selectedDate);
+    const record = attendance.find(a => String(a.studentId) === String(studentId) && a.date === selectedDate);
     if (record) return record.status || 'PRESENT';
     if (isDeclaredHoliday) {
       return 'HOLIDAY';
@@ -264,36 +264,27 @@ export default function Attendance({
     return 'PRESENT';
   };
 
-  // 1-Tap Toggle: Present ↔ Absent (Works across any view and auto-detects student batch)
-  const handleToggleAbsent = (studentId) => {
-    const student = students.find(s => s.id === studentId);
-    const currentStatus = getStudentStatus(studentId);
-    let newStatus;
-    if (currentStatus === 'HOLIDAY') {
-      newStatus = 'PRESENT';
-    } else if (currentStatus === 'ABSENT') {
-      newStatus = 'PRESENT';
-    } else {
-      newStatus = 'ABSENT';
-    }
-
-    const existingIndex = attendance.findIndex(a => a.studentId === studentId && a.date === selectedDate);
+  // Explicit Status Setter (Present, Absent, Late) - Saves immediately on 1st click
+  const handleSetStatus = (studentId, status) => {
+    const student = students.find(s => String(s.id) === String(studentId));
+    const existingIndex = attendance.findIndex(a => String(a.studentId) === String(studentId) && a.date === selectedDate);
     let updated = [...attendance];
     const remarks = isSelectedDateSunday ? 'Sunday Extra Class' : '';
 
     if (existingIndex >= 0) {
       updated[existingIndex] = {
         ...updated[existingIndex],
-        status: newStatus,
+        studentId: student?.id || studentId,
+        status,
         remarks: updated[existingIndex].remarks || remarks,
         batchId: student?.batchId || updated[existingIndex]?.batchId
       };
     } else {
       updated.push({
         id: generateNextId(updated),
-        studentId,
+        studentId: student?.id || studentId,
         date: selectedDate,
-        status: newStatus,
+        status,
         remarks,
         batchId: student?.batchId
       });
@@ -307,37 +298,11 @@ export default function Attendance({
     triggerSaveIndicator();
   };
 
-  // Optional: Set specific status (Present, Absent, Late)
-  const handleSetStatus = (studentId, status) => {
-    const student = students.find(s => s.id === studentId);
-    const existingIndex = attendance.findIndex(a => a.studentId === studentId && a.date === selectedDate);
-    let updated = [...attendance];
-    const remarks = isSelectedDateSunday ? 'Sunday Extra Class' : '';
-
-    if (existingIndex >= 0) {
-      updated[existingIndex] = {
-        ...updated[existingIndex],
-        status,
-        remarks: updated[existingIndex].remarks || remarks,
-        batchId: student?.batchId || updated[existingIndex]?.batchId
-      };
-    } else {
-      updated.push({
-        id: generateNextId(updated),
-        studentId,
-        date: selectedDate,
-        status,
-        remarks,
-        batchId: student?.batchId
-      });
-    }
-
-    if (isSelectedDateSunday && !sundayExtraClassActive) {
-      setSundayExtraClassActive(true);
-    }
-
-    onSaveData({ ...data, attendance: updated });
-    triggerSaveIndicator();
+  // 1-Tap Toggle: Present ↔ Absent (Delegates cleanly to handleSetStatus)
+  const handleToggleAbsent = (studentId) => {
+    const currentStatus = getStudentStatus(studentId);
+    const newStatus = currentStatus === 'ABSENT' ? 'PRESENT' : 'ABSENT';
+    handleSetStatus(studentId, newStatus);
   };
 
   // Reset entire batch to Present (or Mark All Attended for Sunday Extra Class)
@@ -346,7 +311,7 @@ export default function Attendance({
     const remarks = isSelectedDateSunday ? 'Sunday Extra Class' : '';
 
     eligibleBatchStudents.forEach(student => {
-      const existingIndex = updated.findIndex(a => a.studentId === student.id && a.date === selectedDate);
+      const existingIndex = updated.findIndex(a => String(a.studentId) === String(student.id) && a.date === selectedDate);
       if (existingIndex >= 0) {
         updated[existingIndex] = { 
           ...updated[existingIndex], 
@@ -446,7 +411,7 @@ export default function Attendance({
     : attendance
         .filter(a => a.date === selectedDate && a.status === 'ABSENT')
         .map(record => {
-          const student = accessibleStudents.find(s => s.id === record.studentId);
+          const student = accessibleStudents.find(s => String(s.id) === String(record.studentId));
           if (!student || student.status !== 'ACTIVE') return null;
           const studentClass = classes.find(c => c.code === student.classCode);
           const studentBatch = batches.find(b => b.id === (record.batchId || student.batchId));
@@ -1089,12 +1054,12 @@ export default function Attendance({
                               </a>
                             )}
 
-                            {/* 1-Tap Undo / Mark Present */}
+                            {/* 1-Tap Save / Mark Present */}
                             <button
                               type="button"
-                              className="btn btn-sm btn-secondary unmark-present-btn"
-                              onClick={() => handleToggleAbsent(student.id)}
-                              title="Student attended? Tap to mark Present"
+                              className="btn btn-sm btn-secondary unmark-present-btn flex items-center gap-1.5 hover:border-emerald-400"
+                              onClick={() => handleSetStatus(student.id, 'PRESENT')}
+                              title="Student attended? Tap once to save as Present immediately"
                             >
                               <CheckCircle2 size={13} className="text-emerald" />
                               <span>Mark Present</span>
@@ -1303,13 +1268,14 @@ export default function Attendance({
 
                 <button 
                   type="button"
-                  className="btn btn-secondary btn-sm"
+                  className="btn btn-primary btn-sm flex items-center gap-1.5"
                   onClick={handleResetAllPresent}
-                  title={isSelectedDateSunday ? "Mark all students in this batch as attended extra class" : "Reset everyone in this class/batch to Present"}
+                  title={isSelectedDateSunday ? "Mark all students in this batch as attended extra class" : "Save all students in this batch as Present with 1 click"}
                   disabled={eligibleBatchStudents.length === 0}
+                  style={{ background: '#10B981', borderColor: '#059669', color: '#FFFFFF', fontWeight: 600 }}
                 >
-                  {isSelectedDateSunday ? <Zap size={13} className="text-amber" /> : <RotateCcw size={13} />}
-                  <span>{isSelectedDateSunday ? 'Mark All Attended' : 'Reset All Present'}</span>
+                  <Check size={14} />
+                  <span>{isSelectedDateSunday ? 'Mark All Attended' : '✓ Mark Batch All Present'}</span>
                 </button>
               </div>
             </div>
@@ -1327,8 +1293,8 @@ export default function Attendance({
                       key={student.id}
                       type="button"
                       className="absentee-chip"
-                      onClick={() => handleToggleAbsent(student.id)}
-                      title="Tap to unmark (make Present)"
+                      onClick={() => handleSetStatus(student.id, 'PRESENT')}
+                      title="Tap to mark Present and save immediately"
                     >
                       <span className="chip-name">{student.name}</span>
                       <X size={12} className="chip-remove-icon" />
@@ -1481,47 +1447,37 @@ export default function Attendance({
                                 <td className="text-xs font-mono text-secondary">{student.parentPhone}</td>
                               )}
 
-                              {/* 1-Tap Attendance Action */}
+                              {/* Direct 1-Tap Attendance Action Controls */}
                               <td style={{ textAlign: 'center' }}>
-                                <div className="fast-attendance-cell">
+                                <div className="attendance-pills-group flex items-center justify-center gap-1">
                                   <button
                                     type="button"
-                                    className={`btn-fast-attendance ${isAbsent ? 'status-absent' : isLate ? 'status-late' : isSelectedDateSunday ? 'status-extra' : 'status-present'}`}
-                                    onClick={() => handleToggleAbsent(student.id)}
-                                    title={isAbsent ? "Currently Absent. Click to mark Present." : "Currently Present. Click to mark Absent."}
+                                    className={`btn-pill-status pill-present ${!isAbsent && !isLate ? 'active' : ''}`}
+                                    onClick={() => handleSetStatus(student.id, 'PRESENT')}
+                                    title="Mark Present (saves immediately on 1st click)"
                                   >
-                                    {isAbsent ? (
-                                      <>
-                                        <XCircle size={16} />
-                                        <span className="status-title">ABSENT</span>
-                                        <span className="status-sub-hint">Tap for Present</span>
-                                      </>
-                                    ) : isLate ? (
-                                      <>
-                                        <Clock size={16} />
-                                        <span className="status-title">LATE</span>
-                                        <span className="status-sub-hint">Tap for Absent</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        {isSelectedDateSunday ? <Zap size={16} className="text-amber" /> : <CheckCircle2 size={16} />}
-                                        <span className="status-title">{isSelectedDateSunday ? 'ATTENDED' : 'PRESENT'}</span>
-                                        <span className="status-sub-hint">{isSelectedDateSunday ? '⚡ Extra Class' : 'Tap if Absent'}</span>
-                                      </>
-                                    )}
+                                    <CheckCircle2 size={13} />
+                                    <span>{isSelectedDateSunday ? 'Attended' : 'Present'}</span>
                                   </button>
 
-                                  {/* Quick Late Toggle Option */}
                                   <button
                                     type="button"
-                                    className={`btn-late-mini ${isLate ? 'active' : ''}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSetStatus(student.id, isLate ? 'PRESENT' : 'LATE');
-                                    }}
-                                    title={isLate ? "Unmark Late" : "Mark as Late arrival"}
+                                    className={`btn-pill-status pill-absent ${isAbsent ? 'active' : ''}`}
+                                    onClick={() => handleSetStatus(student.id, 'ABSENT')}
+                                    title="Mark Absent (saves immediately on 1st click)"
                                   >
-                                    L
+                                    <XCircle size={13} />
+                                    <span>Absent</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className={`btn-pill-status pill-late ${isLate ? 'active' : ''}`}
+                                    onClick={() => handleSetStatus(student.id, 'LATE')}
+                                    title="Mark Late arrival"
+                                  >
+                                    <Clock size={13} />
+                                    <span>Late</span>
                                   </button>
                                 </div>
                               </td>
@@ -1608,8 +1564,8 @@ export default function Attendance({
                               <button
                                 type="button"
                                 className="btn btn-sm btn-secondary"
-                                onClick={() => handleToggleAbsent(student.id)}
-                                title="Unmark absent"
+                                onClick={() => handleSetStatus(student.id, 'PRESENT')}
+                                title="Unmark absent (Mark Present)"
                               >
                                 <RotateCcw size={12} />
                               </button>
@@ -2700,6 +2656,53 @@ export default function Attendance({
           gap: 6px;
           justify-content: center;
         }
+        .attendance-pills-group {
+          display: inline-flex;
+          align-items: center;
+          background: rgba(15, 23, 42, 0.85);
+          padding: 3px;
+          border-radius: 9px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          gap: 3px;
+        }
+        .btn-pill-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 5px 9px;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          border: 1px solid transparent;
+          background: transparent;
+          color: #94A3B8;
+          cursor: pointer;
+          transition: all 0.15s ease-in-out;
+          user-select: none;
+        }
+        .btn-pill-status:hover {
+          color: #F8FAFC;
+          background: rgba(255, 255, 255, 0.06);
+        }
+        .btn-pill-status.pill-present.active {
+          background: rgba(16, 185, 129, 0.22);
+          color: #34D399;
+          border-color: rgba(16, 185, 129, 0.55);
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
+        }
+        .btn-pill-status.pill-absent.active {
+          background: rgba(244, 63, 94, 0.25);
+          color: #FB7185;
+          border-color: rgba(244, 63, 94, 0.6);
+          box-shadow: 0 0 10px rgba(244, 63, 94, 0.25);
+        }
+        .btn-pill-status.pill-late.active {
+          background: rgba(245, 158, 11, 0.22);
+          color: #FCD34D;
+          border-color: rgba(245, 158, 11, 0.55);
+          box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+        }
+
         .btn-fast-attendance {
           display: inline-flex;
           align-items: center;
@@ -3015,9 +3018,13 @@ export default function Attendance({
           .attendance-split-layout {
             grid-template-columns: 1fr !important;
           }
-          .btn-fast-attendance {
-            padding: 6px 10px;
-            font-size: 0.75rem;
+          .attendance-pills-group {
+            width: 100%;
+            justify-content: center;
+          }
+          .btn-pill-status {
+            padding: 4px 7px;
+            font-size: 0.72rem;
           }
         }
       `}</style>
