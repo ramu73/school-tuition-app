@@ -69,32 +69,44 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
        || accessibleClasses[0]?.code 
        || 'CLASS_10');
 
-  // Helper to determine the current week of the month (1 to 5)
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const defaultYearMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+
+  // Helper to compute all Saturdays that actually exist in a given month (year, month: 0-indexed)
+  const getSaturdaysInMonth = (year, month) => {
+    const saturdays = [];
+    const d = new Date(year, month, 1);
+    while (d.getMonth() === month) {
+      if (d.getDay() === 6) {
+        saturdays.push({
+          weekNum: saturdays.length + 1,
+          date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+        });
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return saturdays;
+  };
+
+  // Helper to determine the current week number of the month (1 to 4 or 5)
   const getCurrentWeekOfMonth = (d = new Date()) => {
-    const day = d.getDate();
-    if (day <= 7) return 1;
-    if (day <= 14) return 2;
-    if (day <= 21) return 3;
-    if (day <= 28) return 4;
-    return 5;
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const sats = getSaturdaysInMonth(year, month);
+    const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const nextSat = sats.find(s => s.date >= todayStr) || sats[sats.length - 1];
+    return nextSat ? nextSat.weekNum : 1;
   };
 
   // Helper to compute Saturday for any specific week number of the current month
   const getSaturdayForWeek = (weekNumber, referenceDate = new Date()) => {
     const year = referenceDate.getFullYear();
     const month = referenceDate.getMonth();
-    const saturdays = [];
-    const d = new Date(year, month, 1);
-    while (d.getMonth() === month) {
-      if (d.getDay() === 6) {
-        saturdays.push(new Date(d));
-      }
-      d.setDate(d.getDate() + 1);
-    }
+    const saturdays = getSaturdaysInMonth(year, month);
     const idx = Math.min(Math.max(1, Number(weekNumber) || 1) - 1, saturdays.length - 1);
-    const sat = saturdays[idx] || new Date();
-    const pad = n => String(n).padStart(2, '0');
-    return `${sat.getFullYear()}-${pad(sat.getMonth() + 1)}-${pad(sat.getDate())}`;
+    const sat = saturdays[idx];
+    return sat ? sat.date : `${year}-${pad(month + 1)}-01`;
   };
 
   // Helper to compute next upcoming Saturday date for the Saturday weekly test template
@@ -109,6 +121,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const initialWeekNum = getCurrentWeekOfMonth();
 
   const [selectedClass, setSelectedClass] = useState(initialClassCode);
+  const [selectedYearMonth, setSelectedYearMonth] = useState(defaultYearMonth);
   const [examTabFilter, setExamTabFilter] = useState('ACTIVE'); // 'ACTIVE' | 'COMPLETED' | 'ALL'
   const [newExamModalOpen, setNewExamModalOpen] = useState(false);
   const [editExamModalOpen, setEditExamModalOpen] = useState(false);
@@ -117,6 +130,24 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const [examErrors, setExamErrors] = useState({});
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
+
+  // Parse selectedYear and selectedMonthIndex from selectedYearMonth (e.g. '2026-11')
+  const [selectedYear, selectedMonthIndex] = useMemo(() => {
+    const parts = (selectedYearMonth || defaultYearMonth).split('-').map(Number);
+    const yr = parts[0] || now.getFullYear();
+    const mo = (parts[1] || (now.getMonth() + 1)) - 1;
+    return [yr, mo];
+  }, [selectedYearMonth, defaultYearMonth]);
+
+  const selectedMonthLabel = useMemo(() => {
+    const d = new Date(selectedYear, selectedMonthIndex, 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, [selectedYear, selectedMonthIndex]);
+
+  // Dynamic calculation: exactly how many Saturdays exist in the selected month
+  const monthSaturdays = useMemo(() => {
+    return getSaturdaysInMonth(selectedYear, selectedMonthIndex);
+  }, [selectedYear, selectedMonthIndex]);
 
   // New and Edit exam state objects for modal dialogs (prevents ReferenceErrors)
   const [newExamData, setNewExamData] = useState({
@@ -154,73 +185,137 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     return allClassExams.filter(e => e.status === 'COMPLETED');
   }, [allClassExams]);
 
-  // Generate the 5 Saturday week slots + Basic Test + Table Test for the currently selected class
-  const classWeekSlots = useMemo(() => {
+  // Generate the Saturday week slots (exact count of Saturdays for this month) + Basic Test + Table Test
+  const { weekSlots, foundationSlots, otherClassExams, classWeekSlots } = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0];
+    const claimedExamIds = new Set();
 
-    const slotDefinitions = [
-      { key: 'WEEK_1', weekNum: 1, type: 'WEEK', defaultTitle: 'Week 1 Saturday Test', date: getSaturdayForWeek(1), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 1', 'week1'] },
-      { key: 'WEEK_2', weekNum: 2, type: 'WEEK', defaultTitle: 'Week 2 Saturday Test', date: getSaturdayForWeek(2), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 2', 'week2'] },
-      { key: 'WEEK_3', weekNum: 3, type: 'WEEK', defaultTitle: 'Week 3 Saturday Test', date: getSaturdayForWeek(3), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 3', 'week3'] },
-      { key: 'WEEK_4', weekNum: 4, type: 'WEEK', defaultTitle: 'Week 4 Saturday Test', date: getSaturdayForWeek(4), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 4', 'week4'] },
-      { key: 'WEEK_5', weekNum: 5, type: 'WEEK', defaultTitle: 'Week 5 Saturday Test', date: getSaturdayForWeek(5), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 5', 'week5'] },
-      { key: 'BASIC_TEST', weekNum: null, type: 'BASIC', defaultTitle: 'Basic Test', date: todayStr, defaultTotal: 25, defaultPass: 9, matchTerms: ['basic test', 'basics test', 'basic'] },
-      { key: 'TABLE_TEST', weekNum: null, type: 'TABLE', defaultTitle: 'Table Test', date: todayStr, defaultTotal: 20, defaultPass: 7, matchTerms: ['table test', 'tables test', 'table', 'tables'] },
-    ];
-
-    return slotDefinitions.map(def => {
-      const slotKey = def.key;
-      const rule = customVirtualRules[`${selectedClass}_${slotKey}`] || {};
-      
-      // Look for an existing exam matching this slot for the selected class:
+    // 1. Weekly Saturday tests for this month (strictly monthSaturdays.length, e.g. 4 for Nov, 5 for Aug)
+    const generatedWeekSlots = monthSaturdays.map(sat => {
+      // Look for an existing exam for this class that belongs to this week
+      // Match by:
+      // (a) Exact date match: e.date === sat.date
+      // OR (b) Week number in title + month matches (e.g. "Week 4" in 2026-11)
       const existingExam = allClassExams.find(e => {
-        const titleLower = e.title?.toLowerCase() || '';
-        const matchesTerm = def.matchTerms.some(term => titleLower.includes(term));
-        const matchesDate = def.type === 'WEEK' && e.date === def.date;
-        return matchesTerm || matchesDate;
+        if (claimedExamIds.has(e.id)) return false;
+        if (e.date === sat.date) return true;
+        const titleLower = (e.title || '').toLowerCase();
+        const matchesWeekName = titleLower.includes(`week ${sat.weekNum}`) || titleLower.includes(`week${sat.weekNum}`);
+        const matchesThisMonth = e.date && e.date.startsWith(selectedYearMonth);
+        return matchesWeekName && matchesThisMonth;
       });
 
       if (existingExam) {
+        claimedExamIds.add(existingExam.id);
+        // Also claim any duplicate exams in the database for this same week or date so they don't leak into otherClassExams
+        allClassExams.forEach(e => {
+          if (e.date === sat.date) claimedExamIds.add(e.id);
+          const tLower = (e.title || '').toLowerCase();
+          if ((tLower.includes(`week ${sat.weekNum}`) || tLower.includes(`week${sat.weekNum}`)) && e.date?.startsWith(selectedYearMonth)) {
+            claimedExamIds.add(e.id);
+          }
+        });
+
         return {
           id: existingExam.id,
-          slotKey,
+          slotKey: `WEEK_${sat.weekNum}`,
           isVirtual: false,
-          weekNum: def.weekNum,
+          weekNum: sat.weekNum,
+          type: 'WEEK',
+          title: existingExam.title,
+          classCode: selectedClass,
+          subject: existingExam.subject || 'Multi-Subject',
+          totalMarks: existingExam.totalMarks || 50,
+          passingMarks: existingExam.passingMarks || 18,
+          date: existingExam.date || sat.date,
+          status: existingExam.status || 'ACTIVE',
+          existingExam
+        };
+      }
+
+      const rule = customVirtualRules[`${selectedClass}_${selectedYearMonth}_WEEK_${sat.weekNum}`] || {};
+      return {
+        id: `VIRTUAL_WEEK_${sat.weekNum}`,
+        slotKey: `WEEK_${sat.weekNum}`,
+        isVirtual: true,
+        weekNum: sat.weekNum,
+        type: 'WEEK',
+        title: rule.title || `Week ${sat.weekNum} Saturday Test`,
+        classCode: selectedClass,
+        subject: 'Multi-Subject',
+        totalMarks: rule.totalMarks || 50,
+        passingMarks: rule.passingMarks || 18,
+        date: rule.date || sat.date,
+        status: 'ACTIVE'
+      };
+    });
+
+    // 2. Foundation & Drill Tests (Basic Test & Table Test)
+    const foundationDefs = [
+      { key: 'BASIC_TEST', type: 'BASIC', defaultTitle: 'Basic Test', defaultTotal: 25, defaultPass: 9, matchTerms: ['basic test', 'basics test', 'basic'] },
+      { key: 'TABLE_TEST', type: 'TABLE', defaultTitle: 'Table Test', defaultTotal: 20, defaultPass: 7, matchTerms: ['table test', 'tables test', 'table', 'tables'] }
+    ];
+
+    const generatedFoundationSlots = foundationDefs.map(def => {
+      const existingExam = allClassExams.find(e => {
+        if (claimedExamIds.has(e.id)) return false;
+        const titleLower = (e.title || '').toLowerCase();
+        return def.matchTerms.some(term => titleLower.includes(term));
+      });
+
+      if (existingExam) {
+        claimedExamIds.add(existingExam.id);
+        allClassExams.forEach(e => {
+          const tLower = (e.title || '').toLowerCase();
+          if (def.matchTerms.some(term => tLower.includes(term))) {
+            claimedExamIds.add(e.id);
+          }
+        });
+
+        return {
+          id: existingExam.id,
+          slotKey: def.key,
+          isVirtual: false,
+          weekNum: null,
           type: def.type,
           title: existingExam.title,
           classCode: selectedClass,
           subject: existingExam.subject || (def.type === 'TABLE' ? 'Mathematics' : 'Multi-Subject'),
           totalMarks: existingExam.totalMarks || def.defaultTotal,
           passingMarks: existingExam.passingMarks || def.defaultPass,
-          date: existingExam.date || def.date,
+          date: existingExam.date || todayStr,
           status: existingExam.status || 'ACTIVE',
           existingExam
         };
       }
 
-      // Virtual Slot ready to be graded and auto-created on save
+      const rule = customVirtualRules[`${selectedClass}_${selectedYearMonth}_${def.key}`] || {};
       return {
-        id: `VIRTUAL_${slotKey}`,
-        slotKey,
+        id: `VIRTUAL_${def.key}`,
+        slotKey: def.key,
         isVirtual: true,
-        weekNum: def.weekNum,
+        weekNum: null,
         type: def.type,
         title: rule.title || def.defaultTitle,
         classCode: selectedClass,
         subject: def.type === 'TABLE' ? 'Mathematics' : 'Multi-Subject',
         totalMarks: rule.totalMarks || def.defaultTotal,
         passingMarks: rule.passingMarks || def.defaultPass,
-        date: rule.date || def.date,
+        date: rule.date || todayStr,
         status: 'ACTIVE'
       };
     });
-  }, [allClassExams, selectedClass, customVirtualRules]);
 
-  // Other non-weekly / custom tests for this class (e.g. mock boards, unit revisions)
-  const otherClassExams = useMemo(() => {
-    const standardSlotIds = new Set(classWeekSlots.filter(s => !s.isVirtual).map(s => s.id));
-    return allClassExams.filter(e => !standardSlotIds.has(e.id));
-  }, [allClassExams, classWeekSlots]);
+    // 3. Other non-weekly / custom tests for this class (e.g. mock boards, unit revisions)
+    const generatedOtherExams = allClassExams.filter(e => !claimedExamIds.has(e.id));
+
+    return {
+      weekSlots: generatedWeekSlots,
+      foundationSlots: generatedFoundationSlots,
+      otherClassExams: generatedOtherExams,
+      classWeekSlots: [...generatedWeekSlots, ...generatedFoundationSlots]
+    };
+  }, [allClassExams, selectedClass, monthSaturdays, customVirtualRules, selectedYearMonth]);
 
   // Initial selected test slot: defaults to current week
   const [selectedExamId, setSelectedExamId] = useState(() => {
@@ -238,27 +333,27 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       if (matchedOther) return matchedOther;
     }
 
-    const defaultSlot = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
-    return defaultSlot;
+    const def = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
+    return def;
   }, [classWeekSlots, otherClassExams, selectedExamId, initialWeekNum]);
 
-  // Virtual key for local draft state
-  const virtualKey = `${selectedClass}_${currentExam?.slotKey || (currentExam?.weekNum ? `WEEK_${currentExam.weekNum}` : currentExam?.id || 'DEFAULT')}`;
+  // Virtual key for local draft state: scoped to class, month, and slotKey
+  const virtualKey = `${selectedClass}_${selectedYearMonth}_${currentExam?.slotKey || (currentExam?.weekNum ? `WEEK_${currentExam.weekNum}` : currentExam?.id || 'DEFAULT')}`;
 
-  // Keep selectedExamId valid when switching class
+  // Keep selectedExamId valid when switching class or month
   useEffect(() => {
     if (selectedExamId) {
       const existsInSlots = classWeekSlots.some(s => String(s.id) === String(selectedExamId));
       const existsInOthers = otherClassExams.some(e => String(e.id) === String(selectedExamId));
       if (!existsInSlots && !existsInOthers) {
         const def = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
-        setSelectedExamId(def ? def.id : `VIRTUAL_WEEK_${initialWeekNum}`);
+        setSelectedExamId(def ? def.id : classWeekSlots[0]?.id || `VIRTUAL_WEEK_1`);
       }
     } else {
       const def = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
-      setSelectedExamId(def ? def.id : `VIRTUAL_WEEK_${initialWeekNum}`);
+      setSelectedExamId(def ? def.id : classWeekSlots[0]?.id || `VIRTUAL_WEEK_1`);
     }
-  }, [selectedClass, initialWeekNum]);
+  }, [selectedClass, selectedYearMonth, initialWeekNum, classWeekSlots, otherClassExams]);
 
   // Helper to get normalized subjects available for any class
   const getSubjectsForClass = useCallback((classCode) => {
@@ -347,7 +442,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
   const handleSelectWeek = (weekNumber) => {
     const wn = Number(weekNumber) || 1;
-    const satDate = getSaturdayForWeek(wn);
+    const sat = monthSaturdays.find(s => s.weekNum === wn);
+    const satDate = sat ? sat.date : (monthSaturdays[0]?.date || new Date().toISOString().split('T')[0]);
     const activeSub = (newExamData.subject === '__CUSTOM__' ? newExamData.customSubject : newExamData.subject) || 'Mathematics';
     setNewExamData(prev => ({
       ...prev,
@@ -1347,6 +1443,54 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
             </select>
           </div>
 
+          {/* Month Selector with Prev/Next buttons */}
+          <div className="form-group mb-0" style={{ minWidth: '210px' }}>
+            <div className="flex items-center justify-between mb-1">
+              <label className="form-label mb-0">Month</label>
+              <span className="text-3xs text-amber-300 font-semibold">
+                📅 {monthSaturdays.length} Saturdays
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '6px 9px', height: '36px' }}
+                onClick={() => {
+                  const d = new Date(selectedYear, selectedMonthIndex - 1, 1);
+                  setSelectedYearMonth(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+                }}
+                title="Previous Month"
+              >
+                ◀
+              </button>
+              <input 
+                type="month" 
+                className="form-input font-semibold"
+                style={{ padding: '6px 10px', height: '36px', flex: 1, color: 'white', background: 'rgba(15, 23, 42, 0.6)' }}
+                value={selectedYearMonth}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedYearMonth(e.target.value);
+                  }
+                }}
+                title="Select Month to view and schedule tests"
+              />
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '6px 9px', height: '36px' }}
+                onClick={() => {
+                  const d = new Date(selectedYear, selectedMonthIndex + 1, 1);
+                  setSelectedYearMonth(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+                }}
+                title="Next Month"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+
           <div className="form-group mb-0" style={{ minWidth: '320px', flex: 1 }}>
             <label className="form-label">
               Select Test / Exam
@@ -1363,8 +1507,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               value={currentExam?.id || ''}
               onChange={(e) => setSelectedExamId(e.target.value)}
             >
-              <optgroup label="📅 Saturday Weekly Tests (Month Weeks 1 to 5)">
-                {classWeekSlots.filter(s => s.type === 'WEEK').map(slot => (
+              <optgroup label={`📅 Saturday Weekly Tests (${selectedMonthLabel} — ${weekSlots.length} Saturdays)`}>
+                {weekSlots.map(slot => (
                   <option key={slot.id} value={slot.id}>
                     {slot.isVirtual ? '✨ ' : (slot.status === 'COMPLETED' ? '✓ ' : '⚡ ')}
                     {slot.title} ({slot.date}) {slot.isVirtual ? '— [Ready to Grade & Save]' : ''}
@@ -1372,7 +1516,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 ))}
               </optgroup>
               <optgroup label="🎯 Foundation & Drill Tests (Basic & Table Tests)">
-                {classWeekSlots.filter(s => s.type !== 'WEEK').map(slot => (
+                {foundationSlots.map(slot => (
                   <option key={slot.id} value={slot.id}>
                     {slot.isVirtual ? '✨ ' : (slot.status === 'COMPLETED' ? '✓ ' : '⚡ ')}
                     {slot.title} {slot.isVirtual ? '— [Ready to Grade & Save]' : `(${slot.date})`}
@@ -1920,20 +2064,19 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 {/* 1-Tap Week Pills */}
                 <div className="week-pills-cluster flex items-center gap-2 flex-wrap mb-3">
-                  {[1, 2, 3, 4, 5].map((wn) => {
-                    const isSelected = newExamData.week === `WEEK_${wn}`;
-                    const satDate = getSaturdayForWeek(wn);
+                  {monthSaturdays.map((sat) => {
+                    const isSelected = newExamData.week === `WEEK_${sat.weekNum}`;
                     return (
                       <button
-                        key={wn}
+                        key={sat.weekNum}
                         type="button"
                         className={`week-pill-btn ${isSelected ? 'active' : ''}`}
-                        onClick={() => handleSelectWeek(wn)}
-                        title={`Week ${wn} (Saturday: ${satDate})`}
+                        onClick={() => handleSelectWeek(sat.weekNum)}
+                        title={`Week ${sat.weekNum} (Saturday: ${sat.date})`}
                       >
                         <span className="week-pill-badge">{isSelected ? '✓' : '⚡'}</span>
-                        <span className="font-bold">Week {wn}</span>
-                        <span className="week-pill-date">({satDate.split('-').slice(1).join('/')})</span>
+                        <span className="font-bold">Week {sat.weekNum}</span>
+                        <span className="week-pill-date">({sat.date.split('-').slice(1).join('/')})</span>
                       </button>
                     );
                   })}
@@ -2019,11 +2162,11 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                         }
                       }}
                     >
-                      <option value="WEEK_1">📅 Week 1 (1st Saturday Test)</option>
-                      <option value="WEEK_2">📅 Week 2 (2nd Saturday Test)</option>
-                      <option value="WEEK_3">📅 Week 3 (3rd Saturday Test)</option>
-                      <option value="WEEK_4">📅 Week 4 (4th Saturday Test)</option>
-                      <option value="WEEK_5">📅 Week 5 (5th Saturday Test)</option>
+                      {monthSaturdays.map(sat => (
+                        <option key={sat.weekNum} value={`WEEK_${sat.weekNum}`}>
+                          📅 Week {sat.weekNum} ({sat.date})
+                        </option>
+                      ))}
                       <option value="BASIC_TEST">🎯 Basic Test</option>
                       <option value="TABLE_TEST">🔢 Table Test (Multiplication)</option>
                       <option value="CUSTOM">📝 Custom / Unit Test / Mid-Term</option>
