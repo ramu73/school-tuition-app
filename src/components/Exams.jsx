@@ -154,31 +154,45 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     return allClassExams.filter(e => e.status === 'COMPLETED');
   }, [allClassExams]);
 
-  // Generate the 5 Saturday week slots for the currently selected class
+  // Generate the 5 Saturday week slots + Basic Test + Table Test for the currently selected class
   const classWeekSlots = useMemo(() => {
-    return [1, 2, 3, 4, 5].map(wn => {
-      const satDate = getSaturdayForWeek(wn);
-      const defaultTitle = `Week ${wn} Saturday Test`;
-      const rule = customVirtualRules[`${selectedClass}_WEEK_${wn}`] || {};
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const slotDefinitions = [
+      { key: 'WEEK_1', weekNum: 1, type: 'WEEK', defaultTitle: 'Week 1 Saturday Test', date: getSaturdayForWeek(1), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 1', 'week1'] },
+      { key: 'WEEK_2', weekNum: 2, type: 'WEEK', defaultTitle: 'Week 2 Saturday Test', date: getSaturdayForWeek(2), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 2', 'week2'] },
+      { key: 'WEEK_3', weekNum: 3, type: 'WEEK', defaultTitle: 'Week 3 Saturday Test', date: getSaturdayForWeek(3), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 3', 'week3'] },
+      { key: 'WEEK_4', weekNum: 4, type: 'WEEK', defaultTitle: 'Week 4 Saturday Test', date: getSaturdayForWeek(4), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 4', 'week4'] },
+      { key: 'WEEK_5', weekNum: 5, type: 'WEEK', defaultTitle: 'Week 5 Saturday Test', date: getSaturdayForWeek(5), defaultTotal: 50, defaultPass: 18, matchTerms: ['week 5', 'week5'] },
+      { key: 'BASIC_TEST', weekNum: null, type: 'BASIC', defaultTitle: 'Basic Test', date: todayStr, defaultTotal: 25, defaultPass: 9, matchTerms: ['basic test', 'basics test', 'basic'] },
+      { key: 'TABLE_TEST', weekNum: null, type: 'TABLE', defaultTitle: 'Table Test', date: todayStr, defaultTotal: 20, defaultPass: 7, matchTerms: ['table test', 'tables test', 'table', 'tables'] },
+    ];
+
+    return slotDefinitions.map(def => {
+      const slotKey = def.key;
+      const rule = customVirtualRules[`${selectedClass}_${slotKey}`] || {};
       
-      // Look for an existing exam matching this week for the selected class:
-      const existingExam = allClassExams.find(e => 
-        e.title?.toLowerCase().includes(`week ${wn}`) ||
-        e.title?.toLowerCase().includes(`week${wn}`) ||
-        e.date === satDate
-      );
+      // Look for an existing exam matching this slot for the selected class:
+      const existingExam = allClassExams.find(e => {
+        const titleLower = e.title?.toLowerCase() || '';
+        const matchesTerm = def.matchTerms.some(term => titleLower.includes(term));
+        const matchesDate = def.type === 'WEEK' && e.date === def.date;
+        return matchesTerm || matchesDate;
+      });
 
       if (existingExam) {
         return {
           id: existingExam.id,
+          slotKey,
           isVirtual: false,
-          weekNum: wn,
+          weekNum: def.weekNum,
+          type: def.type,
           title: existingExam.title,
           classCode: selectedClass,
-          subject: existingExam.subject || 'Multi-Subject',
-          totalMarks: existingExam.totalMarks || 50,
-          passingMarks: existingExam.passingMarks || 18,
-          date: existingExam.date || satDate,
+          subject: existingExam.subject || (def.type === 'TABLE' ? 'Mathematics' : 'Multi-Subject'),
+          totalMarks: existingExam.totalMarks || def.defaultTotal,
+          passingMarks: existingExam.passingMarks || def.defaultPass,
+          date: existingExam.date || def.date,
           status: existingExam.status || 'ACTIVE',
           existingExam
         };
@@ -186,15 +200,17 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
       // Virtual Slot ready to be graded and auto-created on save
       return {
-        id: `VIRTUAL_WEEK_${wn}`,
+        id: `VIRTUAL_${slotKey}`,
+        slotKey,
         isVirtual: true,
-        weekNum: wn,
-        title: rule.title || defaultTitle,
+        weekNum: def.weekNum,
+        type: def.type,
+        title: rule.title || def.defaultTitle,
         classCode: selectedClass,
-        subject: 'Multi-Subject',
-        totalMarks: rule.totalMarks || 50,
-        passingMarks: rule.passingMarks || 18,
-        date: satDate,
+        subject: def.type === 'TABLE' ? 'Mathematics' : 'Multi-Subject',
+        totalMarks: rule.totalMarks || def.defaultTotal,
+        passingMarks: rule.passingMarks || def.defaultPass,
+        date: rule.date || def.date,
         status: 'ACTIVE'
       };
     });
@@ -202,8 +218,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
   // Other non-weekly / custom tests for this class (e.g. mock boards, unit revisions)
   const otherClassExams = useMemo(() => {
-    const weekExamIds = new Set(classWeekSlots.filter(s => !s.isVirtual).map(s => s.id));
-    return allClassExams.filter(e => !weekExamIds.has(e.id));
+    const standardSlotIds = new Set(classWeekSlots.filter(s => !s.isVirtual).map(s => s.id));
+    return allClassExams.filter(e => !standardSlotIds.has(e.id));
   }, [allClassExams, classWeekSlots]);
 
   // Initial selected test slot: defaults to current week
@@ -227,7 +243,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   }, [classWeekSlots, otherClassExams, selectedExamId, initialWeekNum]);
 
   // Virtual key for local draft state
-  const virtualKey = `${selectedClass}_WEEK_${currentExam?.weekNum || 1}`;
+  const virtualKey = `${selectedClass}_${currentExam?.slotKey || (currentExam?.weekNum ? `WEEK_${currentExam.weekNum}` : currentExam?.id || 'DEFAULT')}`;
 
   // Keep selectedExamId valid when switching class
   useEffect(() => {
@@ -486,6 +502,26 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         subject: chosenSubject,
         totalMarks: 25,
         passingMarks: 9,
+        date: new Date().toISOString().split('T')[0]
+      }));
+    } else if (templateType === 'BASIC') {
+      setNewExamData(prev => ({
+        ...prev,
+        week: 'BASIC_TEST',
+        title: 'Basic Test',
+        subject: chosenSubject,
+        totalMarks: 25,
+        passingMarks: 9,
+        date: new Date().toISOString().split('T')[0]
+      }));
+    } else if (templateType === 'TABLE') {
+      setNewExamData(prev => ({
+        ...prev,
+        week: 'TABLE_TEST',
+        title: 'Table Test',
+        subject: 'Mathematics',
+        totalMarks: 20,
+        passingMarks: 7,
         date: new Date().toISOString().split('T')[0]
       }));
     } else if (templateType === 'MONTHLY') {
@@ -822,13 +858,23 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
     if (currentExam.isVirtual) {
       const newExamId = generateNextId(exams);
+      const defaultTitle = currentExam.slotKey === 'BASIC_TEST'
+        ? 'Basic Test'
+        : currentExam.slotKey === 'TABLE_TEST'
+          ? 'Table Test'
+          : `Week ${currentExam.weekNum || 1} Saturday Test`;
+
+      const defaultSubject = currentExam.slotKey === 'TABLE_TEST'
+        ? 'Mathematics'
+        : (currentExam.subject || 'Multi-Subject');
+
       const newExam = {
         id: newExamId,
-        title: currentExam.title || `Week ${currentExam.weekNum} Saturday Test`,
+        title: currentExam.title || defaultTitle,
         classCode: selectedClass,
-        subject: 'Multi-Subject',
-        totalMarks: currentExam.totalMarks || 50,
-        passingMarks: currentExam.passingMarks || 18,
+        subject: defaultSubject,
+        totalMarks: currentExam.totalMarks || (currentExam.slotKey === 'TABLE_TEST' ? 20 : currentExam.slotKey === 'BASIC_TEST' ? 25 : 50),
+        passingMarks: currentExam.passingMarks || (currentExam.slotKey === 'TABLE_TEST' ? 7 : currentExam.slotKey === 'BASIC_TEST' ? 9 : 18),
         date: currentExam.date,
         status: 'ACTIVE'
       };
@@ -841,7 +887,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         const vRec = classWeekData[s.id];
         const val = vRec?.marksObtained ?? '';
         const isAbsent = Boolean(vRec?.isAbsent || val === 'AB');
-        const subject = vRec?.subject || availableClassSubjects[0] || 'Mathematics';
+        const subject = vRec?.subject || (currentExam.slotKey === 'TABLE_TEST' ? 'Mathematics' : (availableClassSubjects[0] || 'Mathematics'));
         const remarks = isAbsent
           ? 'Absent'
           : (val !== '' && val !== null && Number(val) >= newExam.passingMarks)
@@ -1318,10 +1364,18 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               onChange={(e) => setSelectedExamId(e.target.value)}
             >
               <optgroup label="📅 Saturday Weekly Tests (Month Weeks 1 to 5)">
-                {classWeekSlots.map(slot => (
+                {classWeekSlots.filter(s => s.type === 'WEEK').map(slot => (
                   <option key={slot.id} value={slot.id}>
                     {slot.isVirtual ? '✨ ' : (slot.status === 'COMPLETED' ? '✓ ' : '⚡ ')}
                     {slot.title} ({slot.date}) {slot.isVirtual ? '— [Ready to Grade & Save]' : ''}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="🎯 Foundation & Drill Tests (Basic & Table Tests)">
+                {classWeekSlots.filter(s => s.type !== 'WEEK').map(slot => (
+                  <option key={slot.id} value={slot.id}>
+                    {slot.isVirtual ? '✨ ' : (slot.status === 'COMPLETED' ? '✓ ' : '⚡ ')}
+                    {slot.title} {slot.isVirtual ? '— [Ready to Grade & Save]' : `(${slot.date})`}
                   </option>
                 ))}
               </optgroup>
@@ -1342,7 +1396,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
             <div className="exam-meta-pill-box">
               <div className="exam-meta-tag" title="Each student can have their own independent subject in the table below">
                 <BookOpen size={14} className="text-sky-400" />
-                <span>Multi-Subject / Per Student</span>
+                <span>{currentExam.slotKey === 'TABLE_TEST' ? 'Mathematics (Tables)' : 'Multi-Subject / Per Student'}</span>
               </div>
 
               {/* Max & Pass Marks Preset Selector */}
@@ -1885,6 +1939,41 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   })}
                   <button
                     type="button"
+                    className={`week-pill-btn ${newExamData.week === 'BASIC_TEST' ? 'active' : ''}`}
+                    onClick={() => {
+                      setNewExamData(prev => ({
+                        ...prev,
+                        week: 'BASIC_TEST',
+                        title: 'Basic Test',
+                        totalMarks: 25,
+                        passingMarks: 9,
+                        date: new Date().toISOString().split('T')[0]
+                      }));
+                    }}
+                    title="Basic Foundation / Arithmetic Test"
+                  >
+                    <span>🎯 Basic Test</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`week-pill-btn ${newExamData.week === 'TABLE_TEST' ? 'active' : ''}`}
+                    onClick={() => {
+                      setNewExamData(prev => ({
+                        ...prev,
+                        week: 'TABLE_TEST',
+                        title: 'Table Test',
+                        subject: 'Mathematics',
+                        totalMarks: 20,
+                        passingMarks: 7,
+                        date: new Date().toISOString().split('T')[0]
+                      }));
+                    }}
+                    title="Tables 1–20 Mathematics Drill Test"
+                  >
+                    <span>🔢 Table Test</span>
+                  </button>
+                  <button
+                    type="button"
                     className={`week-pill-btn ${newExamData.week === 'CUSTOM' ? 'active' : ''}`}
                     onClick={() => {
                       setNewExamData(prev => ({ ...prev, week: 'CUSTOM' }));
@@ -1903,10 +1992,30 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                       className="form-select"
                       value={newExamData.week || 'WEEK_1'}
                       onChange={(e) => {
-                        if (e.target.value === 'CUSTOM') {
+                        const val = e.target.value;
+                        if (val === 'CUSTOM') {
                           setNewExamData(prev => ({ ...prev, week: 'CUSTOM' }));
+                        } else if (val === 'BASIC_TEST') {
+                          setNewExamData(prev => ({
+                            ...prev,
+                            week: 'BASIC_TEST',
+                            title: 'Basic Test',
+                            totalMarks: 25,
+                            passingMarks: 9,
+                            date: new Date().toISOString().split('T')[0]
+                          }));
+                        } else if (val === 'TABLE_TEST') {
+                          setNewExamData(prev => ({
+                            ...prev,
+                            week: 'TABLE_TEST',
+                            title: 'Table Test',
+                            subject: 'Mathematics',
+                            totalMarks: 20,
+                            passingMarks: 7,
+                            date: new Date().toISOString().split('T')[0]
+                          }));
                         } else {
-                          handleSelectWeek(e.target.value.replace('WEEK_', ''));
+                          handleSelectWeek(val.replace('WEEK_', ''));
                         }
                       }}
                     >
@@ -1915,6 +2024,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                       <option value="WEEK_3">📅 Week 3 (3rd Saturday Test)</option>
                       <option value="WEEK_4">📅 Week 4 (4th Saturday Test)</option>
                       <option value="WEEK_5">📅 Week 5 (5th Saturday Test)</option>
+                      <option value="BASIC_TEST">🎯 Basic Test</option>
+                      <option value="TABLE_TEST">🔢 Table Test (Multiplication)</option>
                       <option value="CUSTOM">📝 Custom / Unit Test / Mid-Term</option>
                     </select>
                   </div>
