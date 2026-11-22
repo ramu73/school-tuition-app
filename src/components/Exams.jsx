@@ -18,7 +18,10 @@ import {
   Download,
   Copy,
   Share2,
-  CheckCircle
+  CheckCircle,
+  Users,
+  Calendar,
+  Layers
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { logger } from '../lib/logger';
@@ -66,6 +69,34 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
        || accessibleClasses[0]?.code 
        || 'CLASS_10');
 
+  // Helper to determine the current week of the month (1 to 5)
+  const getCurrentWeekOfMonth = (d = new Date()) => {
+    const day = d.getDate();
+    if (day <= 7) return 1;
+    if (day <= 14) return 2;
+    if (day <= 21) return 3;
+    if (day <= 28) return 4;
+    return 5;
+  };
+
+  // Helper to compute Saturday for any specific week number of the current month
+  const getSaturdayForWeek = (weekNumber, referenceDate = new Date()) => {
+    const year = referenceDate.getFullYear();
+    const month = referenceDate.getMonth();
+    const saturdays = [];
+    const d = new Date(year, month, 1);
+    while (d.getMonth() === month) {
+      if (d.getDay() === 6) {
+        saturdays.push(new Date(d));
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    const idx = Math.min(Math.max(1, Number(weekNumber) || 1) - 1, saturdays.length - 1);
+    const sat = saturdays[idx] || new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${sat.getFullYear()}-${pad(sat.getMonth() + 1)}-${pad(sat.getDate())}`;
+  };
+
   // Helper to compute next upcoming Saturday date for the Saturday weekly test template
   const getNextSaturdayDate = () => {
     const d = new Date();
@@ -74,6 +105,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     d.setDate(d.getDate() + diff);
     return d.toISOString().split('T')[0];
   };
+
+  const initialWeekNum = getCurrentWeekOfMonth();
 
   const [selectedClass, setSelectedClass] = useState(initialClassCode);
   const [examTabFilter, setExamTabFilter] = useState('ACTIVE'); // 'ACTIVE' | 'COMPLETED' | 'ALL'
@@ -115,14 +148,18 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     return firstExamForClass ? firstExamForClass.id : '';
   });
 
-  // New Exam Form
+  // New Exam Form (Defaults to current week and creates for All Classes by default)
   const [newExamData, setNewExamData] = useState({
-    title: '',
+    week: `WEEK_${initialWeekNum}`,
+    title: `Week ${initialWeekNum} Test - Mathematics`,
     classCode: initialClassCode,
+    targetMode: 'ALL_CLASSES', // 'ALL_CLASSES' | 'SINGLE_CLASS'
+    selectedClasses: accessibleClasses.map(c => c.code),
     subject: 'Mathematics',
+    customSubject: '',
     totalMarks: 50,
     passingMarks: 18,
-    date: getNextSaturdayDate()
+    date: getSaturdayForWeek(initialWeekNum)
   });
 
   // Edit Exam Form
@@ -237,6 +274,58 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     };
   }, [currentExam, examStudents, marks]);
 
+  const handleSelectWeek = (weekNumber) => {
+    const wn = Number(weekNumber) || 1;
+    const satDate = getSaturdayForWeek(wn);
+    const activeSub = (newExamData.subject === '__CUSTOM__' ? newExamData.customSubject : newExamData.subject) || 'Mathematics';
+    setNewExamData(prev => ({
+      ...prev,
+      week: `WEEK_${wn}`,
+      title: `Week ${wn} Test - ${activeSub}`,
+      date: satDate
+    }));
+    if (examErrors.title) setExamErrors(prev => ({ ...prev, title: null }));
+    if (examErrors.date) setExamErrors(prev => ({ ...prev, date: null }));
+  };
+
+  const handleSelectSubject = (newSubject) => {
+    const weekNum = newExamData.week && newExamData.week !== 'CUSTOM'
+      ? newExamData.week.replace('WEEK_', '')
+      : getCurrentWeekOfMonth();
+    const displaySub = newSubject === '__CUSTOM__' ? (newExamData.customSubject || '') : newSubject;
+    setNewExamData(prev => {
+      const isStandardTitle = !prev.title || prev.title.startsWith('Week ') || prev.title.includes('Test -');
+      return {
+        ...prev,
+        subject: newSubject,
+        title: isStandardTitle && displaySub ? `Week ${weekNum} Test - ${displaySub}` : prev.title
+      };
+    });
+    if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
+  };
+
+  const handleOpenCreateModal = (forcedClassCode = null) => {
+    const targetCls = forcedClassCode || selectedClass || accessibleClasses[0]?.code || 'CLASS_10';
+    const weekNum = getCurrentWeekOfMonth();
+    const subs = getSubjectsForClass(targetCls);
+    const chosenSub = subs.includes('Mathematics') ? 'Mathematics' : (subs[0] || 'Mathematics');
+
+    setNewExamData({
+      week: `WEEK_${weekNum}`,
+      title: `Week ${weekNum} Test - ${chosenSub}`,
+      classCode: targetCls,
+      targetMode: forcedClassCode ? 'SINGLE_CLASS' : 'ALL_CLASSES',
+      selectedClasses: accessibleClasses.map(c => c.code),
+      subject: chosenSub,
+      customSubject: '',
+      totalMarks: 50,
+      passingMarks: 18,
+      date: getSaturdayForWeek(weekNum)
+    });
+    setExamErrors({});
+    setNewExamModalOpen(true);
+  };
+
   const handleCreateExam = (e) => {
     e.preventDefault();
     const errors = {};
@@ -244,7 +333,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     if (!newExamData.title || newExamData.title.trim().length < 3) {
       errors.title = 'Test title must be at least 3 characters.';
     }
-    if (!newExamData.subject || newExamData.subject.trim().length < 2) {
+    const finalSubject = (newExamData.subject === '__CUSTOM__' ? newExamData.customSubject : newExamData.subject) || '';
+    if (!finalSubject || finalSubject.trim().length < 2) {
       errors.subject = 'Subject name must be at least 2 characters.';
     }
     const tot = Number(newExamData.totalMarks);
@@ -259,67 +349,84 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       errors.date = 'Please select a valid exam date.';
     }
 
+    const targetClassCodes = newExamData.targetMode === 'SINGLE_CLASS'
+      ? [newExamData.classCode]
+      : (newExamData.selectedClasses && newExamData.selectedClasses.length > 0 ? newExamData.selectedClasses : []);
+
+    if (targetClassCodes.length === 0) {
+      errors.targetClasses = 'Please select at least one standard/class.';
+    }
+
     if (Object.keys(errors).length > 0) {
       setExamErrors(errors);
       logger.warn(logger.CATEGORIES.VALIDATION, 'Exam creation validation failed', { errors, examTitle: newExamData.title });
       return;
     }
 
-    const createdId = generateNextId(exams);
-    const createdExam = {
-      id: createdId,
-      title: newExamData.title.trim(),
-      classCode: newExamData.classCode,
-      subject: newExamData.subject.trim(),
-      totalMarks: tot || 50,
-      passingMarks: pass || 18,
-      date: newExamData.date,
-      status: 'ACTIVE'
-    };
+    let nextId = generateNextId(exams);
+    const createdExams = [];
+
+    for (const code of targetClassCodes) {
+      createdExams.push({
+        id: nextId++,
+        title: newExamData.title.trim(),
+        classCode: code,
+        subject: finalSubject.trim(),
+        totalMarks: tot || 50,
+        passingMarks: pass || 18,
+        date: newExamData.date,
+        status: 'ACTIVE'
+      });
+    }
 
     onSaveData({
       ...data,
-      exams: [createdExam, ...exams]
+      exams: [...createdExams, ...exams]
     });
 
-    logger.action(currentUser, 'CREATE_EXAM', `Scheduled test "${createdExam.title}" for ${createdExam.classCode} (${createdExam.totalMarks} marks)`, {
-      examId: createdId,
-      subject: createdExam.subject,
-      classCode: createdExam.classCode
+    logger.action(currentUser, 'CREATE_EXAM', `Scheduled test "${newExamData.title.trim()}" across ${createdExams.length} classes (${tot} marks)`, {
+      examCount: createdExams.length,
+      subject: finalSubject.trim(),
+      classCodes: targetClassCodes
     });
 
-    setSelectedClass(newExamData.classCode);
+    // Automatically focus on current class or first created exam
+    const primaryExam = createdExams.find(ex => ex.classCode === selectedClass) || createdExams[0];
+    if (primaryExam) {
+      setSelectedClass(primaryExam.classCode);
+      setSelectedExamId(primaryExam.id);
+    }
     setExamTabFilter('ACTIVE'); // Ensure newly created test is visible in Active tab
-    setSelectedExamId(createdId);
     setNewExamModalOpen(false);
     setExamErrors({});
-    setNewExamData({
-      title: '',
-      classCode: newExamData.classCode,
-      subject: 'Mathematics',
-      totalMarks: 50,
-      passingMarks: 18,
-      date: getNextSaturdayDate()
-    });
   };
 
   // 1-Click Template Quick Filler for New Tests
   const handleApplyTemplate = (templateType) => {
     const subjects = getSubjectsForClass(newExamData.classCode);
-    const chosenSubject = newExamData.subject || subjects[0] || 'Mathematics';
+    const chosenSubject = (newExamData.subject === '__CUSTOM__' ? newExamData.customSubject : newExamData.subject) || subjects[0] || 'Mathematics';
+
+    if (templateType.startsWith('WEEK_')) {
+      const wn = Number(templateType.replace('WEEK_', '')) || 1;
+      handleSelectWeek(wn);
+      return;
+    }
 
     if (templateType === 'WEEKLY') {
+      const wn = getCurrentWeekOfMonth();
       setNewExamData(prev => ({
         ...prev,
-        title: `Saturday Weekly Test - ${chosenSubject}`,
+        week: `WEEK_${wn}`,
+        title: `Week ${wn} Test - ${chosenSubject}`,
         subject: chosenSubject,
         totalMarks: 50,
         passingMarks: 18,
-        date: getNextSaturdayDate()
+        date: getSaturdayForWeek(wn)
       }));
     } else if (templateType === 'SLIP') {
       setNewExamData(prev => ({
         ...prev,
+        week: 'CUSTOM',
         title: `Slip Test - ${chosenSubject}`,
         subject: chosenSubject,
         totalMarks: 25,
@@ -329,6 +436,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     } else if (templateType === 'MONTHLY') {
       setNewExamData(prev => ({
         ...prev,
+        week: 'CUSTOM',
         title: `Monthly Assessment - ${chosenSubject}`,
         subject: chosenSubject,
         totalMarks: 100,
@@ -856,14 +964,12 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           <p className="page-subtitle">Weekly slip tests, unit exams, subject customization, and WhatsApp scorecards</p>
         </div>
         <button 
-          className="btn btn-primary" 
-          onClick={() => {
-            setNewExamData(prev => ({ ...prev, classCode: selectedClass }));
-            setNewExamModalOpen(true);
-          }}
+          className="btn btn-primary flex items-center gap-2" 
+          onClick={() => handleOpenCreateModal()}
+          title="Schedule Week 1–5 Test for all classes at once"
         >
-          <Plus size={16} />
-          <span>Create New Test</span>
+          <Sparkles size={16} />
+          <span>Create New Test (Week 1–5 / All Classes)</span>
         </button>
       </div>
 
@@ -1344,10 +1450,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           <button 
             type="button" 
             className="btn btn-primary"
-            onClick={() => {
-              setNewExamData(prev => ({ ...prev, classCode: selectedClass }));
-              setNewExamModalOpen(true);
-            }}
+            onClick={() => handleOpenCreateModal(selectedClass)}
           >
             <Plus size={16} />
             <span>Schedule Test for {classes.find(c => c.code === selectedClass)?.name || selectedClass}</span>
@@ -1355,14 +1458,17 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         </div>
       )}
 
-      {/* Create Exam Modal */}
+      {/* Create Exam Modal - 1-Click Week 1-5 & Multi-Class Scheduling */}
       {newExamModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content" style={{ maxWidth: '640px' }}>
             <div className="modal-header">
               <div>
-                <h2 className="modal-title">Schedule New Test / Exam</h2>
-                <p className="text-3xs text-muted mt-0.5">Use a 1-click template or customize your weekly test parameters</p>
+                <h2 className="modal-title flex items-center gap-2">
+                  <Sparkles size={20} className="text-amber" />
+                  <span>Schedule Test / Exam</span>
+                </h2>
+                <p className="text-3xs text-muted mt-0.5">Quickly schedule Saturday slip tests across Week 1–5 for all classes at once</p>
               </div>
               <button className="close-btn" onClick={() => setNewExamModalOpen(false)}>
                 <X size={20} />
@@ -1383,50 +1489,275 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   alignItems: 'center',
                   gap: '8px'
                 }}>
-                  ⚠️ Please fix the highlighted fields to create this test.
+                  ⚠️ Please resolve the highlighted fields to schedule this test.
                 </div>
               )}
 
-              {/* 1-Click Quick Exam Templates Bar */}
-              <div className="exam-templates-section mb-3" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 'var(--radius-md)', padding: '10px 12px' }}>
-                <label className="form-label mb-1.5 flex items-center gap-1.5 text-xs text-amber-300 font-bold">
-                  <Sparkles size={13} className="text-amber" />
-                  <span>1-Click Quick Templates (Auto-fills marks, date & title):</span>
-                </label>
-                <div className="template-pills-row flex items-center gap-2 flex-wrap">
+              {/* 1. Fast Week 1 - Week 5 Selector Banner */}
+              <div className="exam-week-banner mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="form-label mb-0 flex items-center gap-1.5 text-xs text-amber-300 font-bold">
+                    <Calendar size={13} className="text-amber" />
+                    <span>Select Week (Saturday Weekly Slip Tests):</span>
+                  </label>
+                  <span className="text-3xs text-muted">Auto-fills Saturday date &amp; title</span>
+                </div>
+
+                {/* 1-Tap Week Pills */}
+                <div className="week-pills-cluster flex items-center gap-2 flex-wrap mb-3">
+                  {[1, 2, 3, 4, 5].map((wn) => {
+                    const isSelected = newExamData.week === `WEEK_${wn}`;
+                    const satDate = getSaturdayForWeek(wn);
+                    return (
+                      <button
+                        key={wn}
+                        type="button"
+                        className={`week-pill-btn ${isSelected ? 'active' : ''}`}
+                        onClick={() => handleSelectWeek(wn)}
+                        title={`Week ${wn} (Saturday: ${satDate})`}
+                      >
+                        <span className="week-pill-badge">{isSelected ? '✓' : '⚡'}</span>
+                        <span className="font-bold">Week {wn}</span>
+                        <span className="week-pill-date">({satDate.split('-').slice(1).join('/')})</span>
+                      </button>
+                    );
+                  })}
                   <button
                     type="button"
-                    className="template-pill-btn"
-                    onClick={() => handleApplyTemplate('WEEKLY')}
-                    title="Saturday test (50 Marks, 18 Pass, upcoming Saturday date)"
+                    className={`week-pill-btn ${newExamData.week === 'CUSTOM' ? 'active' : ''}`}
+                    onClick={() => {
+                      setNewExamData(prev => ({ ...prev, week: 'CUSTOM' }));
+                    }}
+                    title="Custom or Unit Test"
                   >
-                    ⚡ Saturday Weekly Test (50 M)
+                    <span>📝 Custom / Unit Test</span>
                   </button>
-                  <button
-                    type="button"
-                    className="template-pill-btn"
-                    onClick={() => handleApplyTemplate('SLIP')}
-                    title="Chapter slip test (25 Marks, 9 Pass, today's date)"
-                  >
-                    ⚡ Unit Slip Test (25 M)
-                  </button>
-                  <button
-                    type="button"
-                    className="template-pill-btn"
-                    onClick={() => handleApplyTemplate('MONTHLY')}
-                    title="Monthly board mock test (100 Marks, 35 Pass, today's date)"
-                  >
-                    ⚡ Monthly Assessment (100 M)
-                  </button>
+                </div>
+
+                {/* Week & Subject Dropdown Grid */}
+                <div className="form-grid-2">
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs">Test Period / Week *</label>
+                    <select
+                      className="form-select"
+                      value={newExamData.week || 'WEEK_1'}
+                      onChange={(e) => {
+                        if (e.target.value === 'CUSTOM') {
+                          setNewExamData(prev => ({ ...prev, week: 'CUSTOM' }));
+                        } else {
+                          handleSelectWeek(e.target.value.replace('WEEK_', ''));
+                        }
+                      }}
+                    >
+                      <option value="WEEK_1">📅 Week 1 (1st Saturday Test)</option>
+                      <option value="WEEK_2">📅 Week 2 (2nd Saturday Test)</option>
+                      <option value="WEEK_3">📅 Week 3 (3rd Saturday Test)</option>
+                      <option value="WEEK_4">📅 Week 4 (4th Saturday Test)</option>
+                      <option value="WEEK_5">📅 Week 5 (5th Saturday Test)</option>
+                      <option value="CUSTOM">📝 Custom / Unit Test / Mid-Term</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs">Subject *</label>
+                    <select
+                      className={`form-select ${examErrors.subject ? 'input-error' : ''}`}
+                      value={['Mathematics', 'Science', 'Social Studies', 'English', 'Telugu', 'Hindi', 'Physics', 'Chemistry', 'Biology', 'Computer'].includes(newExamData.subject) ? newExamData.subject : (newExamData.subject ? '__CUSTOM__' : 'Mathematics')}
+                      onChange={(e) => {
+                        if (e.target.value === '__CUSTOM__') {
+                          setNewExamData(prev => ({ ...prev, subject: '__CUSTOM__' }));
+                        } else {
+                          handleSelectSubject(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="Mathematics">📐 Mathematics</option>
+                      <option value="Science">🔬 Science (General / Physical / Bio)</option>
+                      <option value="Social Studies">🌍 Social Studies</option>
+                      <option value="English">📖 English</option>
+                      <option value="Telugu">🔤 Telugu</option>
+                      <option value="Hindi">🇮🇳 Hindi</option>
+                      <option value="Physics">⚡ Physics</option>
+                      <option value="Chemistry">🧪 Chemistry</option>
+                      <option value="Biology">🌱 Biology</option>
+                      <option value="Computer">💻 Computer Science</option>
+                      <option value="__CUSTOM__">✏️ Type Custom Subject...</option>
+                    </select>
+                    {newExamData.subject === '__CUSTOM__' && (
+                      <input
+                        type="text"
+                        className="form-input mt-2"
+                        placeholder="Type custom subject name (e.g. Sanskrit, EVS)..."
+                        value={newExamData.customSubject}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewExamData(prev => {
+                            const wn = prev.week && prev.week !== 'CUSTOM' ? prev.week.replace('WEEK_', '') : getCurrentWeekOfMonth();
+                            const isStandardTitle = !prev.title || prev.title.startsWith('Week ') || prev.title.includes('Test -');
+                            return {
+                              ...prev,
+                              customSubject: val,
+                              title: isStandardTitle && val ? `Week ${wn} Test - ${val}` : prev.title
+                            };
+                          });
+                          if (examErrors.subject) setExamErrors(p => ({ ...p, subject: null }));
+                        }}
+                        autoFocus
+                      />
+                    )}
+                    {examErrors.subject && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                        {examErrors.subject}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Test Title *</label>
+              {/* 2. Target Classes Section - Batch create for all classes */}
+              <div className="target-classes-section mb-3">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <div>
+                    <label className="form-label mb-0 flex items-center gap-1.5 text-xs text-indigo-300 font-bold">
+                      <Users size={14} className="text-primary-500" />
+                      <span>Target Classes / Standards:</span>
+                    </label>
+                    <span className="text-3xs text-muted">Schedule for all classes simultaneously or select one</span>
+                  </div>
+
+                  {/* Toggle between All Classes and Single Class */}
+                  <div className="class-mode-toggle flex items-center gap-1 bg-surface p-1 rounded-lg border border-subtle">
+                    <button
+                      type="button"
+                      className={`mode-toggle-btn ${newExamData.targetMode === 'ALL_CLASSES' ? 'active' : ''}`}
+                      onClick={() => {
+                        setNewExamData(prev => ({
+                          ...prev,
+                          targetMode: 'ALL_CLASSES',
+                          selectedClasses: accessibleClasses.map(c => c.code)
+                        }));
+                        if (examErrors.targetClasses) setExamErrors(p => ({ ...p, targetClasses: null }));
+                      }}
+                    >
+                      🚀 All Classes ({accessibleClasses.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`mode-toggle-btn ${newExamData.targetMode === 'SINGLE_CLASS' ? 'active' : ''}`}
+                      onClick={() => {
+                        setNewExamData(prev => ({
+                          ...prev,
+                          targetMode: 'SINGLE_CLASS'
+                        }));
+                        if (examErrors.targetClasses) setExamErrors(p => ({ ...p, targetClasses: null }));
+                      }}
+                    >
+                      🎯 Single Class
+                    </button>
+                  </div>
+                </div>
+
+                {newExamData.targetMode === 'SINGLE_CLASS' ? (
+                  <div className="form-group mb-0">
+                    <select
+                      className="form-select"
+                      value={newExamData.classCode}
+                      onChange={(e) => {
+                        setNewExamData(prev => ({ ...prev, classCode: e.target.value }));
+                      }}
+                    >
+                      {accessibleClasses.map(cls => (
+                        <option key={cls.code} value={cls.code}>{cls.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Quick filter helpers */}
+                    <div className="flex items-center gap-2 mb-2 flex-wrap text-3xs">
+                      <span className="text-muted">Quick filters:</span>
+                      <button
+                        type="button"
+                        className="text-amber-300 hover:underline"
+                        onClick={() => setNewExamData(prev => ({ ...prev, selectedClasses: accessibleClasses.map(c => c.code) }))}
+                      >
+                        Select All ({accessibleClasses.length})
+                      </button>
+                      <span className="text-muted">•</span>
+                      <button
+                        type="button"
+                        className="text-amber-300 hover:underline"
+                        onClick={() => {
+                          const highSchool = accessibleClasses.filter(c => ['CLASS_6', 'CLASS_7', 'CLASS_8', 'CLASS_9', 'CLASS_10'].includes(c.code)).map(c => c.code);
+                          setNewExamData(prev => ({ ...prev, selectedClasses: highSchool }));
+                        }}
+                      >
+                        Classes 6 to 10 (High School)
+                      </button>
+                      <span className="text-muted">•</span>
+                      <button
+                        type="button"
+                        className="text-amber-300 hover:underline"
+                        onClick={() => {
+                          const primary = accessibleClasses.filter(c => ['CLASS_1', 'CLASS_2', 'CLASS_3', 'CLASS_4', 'CLASS_5'].includes(c.code)).map(c => c.code);
+                          setNewExamData(prev => ({ ...prev, selectedClasses: primary }));
+                        }}
+                      >
+                        Classes 1 to 5 (Primary)
+                      </button>
+                    </div>
+
+                    {/* Class Chips Grid */}
+                    <div className="class-chips-grid">
+                      {accessibleClasses.map(cls => {
+                        const isChecked = (newExamData.selectedClasses || []).includes(cls.code);
+                        return (
+                          <button
+                            key={cls.code}
+                            type="button"
+                            className={`class-chip-pill ${isChecked ? 'active' : ''}`}
+                            onClick={() => {
+                              const current = newExamData.selectedClasses || [];
+                              const updated = isChecked 
+                                ? current.filter(c => c !== cls.code)
+                                : [...current, cls.code];
+                              setNewExamData(prev => ({ ...prev, selectedClasses: updated }));
+                              if (examErrors.targetClasses) setExamErrors(p => ({ ...p, targetClasses: null }));
+                            }}
+                          >
+                            <span className="chip-indicator">{isChecked ? '✓' : '+'}</span>
+                            <span>{cls.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {examErrors.targetClasses && (
+                      <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '6px', display: 'block' }}>
+                        {examErrors.targetClasses}
+                      </span>
+                    )}
+
+                    <div className="mt-2 text-xs text-indigo-200 flex items-center gap-1.5">
+                      <Sparkles size={12} className="text-amber-300" />
+                      <span>
+                        Creates this test simultaneously for <strong>{(newExamData.selectedClasses || []).length} classes</strong> in 1 click!
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Generated Title & Customization */}
+              <div className="form-group mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label mb-0 text-xs">Test Title *</label>
+                  <span className="text-3xs text-muted">Auto-generated from Week &amp; Subject</span>
+                </div>
                 <input 
                   type="text"
                   className={`form-input ${examErrors.title ? 'input-error' : ''}`}
-                  placeholder="e.g. Saturday Weekly Test - Mathematics"
+                  placeholder="e.g. Week 1 Test - Mathematics"
                   value={newExamData.title}
                   onChange={(e) => {
                     setNewExamData({ ...newExamData, title: e.target.value });
@@ -1440,67 +1771,27 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 )}
               </div>
 
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label className="form-label">Standard (Class 1 to 10) *</label>
-                  <select 
-                    className="form-select"
-                    value={newExamData.classCode}
-                    onChange={(e) => {
-                      const newCls = e.target.value;
-                      const subs = getSubjectsForClass(newCls);
-                      setNewExamData(prev => ({ 
-                        ...prev, 
-                        classCode: newCls,
-                        subject: subs.includes(prev.subject) ? prev.subject : (subs[0] || 'Mathematics')
-                      }));
-                    }}
-                  >
-                    {classes.map(cls => (
-                      <option key={cls.code} value={cls.code}>{cls.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Default Subject *</label>
-                  <select 
-                    className={`form-select ${examErrors.subject ? 'input-error' : ''}`}
-                    value={getSubjectsForClass(newExamData.classCode).includes(newExamData.subject) ? newExamData.subject : (newExamData.subject ? '__CUSTOM__' : '')}
-                    onChange={(e) => {
-                      if (e.target.value === '__CUSTOM__') {
-                        const custom = window.prompt('Enter custom subject name for this test:', newExamData.subject && !getSubjectsForClass(newExamData.classCode).includes(newExamData.subject) ? newExamData.subject : '');
-                        if (custom && custom.trim()) {
-                          setNewExamData({ ...newExamData, subject: custom.trim() });
-                          if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
-                        }
-                      } else {
-                        setNewExamData({ ...newExamData, subject: e.target.value });
-                        if (examErrors.subject) setExamErrors(prev => ({ ...prev, subject: null }));
-                      }
-                    }}
-                  >
-                    <option value="">-- Select Subject --</option>
-                    {getSubjectsForClass(newExamData.classCode).map((sub, idx) => (
-                      <option key={idx} value={sub}>{sub}</option>
-                    ))}
-                    {!getSubjectsForClass(newExamData.classCode).includes(newExamData.subject) && newExamData.subject && (
-                      <option value={newExamData.subject}>{newExamData.subject} (Custom)</option>
-                    )}
-                    <option value="__CUSTOM__">✏️ Other / Custom Subject...</option>
-                  </select>
-                  {examErrors.subject && (
-                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                      {examErrors.subject}
-                    </span>
-                  )}
-                  <span className="text-3xs text-muted mt-1">Note: Individual students can also have different subjects in the marks table.</span>
-                </div>
-              </div>
-
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label className="form-label">Total Maximum Marks</label>
+              {/* 4. Marks & Date Grid */}
+              <div className="form-grid-3 mb-3">
+                <div className="form-group mb-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="form-label mb-0 text-xs">Total Marks *</label>
+                    <div className="flex items-center gap-1">
+                      {[25, 50, 100].map(m => (
+                        <button
+                          key={m}
+                          type="button"
+                          className={`marks-preset-btn ${Number(newExamData.totalMarks) === m ? 'active' : ''}`}
+                          onClick={() => {
+                            const pass = m === 25 ? 9 : (m === 50 ? 18 : 35);
+                            setNewExamData(prev => ({ ...prev, totalMarks: m, passingMarks: pass }));
+                          }}
+                        >
+                          {m}M
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input 
                     type="number"
                     className={`form-input ${examErrors.totalMarks ? 'input-error' : ''}`}
@@ -1517,8 +1808,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   )}
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Passing Marks</label>
+                <div className="form-group mb-0">
+                  <label className="form-label text-xs">Passing Marks *</label>
                   <input 
                     type="number"
                     className={`form-input ${examErrors.passingMarks ? 'input-error' : ''}`}
@@ -1534,32 +1825,42 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                     </span>
                   )}
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label className="form-label">Exam Date *</label>
-                <input 
-                  type="date"
-                  className={`form-input ${examErrors.date ? 'input-error' : ''}`}
-                  value={newExamData.date}
-                  onChange={(e) => {
-                    setNewExamData({ ...newExamData, date: e.target.value });
-                    if (examErrors.date) setExamErrors(prev => ({ ...prev, date: null }));
-                  }}
-                />
-                {examErrors.date && (
-                  <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
-                    {examErrors.date}
-                  </span>
-                )}
+                <div className="form-group mb-0">
+                  <label className="form-label text-xs">Test Date (Saturday) *</label>
+                  <input 
+                    type="date"
+                    className={`form-input ${examErrors.date ? 'input-error' : ''}`}
+                    value={newExamData.date}
+                    onChange={(e) => {
+                      setNewExamData({ ...newExamData, date: e.target.value });
+                      if (examErrors.date) setExamErrors(prev => ({ ...prev, date: null }));
+                    }}
+                  />
+                  {examErrors.date && (
+                    <span className="field-error-text" style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                      {examErrors.date}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="modal-actions-flex">
                 <button type="button" className="btn btn-secondary" onClick={() => { setNewExamModalOpen(false); setExamErrors({}); }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  Create Test
+                <button type="submit" className="btn btn-primary" style={{ minWidth: '220px' }}>
+                  {newExamData.targetMode === 'SINGLE_CLASS' ? (
+                    <>
+                      <Plus size={16} />
+                      <span>Create Test ({classes.find(c => c.code === newExamData.classCode)?.name || 'Class'})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      <span>Create Test for {(newExamData.selectedClasses || []).length} Classes 🚀</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -2157,6 +2458,140 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           background: rgba(245, 158, 11, 0.2);
           border-color: #F59E0B;
           transform: translateY(-1px);
+        }
+
+        /* Week 1–5 Quick Selector & Multi-Class Scheduling Styles */
+        .exam-week-banner {
+          background: rgba(245, 158, 11, 0.08);
+          border: 1px solid rgba(245, 158, 11, 0.25);
+          border-radius: var(--radius-md);
+          padding: 12px;
+        }
+        .week-pills-cluster {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          flex-wrap: wrap;
+        }
+        .week-pill-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 11px;
+          border-radius: 7px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: var(--text-secondary);
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .week-pill-btn:hover {
+          background: rgba(245, 158, 11, 0.15);
+          border-color: rgba(245, 158, 11, 0.4);
+          color: #FCD34D;
+          transform: translateY(-1px);
+        }
+        .week-pill-btn.active {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.28) 0%, rgba(217, 119, 6, 0.22) 100%);
+          border-color: #F59E0B;
+          color: #FCD34D;
+          box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+        }
+        .week-pill-badge {
+          font-size: 0.75rem;
+        }
+        .week-pill-date {
+          font-size: 0.7rem;
+          opacity: 0.8;
+        }
+
+        /* Target Classes Multi-Selection */
+        .target-classes-section {
+          background: rgba(99, 102, 241, 0.08);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          border-radius: var(--radius-md);
+          padding: 12px;
+        }
+        .class-mode-toggle {
+          display: inline-flex;
+          gap: 4px;
+        }
+        .mode-toggle-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          padding: 4px 10px;
+          border-radius: 6px;
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .mode-toggle-btn.active {
+          background: var(--primary-600);
+          color: #FFFFFF;
+        }
+        .class-chips-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+          gap: 8px;
+          margin-top: 6px;
+        }
+        .class-chip-pill {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          padding: 7px 8px;
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: var(--text-secondary);
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .class-chip-pill:hover {
+          background: rgba(99, 102, 241, 0.15);
+          border-color: rgba(99, 102, 241, 0.4);
+          color: #EEF2FF;
+        }
+        .class-chip-pill.active {
+          background: rgba(16, 185, 129, 0.18);
+          border-color: rgba(16, 185, 129, 0.5);
+          color: #34D399;
+          font-weight: 700;
+        }
+        .chip-indicator {
+          font-size: 0.75rem;
+        }
+        .marks-preset-btn {
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          color: var(--text-secondary);
+          font-size: 0.7rem;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .marks-preset-btn.active {
+          background: rgba(245, 158, 11, 0.25);
+          border-color: #F59E0B;
+          color: #FCD34D;
+        }
+        .form-grid-3 {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 12px;
+        }
+        @media (max-width: 640px) {
+          .form-grid-3 {
+            grid-template-columns: 1fr;
+          }
         }
 
         .exam-selectors-card {
