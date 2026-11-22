@@ -118,80 +118,131 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
 
-  // Input refs for Excel-like ArrowDown / Enter key navigation
-  const markInputsRef = React.useRef({});
-
-  // All exams for the currently selected class
-  const allClassExams = useMemo(() => {
-    return exams.filter(e => e.classCode === selectedClass);
-  }, [exams, selectedClass]);
-
-  // Active tests (tests needing marks entry or currently ongoing)
-  const activeClassExams = useMemo(() => {
-    return allClassExams.filter(e => (e.status || 'ACTIVE') !== 'COMPLETED');
-  }, [allClassExams]);
-
-  // Completed & Concluded tests (read-only historical archives)
-  const completedClassExams = useMemo(() => {
-    return allClassExams.filter(e => e.status === 'COMPLETED');
-  }, [allClassExams]);
-
-  // Exams matching the active tab filter
-  const classExams = useMemo(() => {
-    if (examTabFilter === 'ACTIVE') return activeClassExams;
-    if (examTabFilter === 'COMPLETED') return completedClassExams;
-    return allClassExams;
-  }, [examTabFilter, activeClassExams, completedClassExams, allClassExams]);
-
-  const [selectedExamId, setSelectedExamId] = useState(() => {
-    const firstExamForClass = classExams[0] || allClassExams[0];
-    return firstExamForClass ? firstExamForClass.id : '';
-  });
-
-  // New Exam Form (Defaults to current week and creates for All Classes by default)
+  // New and Edit exam state objects for modal dialogs (prevents ReferenceErrors)
   const [newExamData, setNewExamData] = useState({
     week: `WEEK_${initialWeekNum}`,
-    title: `Week ${initialWeekNum} Test - Mathematics`,
+    title: `Week ${initialWeekNum} Saturday Test`,
     classCode: initialClassCode,
-    targetMode: 'ALL_CLASSES', // 'ALL_CLASSES' | 'SINGLE_CLASS'
+    targetMode: 'ALL_CLASSES',
     selectedClasses: accessibleClasses.map(c => c.code),
-    subject: 'Mathematics',
+    subject: 'Multi-Subject',
     customSubject: '',
     totalMarks: 50,
     passingMarks: 18,
     date: getSaturdayForWeek(initialWeekNum)
   });
-
-  // Edit Exam Form
   const [editExamData, setEditExamData] = useState(null);
 
-  // Guarantee currentExam belongs to the selected class (never leak across classes!)
-  const currentExam = useMemo(() => {
-    if (classExams.length > 0) {
-      return classExams.find(e => e.id === Number(selectedExamId)) || classExams[0];
-    }
-    if (allClassExams.length > 0) {
-      return allClassExams.find(e => e.id === Number(selectedExamId)) || allClassExams[0];
-    }
-    return null;
-  }, [classExams, allClassExams, selectedExamId]);
+  // In-memory virtual marks buffer: allows entering marks before test is saved to DB
+  const [virtualMarks, setVirtualMarks] = useState({});
+  const [customVirtualRules, setCustomVirtualRules] = useState({});
 
-  // Keep selectedExamId strictly synchronized with the selected class exams and tab filter
-  useEffect(() => {
-    if (classExams.length > 0) {
-      const exists = classExams.some(e => e.id === Number(selectedExamId));
-      if (!exists) {
-        setSelectedExamId(classExams[0].id);
+  // Input refs for Excel-like ArrowDown / Enter key navigation
+  const markInputsRef = React.useRef({});
+
+  // All persisted exams for the currently selected class
+  const allClassExams = useMemo(() => {
+    return exams.filter(e => e.classCode === selectedClass);
+  }, [exams, selectedClass]);
+
+  // Active and completed exams for tab pill counts
+  const activeClassExams = useMemo(() => {
+    return allClassExams.filter(e => e.status !== 'COMPLETED');
+  }, [allClassExams]);
+
+  const completedClassExams = useMemo(() => {
+    return allClassExams.filter(e => e.status === 'COMPLETED');
+  }, [allClassExams]);
+
+  // Generate the 5 Saturday week slots for the currently selected class
+  const classWeekSlots = useMemo(() => {
+    return [1, 2, 3, 4, 5].map(wn => {
+      const satDate = getSaturdayForWeek(wn);
+      const defaultTitle = `Week ${wn} Saturday Test`;
+      const rule = customVirtualRules[`${selectedClass}_WEEK_${wn}`] || {};
+      
+      // Look for an existing exam matching this week for the selected class:
+      const existingExam = allClassExams.find(e => 
+        e.title?.toLowerCase().includes(`week ${wn}`) ||
+        e.title?.toLowerCase().includes(`week${wn}`) ||
+        e.date === satDate
+      );
+
+      if (existingExam) {
+        return {
+          id: existingExam.id,
+          isVirtual: false,
+          weekNum: wn,
+          title: existingExam.title,
+          classCode: selectedClass,
+          subject: existingExam.subject || 'Multi-Subject',
+          totalMarks: existingExam.totalMarks || 50,
+          passingMarks: existingExam.passingMarks || 18,
+          date: existingExam.date || satDate,
+          status: existingExam.status || 'ACTIVE',
+          existingExam
+        };
       }
-    } else if (allClassExams.length > 0) {
-      const existsInAll = allClassExams.some(e => e.id === Number(selectedExamId));
-      if (!existsInAll) {
-        setSelectedExamId(allClassExams[0].id);
+
+      // Virtual Slot ready to be graded and auto-created on save
+      return {
+        id: `VIRTUAL_WEEK_${wn}`,
+        isVirtual: true,
+        weekNum: wn,
+        title: rule.title || defaultTitle,
+        classCode: selectedClass,
+        subject: 'Multi-Subject',
+        totalMarks: rule.totalMarks || 50,
+        passingMarks: rule.passingMarks || 18,
+        date: satDate,
+        status: 'ACTIVE'
+      };
+    });
+  }, [allClassExams, selectedClass, customVirtualRules]);
+
+  // Other non-weekly / custom tests for this class (e.g. mock boards, unit revisions)
+  const otherClassExams = useMemo(() => {
+    const weekExamIds = new Set(classWeekSlots.filter(s => !s.isVirtual).map(s => s.id));
+    return allClassExams.filter(e => !weekExamIds.has(e.id));
+  }, [allClassExams, classWeekSlots]);
+
+  // Initial selected test slot: defaults to current week
+  const [selectedExamId, setSelectedExamId] = useState(() => {
+    const def = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
+    return def ? def.id : `VIRTUAL_WEEK_${initialWeekNum}`;
+  });
+
+  // Current active exam: guarantees a valid test or week slot is ALWAYS selected
+  const currentExam = useMemo(() => {
+    if (selectedExamId) {
+      const matchedSlot = classWeekSlots.find(s => String(s.id) === String(selectedExamId));
+      if (matchedSlot) return matchedSlot;
+
+      const matchedOther = otherClassExams.find(e => String(e.id) === String(selectedExamId));
+      if (matchedOther) return matchedOther;
+    }
+
+    const defaultSlot = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
+    return defaultSlot;
+  }, [classWeekSlots, otherClassExams, selectedExamId, initialWeekNum]);
+
+  // Virtual key for local draft state
+  const virtualKey = `${selectedClass}_WEEK_${currentExam?.weekNum || 1}`;
+
+  // Keep selectedExamId valid when switching class
+  useEffect(() => {
+    if (selectedExamId) {
+      const existsInSlots = classWeekSlots.some(s => String(s.id) === String(selectedExamId));
+      const existsInOthers = otherClassExams.some(e => String(e.id) === String(selectedExamId));
+      if (!existsInSlots && !existsInOthers) {
+        const def = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
+        setSelectedExamId(def ? def.id : `VIRTUAL_WEEK_${initialWeekNum}`);
       }
     } else {
-      setSelectedExamId('');
+      const def = classWeekSlots.find(s => s.weekNum === initialWeekNum) || classWeekSlots[0];
+      setSelectedExamId(def ? def.id : `VIRTUAL_WEEK_${initialWeekNum}`);
     }
-  }, [selectedClass, examTabFilter, exams]);
+  }, [selectedClass, initialWeekNum]);
 
   // Helper to get normalized subjects available for any class
   const getSubjectsForClass = useCallback((classCode) => {
@@ -226,7 +277,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     ? accessibleStudents.filter(s => s.classCode === currentExam.classCode && s.status === 'ACTIVE')
     : [];
 
-  // Summary performance statistics for the current exam
+  // Summary performance statistics for the current exam (supports both persisted & virtual slots)
   const examStats = useMemo(() => {
     if (!currentExam || examStudents.length === 0) return null;
     let graded = 0;
@@ -236,8 +287,12 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     let highestStudent = null;
     let passed = 0;
 
+    const classWeekData = virtualMarks[virtualKey] || {};
+
     examStudents.forEach(s => {
-      const m = marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
+      const m = currentExam.isVirtual
+        ? classWeekData[s.id]
+        : marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
       if (!m) return;
       if (m.isAbsent || m.marksObtained === 'AB') {
         absent++;
@@ -272,7 +327,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       passed,
       passRate
     };
-  }, [currentExam, examStudents, marks]);
+  }, [currentExam, examStudents, marks, virtualMarks, virtualKey]);
 
   const handleSelectWeek = (weekNumber) => {
     const wn = Number(weekNumber) || 1;
@@ -585,9 +640,6 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const handleMarkChange = (studentId, marksObtained) => {
     if (!currentExam) return;
 
-    const existingIndex = marks.findIndex(m => m.examId === currentExam.id && m.studentId === studentId);
-    let updatedMarks = [...marks];
-
     let val = marksObtained;
     const isAbsent = val === 'AB';
 
@@ -604,6 +656,32 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         ? 'Passed'
         : (val !== '' && val !== null) ? 'Needs improvement' : 'Pending';
 
+    if (currentExam.isVirtual) {
+      setVirtualMarks(prev => {
+        const classWeek = prev[virtualKey] || {};
+        const existingStudent = classWeek[studentId] || {
+          subject: availableClassSubjects[0] || 'Mathematics'
+        };
+        return {
+          ...prev,
+          [virtualKey]: {
+            ...classWeek,
+            [studentId]: {
+              ...existingStudent,
+              marksObtained: val,
+              isAbsent,
+              remarks
+            }
+          }
+        };
+      });
+      setSaveStatus('dirty');
+      return;
+    }
+
+    const existingIndex = marks.findIndex(m => m.examId === currentExam.id && m.studentId === studentId);
+    let updatedMarks = [...marks];
+
     if (existingIndex >= 0) {
       updatedMarks[existingIndex] = {
         ...updatedMarks[existingIndex],
@@ -616,7 +694,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         id: generateNextId(updatedMarks),
         examId: currentExam.id,
         studentId,
-        subject: currentExam.subject,
+        subject: currentExam.subject || availableClassSubjects[0] || 'Mathematics',
         marksObtained: val,
         isAbsent,
         remarks
@@ -637,23 +715,26 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   // 1-Click Toggle Absent for a Student
   const handleToggleAbsent = (studentId) => {
     if (!currentExam) return;
-    const existing = marks.find(m => m.examId === currentExam.id && m.studentId === studentId);
-    const currentlyAbsent = existing?.isAbsent || existing?.marksObtained === 'AB';
-
-    if (currentlyAbsent) {
-      // Toggle back to empty / active
-      handleMarkChange(studentId, '');
+    if (currentExam.isVirtual) {
+      const classWeek = virtualMarks[virtualKey] || {};
+      const existing = classWeek[studentId];
+      const currentlyAbsent = existing?.isAbsent || existing?.marksObtained === 'AB';
+      handleMarkChange(studentId, currentlyAbsent ? '' : 'AB');
     } else {
-      // Mark as Absent
-      handleMarkChange(studentId, 'AB');
+      const existing = marks.find(m => m.examId === currentExam.id && m.studentId === studentId);
+      const currentlyAbsent = existing?.isAbsent || existing?.marksObtained === 'AB';
+      handleMarkChange(studentId, currentlyAbsent ? '' : 'AB');
     }
   };
 
   // Mark all remaining ungraded students as Absent
   const handleMarkUnmarkedAbsent = () => {
     if (!currentExam) return;
+    const classWeek = virtualMarks[virtualKey] || {};
     const unmarkedStudents = examStudents.filter(s => {
-      const m = marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
+      const m = currentExam.isVirtual 
+        ? classWeek[s.id] 
+        : marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
       return !m || m.marksObtained === '' || m.marksObtained === null;
     });
 
@@ -663,6 +744,23 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     }
 
     if (!window.confirm(`Mark remaining ${unmarkedStudents.length} ungraded student(s) as Absent for this test?`)) {
+      return;
+    }
+
+    if (currentExam.isVirtual) {
+      setVirtualMarks(prev => {
+        const updated = { ...(prev[virtualKey] || {}) };
+        unmarkedStudents.forEach(s => {
+          updated[s.id] = {
+            ...(updated[s.id] || { subject: availableClassSubjects[0] || 'Mathematics' }),
+            marksObtained: 'AB',
+            isAbsent: true,
+            remarks: 'Absent'
+          };
+        });
+        return { ...prev, [virtualKey]: updated };
+      });
+      setSaveStatus('dirty');
       return;
     }
 
@@ -681,7 +779,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           id: generateNextId(updatedMarks),
           examId: currentExam.id,
           studentId: s.id,
-          subject: currentExam.subject,
+          subject: currentExam.subject || availableClassSubjects[0] || 'Mathematics',
           marksObtained: 'AB',
           isAbsent: true,
           remarks: 'Absent'
@@ -717,12 +815,76 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     }
   };
 
+  // Save All Marks to Cloud (creates the exam on-the-fly if virtual slot!)
   const handleSaveAllMarks = () => {
+    if (!currentExam) return;
     setSaveStatus('saving');
-    onSaveData({
-      ...data,
-      marks: [...marks]
-    });
+
+    if (currentExam.isVirtual) {
+      const newExamId = generateNextId(exams);
+      const newExam = {
+        id: newExamId,
+        title: currentExam.title || `Week ${currentExam.weekNum} Saturday Test`,
+        classCode: selectedClass,
+        subject: 'Multi-Subject',
+        totalMarks: currentExam.totalMarks || 50,
+        passingMarks: currentExam.passingMarks || 18,
+        date: currentExam.date,
+        status: 'ACTIVE'
+      };
+
+      const classWeekData = virtualMarks[virtualKey] || {};
+      const newMarkRecords = [];
+      let nextMarkId = generateNextId(marks);
+
+      examStudents.forEach(s => {
+        const vRec = classWeekData[s.id];
+        const val = vRec?.marksObtained ?? '';
+        const isAbsent = Boolean(vRec?.isAbsent || val === 'AB');
+        const subject = vRec?.subject || availableClassSubjects[0] || 'Mathematics';
+        const remarks = isAbsent
+          ? 'Absent'
+          : (val !== '' && val !== null && Number(val) >= newExam.passingMarks)
+            ? 'Passed'
+            : (val !== '' && val !== null) ? 'Needs improvement' : 'Pending';
+
+        newMarkRecords.push({
+          id: nextMarkId++,
+          examId: newExamId,
+          studentId: s.id,
+          subject: subject,
+          marksObtained: isAbsent ? 'AB' : val,
+          isAbsent: isAbsent,
+          remarks: remarks
+        });
+      });
+
+      onSaveData({
+        ...data,
+        exams: [newExam, ...exams],
+        marks: [...marks, ...newMarkRecords]
+      });
+
+      setVirtualMarks(prev => {
+        const next = { ...prev };
+        delete next[virtualKey];
+        return next;
+      });
+
+      setSelectedExamId(newExamId);
+      logger.action(
+        currentUser,
+        'CREATE_AND_SAVE_EXAM',
+        `Created test "${newExam.title}" for ${selectedClass} and saved ${newMarkRecords.length} marks directly from dropdown`,
+        { examId: newExamId, classCode: selectedClass }
+      );
+    } else {
+      onSaveData({
+        ...data,
+        marks: [...marks]
+      });
+    }
+
     setTimeout(() => {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 2500);
@@ -732,6 +894,29 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   // Update student-specific subject for this exam (independent per student!)
   const handleSubjectChange = (studentId, newSubject) => {
     if (!currentExam || !newSubject) return;
+
+    if (currentExam.isVirtual) {
+      setVirtualMarks(prev => {
+        const classWeek = prev[virtualKey] || {};
+        const existingStudent = classWeek[studentId] || {
+          marksObtained: '',
+          isAbsent: false,
+          remarks: 'Pending'
+        };
+        return {
+          ...prev,
+          [virtualKey]: {
+            ...classWeek,
+            [studentId]: {
+              ...existingStudent,
+              subject: newSubject.trim()
+            }
+          }
+        };
+      });
+      setSaveStatus('dirty');
+      return;
+    }
 
     const existingIndex = marks.findIndex(m => m.examId === currentExam.id && m.studentId === studentId);
     let updatedMarks = [...marks];
@@ -756,6 +941,77 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       ...data,
       marks: updatedMarks
     });
+  };
+
+  // Batch helper: Set all students in this class to one subject in 1 click
+  const handleSetAllStudentsSubject = (newSubject) => {
+    if (!currentExam || !newSubject) return;
+
+    if (currentExam.isVirtual) {
+      setVirtualMarks(prev => {
+        const classWeek = { ...(prev[virtualKey] || {}) };
+        examStudents.forEach(s => {
+          classWeek[s.id] = {
+            ...(classWeek[s.id] || { marksObtained: '', isAbsent: false, remarks: 'Pending' }),
+            subject: newSubject.trim()
+          };
+        });
+        return {
+          ...prev,
+          [virtualKey]: classWeek
+        };
+      });
+      setSaveStatus('dirty');
+      return;
+    }
+
+    let updatedMarks = [...marks];
+    examStudents.forEach(s => {
+      const idx = updatedMarks.findIndex(m => m.examId === currentExam.id && m.studentId === s.id);
+      if (idx >= 0) {
+        updatedMarks[idx] = { ...updatedMarks[idx], subject: newSubject.trim() };
+      } else {
+        updatedMarks.push({
+          id: generateNextId(updatedMarks),
+          examId: currentExam.id,
+          studentId: s.id,
+          subject: newSubject.trim(),
+          marksObtained: '',
+          remarks: 'Pending'
+        });
+      }
+    });
+
+    onSaveData({
+      ...data,
+      marks: updatedMarks
+    });
+  };
+
+  // Change Max and Pass marks for current exam directly from pill dropdown
+  const handleUpdateExamMarksRule = (newTot, newPass) => {
+    if (!currentExam) return;
+    if (currentExam.isVirtual) {
+      setCustomVirtualRules(prev => ({
+        ...prev,
+        [virtualKey]: {
+          ...(prev[virtualKey] || {}),
+          totalMarks: newTot,
+          passingMarks: newPass
+        }
+      }));
+    } else {
+      const updatedExams = exams.map(e => {
+        if (e.id === currentExam.id) {
+          return { ...e, totalMarks: newTot, passingMarks: newPass };
+        }
+        return e;
+      });
+      onSaveData({
+        ...data,
+        exams: updatedExams
+      });
+    }
   };
 
   // Grade calculator helper
@@ -1032,13 +1288,11 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           <div className="form-group mb-0">
             <label className="form-label">Standard (Class 1 to 10)</label>
             <select 
-              className="form-select"
+              className="form-select font-semibold"
               value={selectedClass}
               onChange={(e) => {
                 const cls = e.target.value;
                 setSelectedClass(cls);
-                const firstExam = exams.find(ex => ex.classCode === cls);
-                setSelectedExamId(firstExam ? firstExam.id : '');
               }}
             >
               {accessibleClasses.map(cls => (
@@ -1047,50 +1301,84 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
             </select>
           </div>
 
-          <div className="form-group mb-0" style={{ minWidth: '260px', flex: 1 }}>
+          <div className="form-group mb-0" style={{ minWidth: '320px', flex: 1 }}>
             <label className="form-label">
               Select Test / Exam
-              {examTabFilter === 'ACTIVE' && <span className="text-3xs text-amber-300 ml-1.5">(Showing Active)</span>}
-              {examTabFilter === 'COMPLETED' && <span className="text-3xs text-emerald ml-1.5">(Showing Completed)</span>}
+              {currentExam?.isVirtual ? (
+                <span className="text-3xs text-sky-400 ml-1.5 font-semibold">✨ (Zero Modal Auto-Create Mode)</span>
+              ) : currentExam?.status === 'COMPLETED' ? (
+                <span className="text-3xs text-emerald ml-1.5">(Completed Test)</span>
+              ) : (
+                <span className="text-3xs text-amber-300 ml-1.5">(Active Test)</span>
+              )}
             </label>
             <select 
-              className="form-select"
+              className="form-select font-semibold"
               value={currentExam?.id || ''}
               onChange={(e) => setSelectedExamId(e.target.value)}
             >
-              {classExams.length === 0 ? (
-                <option value="">
-                  {examTabFilter === 'ACTIVE' 
-                    ? 'No active tests pending grading (check Completed tab)' 
-                    : examTabFilter === 'COMPLETED'
-                      ? 'No completed tests archived yet'
-                      : 'No tests created yet for this class'}
-                </option>
-              ) : (
-                classExams.map(ex => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.status === 'COMPLETED' ? '✓ [Done] ' : '⚡ [Active] '}
-                    {ex.title} - {ex.subject} ({ex.date})
+              <optgroup label="📅 Saturday Weekly Tests (Month Weeks 1 to 5)">
+                {classWeekSlots.map(slot => (
+                  <option key={slot.id} value={slot.id}>
+                    {slot.isVirtual ? '✨ ' : (slot.status === 'COMPLETED' ? '✓ ' : '⚡ ')}
+                    {slot.title} ({slot.date}) {slot.isVirtual ? '— [Ready to Grade & Save]' : ''}
                   </option>
-                ))
+                ))}
+              </optgroup>
+              {otherClassExams.length > 0 && (
+                <optgroup label="📝 Other Tests / Assessments">
+                  {otherClassExams.map(ex => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.status === 'COMPLETED' ? '✓ ' : '⚡ '}
+                      {ex.title} - {ex.subject} ({ex.date})
+                    </option>
+                  ))}
+                </optgroup>
               )}
             </select>
           </div>
 
           {currentExam && (
             <div className="exam-meta-pill-box">
-              <div className="exam-meta-tag">
-                <BookOpen size={14} />
-                <span>{currentExam.subject}</span>
+              <div className="exam-meta-tag" title="Each student can have their own independent subject in the table below">
+                <BookOpen size={14} className="text-sky-400" />
+                <span>Multi-Subject / Per Student</span>
               </div>
-              <div className="exam-meta-tag">
-                <span>Max: <strong>{currentExam.totalMarks}</strong></span>
+
+              {/* Max & Pass Marks Preset Selector */}
+              <div className="exam-meta-tag flex items-center gap-1.5" style={{ padding: '3px 10px' }} title="Change Total Marks for this test">
+                <span className="text-muted text-xs font-semibold">Max:</span>
+                <select
+                  className="form-select form-select-xs"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '2px 6px',
+                    width: 'auto',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                  value={currentExam.totalMarks}
+                  onChange={(e) => {
+                    const newTot = Number(e.target.value);
+                    const newPass = Math.round(newTot * 0.36);
+                    handleUpdateExamMarksRule(newTot, newPass);
+                  }}
+                >
+                  <option value={20} style={{ background: '#1e293b' }}>20</option>
+                  <option value={25} style={{ background: '#1e293b' }}>25</option>
+                  <option value={50} style={{ background: '#1e293b' }}>50</option>
+                  <option value={100} style={{ background: '#1e293b' }}>100</option>
+                </select>
               </div>
+
               <div className="exam-meta-tag">
                 <span>Pass: <strong>{currentExam.passingMarks}</strong></span>
               </div>
 
-              {/* Lifecycle Status Pill */}
+              {/* Status Pill */}
               <div className="exam-meta-tag" style={{
                 background: currentExam.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
                 borderColor: currentExam.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)',
@@ -1110,7 +1398,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 )}
               </div>
 
-              {/* Save Status & Action Buttons */}
+              {/* Action Buttons */}
               <div className="flex items-center gap-2 flex-wrap">
                 {saveStatus === 'saved' ? (
                   <span className="badge badge-success text-xs font-semibold flex items-center gap-1">
@@ -1121,64 +1409,97 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   <span className="badge badge-warning text-xs font-semibold flex items-center gap-1">
                     <span>Saving to DB...</span>
                   </span>
+                ) : saveStatus === 'dirty' ? (
+                  <span className="badge text-xs font-semibold flex items-center gap-1" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#FCD34D', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+                    <span>Unsaved Changes</span>
+                  </span>
                 ) : null}
 
-                {/* Mark as Completed / Reopen Toggle */}
-                {currentExam.status === 'COMPLETED' ? (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => handleToggleExamStatus(currentExam)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                    title="Reopen this test for editing and grading"
-                  >
-                    <Sparkles size={13} className="text-amber" />
-                    <span>Reopen Test</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm"
-                    onClick={() => handleToggleExamStatus(currentExam)}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#059669', borderColor: '#10B981' }}
-                    title="Finish test & move to completed archives (Preserves marks 100%)"
-                  >
-                    <CheckCircle2 size={13} />
-                    <span>Mark as Completed</span>
-                  </button>
+                {/* Mark as Completed / Reopen Toggle (for saved exams) */}
+                {!currentExam.isVirtual && (
+                  currentExam.status === 'COMPLETED' ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleToggleExamStatus(currentExam)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      title="Reopen this test for editing and grading"
+                    >
+                      <Sparkles size={13} className="text-amber" />
+                      <span>Reopen Test</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-success btn-sm"
+                      onClick={() => handleToggleExamStatus(currentExam)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#059669', borderColor: '#10B981' }}
+                      title="Finish test & move to completed archives"
+                    >
+                      <CheckCircle2 size={13} />
+                      <span>Mark as Completed</span>
+                    </button>
+                  )
                 )}
 
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={handleSaveAllMarks}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  title="Save All Marks to Cloud Database"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#4F46E5', borderColor: '#6366F1', fontWeight: 700 }}
+                  title={currentExam.isVirtual ? 'Creates this exam and saves all entered student marks to Cloud' : 'Save all marks to Cloud'}
                 >
                   <CheckCircle2 size={13} />
-                  <span>Save Marks</span>
+                  <span>{currentExam.isVirtual ? 'Save Marks (Create Test)' : 'Save Marks'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleOpenEditExam(currentExam)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  title="Edit Test Details (Name, Date, Max Marks)"
-                >
-                  <Edit size={13} />
-                  <span>Edit</span>
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger btn-sm"
-                  onClick={() => setDeleteConfirmExam(currentExam)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  title="Delete this test (shows safety warning if marks exist)"
-                >
-                  <Trash2 size={13} />
-                  <span>Delete</span>
-                </button>
+                {!currentExam.isVirtual ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleOpenEditExam(currentExam)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      title="Edit Test Details (Name, Date, Max Marks)"
+                    >
+                      <Edit size={13} />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={() => setDeleteConfirmExam(currentExam)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      title="Delete this test"
+                    >
+                      <Trash2 size={13} />
+                      <span>Delete</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      if (virtualMarks[virtualKey]) {
+                        if (window.confirm('Clear all unsaved marks entered for this week slot?')) {
+                          setVirtualMarks(prev => {
+                            const next = { ...prev };
+                            delete next[virtualKey];
+                            return next;
+                          });
+                          setSaveStatus('idle');
+                        }
+                      }
+                    }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', opacity: virtualMarks[virtualKey] ? 1 : 0.4 }}
+                    disabled={!virtualMarks[virtualKey]}
+                    title="Clear unsaved marks for this week slot"
+                  >
+                    <Trash2 size={13} />
+                    <span>Clear</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1265,7 +1586,36 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               <tr>
                 <th>Roll No</th>
                 <th>Student Name</th>
-                <th>Exam Subject (Customizable)</th>
+                <th>
+                  <div className="flex items-center gap-2">
+                    <span>Subject</span>
+                    <select
+                      className="form-select form-select-xs"
+                      style={{
+                        fontSize: '0.7rem',
+                        padding: '2px 6px',
+                        width: 'auto',
+                        background: 'rgba(30, 41, 59, 0.9)',
+                        borderColor: 'rgba(99, 102, 241, 0.5)',
+                        color: '#93C5FD',
+                        cursor: 'pointer'
+                      }}
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleSetAllStudentsSubject(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      title="Set all students in this class to this subject in 1 click"
+                    >
+                      <option value="" disabled>Set All To... ▼</option>
+                      {availableClassSubjects.map((subj, idx) => (
+                        <option key={idx} value={subj}>{subj}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
                 <th>School</th>
                 <th style={{ width: '180px' }}>Marks (/{currentExam.totalMarks})</th>
                 <th>Percentage</th>
@@ -1277,19 +1627,21 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               {examStudents.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No students currently enrolled in {classes.find(c => c.code === currentExam.classCode)?.name}.
+                    No students currently enrolled in {classes.find(c => c.code === currentExam.classCode)?.name || selectedClass}.
                   </td>
                 </tr>
               ) : (
                 examStudents.map((student, idx) => {
-                  const markRecord = marks.find(m => m.examId === currentExam.id && m.studentId === student.id);
+                  const markRecord = currentExam.isVirtual
+                    ? (virtualMarks[virtualKey]?.[student.id] || { marksObtained: '', isAbsent: false, subject: availableClassSubjects[0] || 'Mathematics', remarks: 'Pending' })
+                    : marks.find(m => m.examId === currentExam.id && m.studentId === student.id);
                   const isAbsent = markRecord?.isAbsent || markRecord?.marksObtained === 'AB';
                   const marksVal = markRecord ? (isAbsent ? '' : markRecord.marksObtained) : '';
                   const hasMarks = !isAbsent && markRecord !== undefined && markRecord.marksObtained !== null && markRecord.marksObtained !== '' && !isNaN(Number(markRecord.marksObtained));
                   const pct = hasMarks ? Math.round((Number(marksVal) / currentExam.totalMarks) * 100) : null;
                   const gradeInfo = hasMarks ? getGrade(Number(marksVal), currentExam.totalMarks) : null;
-                  const studentSubject = markRecord?.subject || currentExam.subject;
-                  const isCustomSubject = markRecord?.subject && markRecord.subject !== currentExam.subject;
+                  const studentSubject = markRecord?.subject || availableClassSubjects[0] || 'Mathematics';
+                  const isCustomSubject = markRecord?.subject && markRecord.subject !== availableClassSubjects[0];
 
                   return (
                     <tr key={student.id}>
@@ -1324,9 +1676,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                           }}
                           title={`Subject for ${student.name} (Independent per student)`}
                         >
-                          <option value={currentExam.subject}>{currentExam.subject} (Default)</option>
-                          {availableClassSubjects.filter(s => s !== currentExam.subject).map((subj, idx) => (
-                            <option key={idx} value={subj}>{subj}</option>
+                          {availableClassSubjects.map((subj, sIdx) => (
+                            <option key={sIdx} value={subj}>{subj}</option>
                           ))}
                           {isCustomSubject && !availableClassSubjects.includes(markRecord.subject) && (
                             <option value={markRecord.subject}>{markRecord.subject} (Custom)</option>
@@ -1401,8 +1752,13 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <button 
                             className="btn btn-sm btn-secondary"
-                            onClick={() => setReportCardStudent({ student, exam: currentExam, mark: markRecord })}
-                            disabled={!hasMarks}
+                            onClick={() => {
+                              if (currentExam.isVirtual) {
+                                handleSaveAllMarks();
+                              }
+                              setReportCardStudent({ student, exam: currentExam, mark: markRecord });
+                            }}
+                            disabled={!hasMarks && !isAbsent}
                             title="View Full Printable Scorecard"
                           >
                             <FileText size={13} />
@@ -1411,31 +1767,36 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                           {!isTeacher && (
                             <button 
                               className="btn btn-sm"
-                              onClick={() => setReportCardStudent({ student, exam: currentExam, mark: markRecord, autoShare: true })}
-                              disabled={!hasMarks}
-                              title={`Send Scorecard Card to ${student.parentName} via WhatsApp`}
-                              style={{ 
-                                background: '#10B981', 
-                                color: 'white', 
-                                border: 'none', 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '4px',
-                                opacity: hasMarks ? 1 : 0.4,
-                                cursor: hasMarks ? 'pointer' : 'not-allowed'
-                              }}
-                            >
-                              <MessageSquare size={13} />
-                              <span>WhatsApp</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
+                              onClick={() => {
+                                if (currentExam.isVirtual) {
+                                handleSaveAllMarks();
+                              }
+                              setReportCardStudent({ student, exam: currentExam, mark: markRecord, autoShare: true });
+                            }}
+                            disabled={!hasMarks && !isAbsent}
+                            title={`Send Scorecard Card to ${student.parentName || 'Parent'} via WhatsApp`}
+                            style={{ 
+                              background: '#10B981', 
+                              color: 'white', 
+                              border: 'none', 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: '4px',
+                              opacity: (hasMarks || isAbsent) ? 1 : 0.4,
+                              cursor: (hasMarks || isAbsent) ? 'pointer' : 'not-allowed'
+                            }}
+                          >
+                            <MessageSquare size={13} />
+                            <span>WhatsApp</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
           </table>
         </div>
       ) : (
