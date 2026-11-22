@@ -645,7 +645,7 @@ export default function SettingsModal({ isOpen, onClose, onDataReset, batches = 
     logger.action(null, 'EXPORT_JSON_BACKUP', 'Exported JSON backup file');
   };
 
-  const sqlCode = `-- Run this in Supabase SQL Editor to create all tables with real-time replication:
+  const sqlCode = `-- Run this in Supabase SQL Editor to create and configure all tables with real-time replication & RLS:
 CREATE TABLE IF NOT EXISTS class_levels (
     id SERIAL PRIMARY KEY,
     code VARCHAR(20) UNIQUE NOT NULL,
@@ -681,6 +681,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     batch_id INT REFERENCES batches(id),
     date DATE NOT NULL,
     status VARCHAR(15) NOT NULL,
+    remarks VARCHAR(255),
     UNIQUE(student_id, date)
 );
 CREATE TABLE IF NOT EXISTS fee_records (
@@ -692,6 +693,36 @@ CREATE TABLE IF NOT EXISTS fee_records (
     balance NUMERIC(10,2),
     status VARCHAR(20) DEFAULT 'PENDING'
 );
+CREATE TABLE IF NOT EXISTS payment_receipts (
+    id SERIAL PRIMARY KEY,
+    receipt_no VARCHAR(50) UNIQUE NOT NULL,
+    student_id INT REFERENCES students(id),
+    date DATE DEFAULT CURRENT_DATE,
+    amount_paid NUMERIC(10,2) NOT NULL,
+    payment_mode VARCHAR(50) DEFAULT 'CASH',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS exams (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(150) NOT NULL,
+    class_code VARCHAR(20),
+    subject VARCHAR(100),
+    exam_date DATE NOT NULL,
+    total_marks NUMERIC(5,2) DEFAULT 50.00,
+    passing_marks NUMERIC(5,2) DEFAULT 18.00,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS exam_marks (
+    id SERIAL PRIMARY KEY,
+    exam_id INT REFERENCES exams(id),
+    student_id INT REFERENCES students(id),
+    marks_obtained NUMERIC(5,2),
+    status VARCHAR(20) DEFAULT 'GRADED',
+    remarks TEXT,
+    UNIQUE(exam_id, student_id)
+);
 CREATE TABLE IF NOT EXISTS announcements (
     id SERIAL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
@@ -701,6 +732,40 @@ CREATE TABLE IF NOT EXISTS announcements (
     target_name VARCHAR(100),
     posted_by VARCHAR(100) DEFAULT 'Admin',
     announcement_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS tutor_feedback (
+    id SERIAL PRIMARY KEY,
+    student_id INT REFERENCES students(id),
+    month_year VARCHAR(20),
+    feedback_date DATE DEFAULT CURRENT_DATE,
+    strength VARCHAR(100),
+    improvement_area VARCHAR(100),
+    next_step VARCHAR(150),
+    academic_performance VARCHAR(50),
+    concept_understanding VARCHAR(50),
+    homework_status VARCHAR(50),
+    class_participation VARCHAR(50),
+    regularity VARCHAR(50),
+    monthly_progress VARCHAR(50),
+    focus_area VARCHAR(100),
+    auto_message TEXT,
+    tutor_remark TEXT,
+    goal JSONB,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS homework_records (
+    id SERIAL PRIMARY KEY,
+    batch_id INT REFERENCES batches(id),
+    class_code VARCHAR(20) REFERENCES class_levels(code),
+    homework_date DATE DEFAULT CURRENT_DATE,
+    subject VARCHAR(100),
+    topic VARCHAR(200),
+    homework_task TEXT NOT NULL,
+    weekly_status VARCHAR(50) DEFAULT 'Regularly Completed',
+    due_date DATE,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS staff_accounts (
@@ -718,7 +783,58 @@ CREATE TABLE IF NOT EXISTS staff_accounts (
     assigned_student_ids JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-ALTER PUBLICATION supabase_realtime ADD TABLE students, attendance, fee_records, announcements, staff_accounts;`;
+CREATE TABLE IF NOT EXISTS inquiries (
+    id SERIAL PRIMARY KEY,
+    student_name VARCHAR(150),
+    parent_name VARCHAR(150),
+    parent_phone VARCHAR(30) NOT NULL,
+    class_code VARCHAR(20),
+    school_name VARCHAR(150),
+    subjects JSONB,
+    message TEXT,
+    status VARCHAR(30) DEFAULT 'NEW',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Realtime
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE class_levels, batches, students, attendance, fee_records, payment_receipts, exams, exam_marks, announcements, tutor_feedback, homework_records, staff_accounts;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;
+
+-- Enable Row Level Security (RLS) on all tables
+ALTER TABLE class_levels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE batches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fee_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payment_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_marks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tutor_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE homework_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inquiries ENABLE ROW LEVEL SECURITY;
+
+-- Configure RLS Policies
+DO $$
+DECLARE
+    t text;
+    tables text[] := ARRAY[
+        'class_levels', 'batches', 'students', 'attendance', 
+        'fee_records', 'payment_receipts', 'exams', 'exam_marks', 
+        'announcements', 'tutor_feedback', 'homework_records', 
+        'staff_accounts', 'inquiries'
+    ];
+BEGIN
+    FOREACH t IN ARRAY tables LOOP
+        EXECUTE format('DROP POLICY IF EXISTS "Allow app all access on %I" ON %I;', t, t);
+        EXECUTE format('CREATE POLICY "Allow app all access on %I" ON %I FOR ALL USING (true) WITH CHECK (true);', t, t);
+    END LOOP;
+END $$;`;
 
   const copySql = () => {
     navigator.clipboard.writeText(sqlCode);
