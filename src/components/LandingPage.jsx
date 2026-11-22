@@ -453,15 +453,26 @@ export default function LandingPage({
               </span>
             </div>
 
-            <h1 className="hero-headline">
-              <span className="hero-brand-supertitle">
-                HAYAGRIVA TUTORIALS
-              </span>
-              <span className="hero-main-title">
-                Building Strong <br />
-                <span className="text-gradient-gold">Foundations</span> for <br />
-                <span className="text-gradient-primary">Brighter Futures</span>
-              </span>
+            {/* Official Academy Supertitle - Dedicated block element above headline */}
+            <div
+              className="hero-brand-supertitle"
+              style={{
+                display: 'block',
+                width: '100%',
+                color: '#FBBF24',
+                letterSpacing: '0.18em',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                marginBottom: '10px'
+              }}
+            >
+              HAYAGRIVA TUTORIALS
+            </div>
+
+            <h1 className="hero-headline" style={{ marginTop: 0 }}>
+              Building Strong <br />
+              <span className="text-gradient-gold">Foundations</span> for <br />
+              <span className="text-gradient-primary">Brighter Futures</span>
             </h1>
 
             {/* Desktop-only description & CTAs (Shown on desktop alongside slider) */}
@@ -614,7 +625,7 @@ export default function LandingPage({
           {/* Mobile-Only Description & CTAs Block (Appears directly below the slider on mobile) */}
           <div className="hero-mobile-content-block">
             <p className="hero-description mobile-hero-desc">
-              Specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics</strong>, our signature <strong>"One Day, One Subject"</strong> framework, and <strong>weekly WhatsApp reports</strong>.
+              <strong>Hayagriva Tutorials</strong> provides specialized coaching for <strong>Classes 1 to 10 (State / SSC &amp; CBSE)</strong> with special focus on <strong>Mathematics &amp; Sciences</strong>, our signature <strong>"One Day, One Subject"</strong> deep immersion framework, and <strong>weekly WhatsApp reports</strong>.
             </p>
 
 
@@ -1904,16 +1915,14 @@ export default function LandingPage({
           color: #FBBF24;
           margin-bottom: 10px;
         }
-        .hero-main-title {
-          display: block;
-        }
         .hero-headline {
           font-family: var(--font-heading);
           font-size: 1.85rem;
           line-height: 1.18;
           font-weight: 850;
           color: #FFFFFF;
-          margin-bottom: 12px;
+          margin-top: 0;
+          margin-bottom: 14px;
           letter-spacing: -0.025em;
         }
         @media (min-width: 640px) {
