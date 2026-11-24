@@ -73,53 +73,6 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const pad = n => String(n).padStart(2, '0');
   const defaultYearMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
 
-  // Helper to compute all Saturdays that actually exist in a given month (year, month: 0-indexed)
-  const getSaturdaysInMonth = (year, month) => {
-    const saturdays = [];
-    const d = new Date(year, month, 1);
-    while (d.getMonth() === month) {
-      if (d.getDay() === 6) {
-        saturdays.push({
-          weekNum: saturdays.length + 1,
-          date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-        });
-      }
-      d.setDate(d.getDate() + 1);
-    }
-    return saturdays;
-  };
-
-  // Helper to determine the current week number of the month (1 to 4 or 5)
-  const getCurrentWeekOfMonth = (d = new Date()) => {
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const sats = getSaturdaysInMonth(year, month);
-    const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const nextSat = sats.find(s => s.date >= todayStr) || sats[sats.length - 1];
-    return nextSat ? nextSat.weekNum : 1;
-  };
-
-  // Helper to compute Saturday for any specific week number of the selected month
-  const getSaturdayForWeek = useCallback((weekNumber, referenceDate = null) => {
-    const yr = referenceDate ? referenceDate.getFullYear() : selectedYear;
-    const mo = referenceDate ? referenceDate.getMonth() : selectedMonthIndex;
-    const saturdays = getSaturdaysInMonth(yr, mo);
-    const idx = Math.min(Math.max(1, Number(weekNumber) || 1) - 1, Math.max(0, saturdays.length - 1));
-    const sat = saturdays[idx];
-    return sat ? sat.date : `${yr}-${pad(mo + 1)}-15`;
-  }, [selectedYear, selectedMonthIndex]);
-
-  // Helper to compute next upcoming Saturday date for the Saturday weekly test template
-  const getNextSaturdayDate = () => {
-    const d = new Date();
-    const day = d.getDay(); // 0 is Sunday, 6 is Saturday
-    const diff = day === 6 ? 0 : (6 - day);
-    d.setDate(d.getDate() + diff);
-    return d.toISOString().split('T')[0];
-  };
-
-  const initialWeekNum = getCurrentWeekOfMonth();
-
   const [selectedClass, setSelectedClass] = useState(initialClassCode);
   const [selectedYearMonth, setSelectedYearMonth] = useState(defaultYearMonth);
   const [examTabFilter, setExamTabFilter] = useState('ACTIVE'); // 'ACTIVE' | 'COMPLETED' | 'ALL'
@@ -144,10 +97,26 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }, [selectedYear, selectedMonthIndex]);
 
+  // Helper to compute all Saturdays that actually exist in a given month (year, month: 0-indexed)
+  const getSaturdaysInMonth = useCallback((year, month) => {
+    const saturdays = [];
+    const d = new Date(year, month, 1);
+    while (d.getMonth() === month) {
+      if (d.getDay() === 6) {
+        saturdays.push({
+          weekNum: saturdays.length + 1,
+          date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+        });
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return saturdays;
+  }, []);
+
   // Dynamic calculation: exactly how many Saturdays exist in the selected month
   const monthSaturdays = useMemo(() => {
     return getSaturdaysInMonth(selectedYear, selectedMonthIndex);
-  }, [selectedYear, selectedMonthIndex]);
+  }, [selectedYear, selectedMonthIndex, getSaturdaysInMonth]);
 
   // Clean default date for tests created or templated in the currently selected month
   const defaultMonthDate = useMemo(() => {
@@ -157,6 +126,37 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     const firstSat = monthSaturdays[0];
     return firstSat ? firstSat.date : `${selectedYearMonth}-15`;
   }, [selectedYearMonth, defaultYearMonth, monthSaturdays]);
+
+  // Helper to determine the current week number of the month (1 to 4 or 5)
+  const getCurrentWeekOfMonth = useCallback((d = new Date()) => {
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const sats = getSaturdaysInMonth(year, month);
+    const todayStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const nextSat = sats.find(s => s.date >= todayStr) || sats[sats.length - 1];
+    return nextSat ? nextSat.weekNum : 1;
+  }, [getSaturdaysInMonth]);
+
+  // Helper to compute Saturday for any specific week number of the selected month
+  const getSaturdayForWeek = useCallback((weekNumber, referenceDate = null) => {
+    const yr = referenceDate ? referenceDate.getFullYear() : selectedYear;
+    const mo = referenceDate ? referenceDate.getMonth() : selectedMonthIndex;
+    const saturdays = getSaturdaysInMonth(yr, mo);
+    const idx = Math.min(Math.max(1, Number(weekNumber) || 1) - 1, Math.max(0, saturdays.length - 1));
+    const sat = saturdays[idx];
+    return sat ? sat.date : `${yr}-${pad(mo + 1)}-15`;
+  }, [selectedYear, selectedMonthIndex, getSaturdaysInMonth]);
+
+  // Helper to compute next upcoming Saturday date for the Saturday weekly test template
+  const getNextSaturdayDate = () => {
+    const d = new Date();
+    const day = d.getDay(); // 0 is Sunday, 6 is Saturday
+    const diff = day === 6 ? 0 : (6 - day);
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  };
+
+  const initialWeekNum = getCurrentWeekOfMonth();
 
   // New and Edit exam state objects for modal dialogs (prevents ReferenceErrors)
   const [newExamData, setNewExamData] = useState({
