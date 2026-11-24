@@ -84,6 +84,12 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const [isSharingCard, setIsSharingCard] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
 
+  // Dual View Mode: 'DIRECTORY' (Conducted Tests Overview) vs 'GRADING' (Single Test Marks Entry)
+  const [viewMode, setViewMode] = useState('DIRECTORY');
+  const [directoryClassFilter, setDirectoryClassFilter] = useState('ALL');
+  const [directoryMonthFilter, setDirectoryMonthFilter] = useState('ALL');
+  const [directorySearchQuery, setDirectorySearchQuery] = useState('');
+
   // Parse selectedYear and selectedMonthIndex from selectedYearMonth (e.g. '2026-11')
   const [selectedYear, selectedMonthIndex] = useMemo(() => {
     const parts = (selectedYearMonth || defaultYearMonth).split('-').map(Number);
@@ -193,6 +199,164 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   const completedClassExams = useMemo(() => {
     return allClassExams.filter(e => e.status === 'COMPLETED');
   }, [allClassExams]);
+
+  // All exams accessible to current user across classes
+  const allAccessibleExams = useMemo(() => {
+    return exams.filter(e => accessibleClasses.some(c => c.code === e.classCode));
+  }, [exams, accessibleClasses]);
+
+  const activeAccessibleExams = useMemo(() => {
+    return allAccessibleExams.filter(e => e.status !== 'COMPLETED');
+  }, [allAccessibleExams]);
+
+  const completedAccessibleExams = useMemo(() => {
+    return allAccessibleExams.filter(e => e.status === 'COMPLETED');
+  }, [allAccessibleExams]);
+
+  // Pre-computed stats for every exam across classes for the directory
+  const directoryExamStatsMap = useMemo(() => {
+    const statsMap = new Map();
+    const cleanDate = (d) => String(d || '').replace(/\//g, '-').trim();
+
+    exams.forEach(exam => {
+      const clsStudents = accessibleStudents.filter(s => s.classCode === exam.classCode && s.status === 'ACTIVE');
+      let graded = 0;
+      let absent = 0;
+      let totalScore = 0;
+      let highest = -1;
+      let highestStudent = null;
+      let passed = 0;
+
+      clsStudents.forEach(s => {
+        const m = marks.find(mk => mk.examId === exam.id && mk.studentId === s.id);
+        if (!m) return;
+        if (m.isAbsent || m.marksObtained === 'AB') {
+          absent++;
+        } else if (m.marksObtained !== '' && m.marksObtained !== null && !isNaN(Number(m.marksObtained))) {
+          graded++;
+          const score = Number(m.marksObtained);
+          totalScore += score;
+          if (score >= (exam.passingMarks || 18)) {
+            passed++;
+          }
+          if (score > highest) {
+            highest = score;
+            highestStudent = s.name;
+          }
+        }
+      });
+
+      const total = clsStudents.length;
+      const pending = total - graded - absent;
+      const avgScore = graded > 0 ? (totalScore / graded).toFixed(1) : '0';
+      const avgPct = graded > 0 && exam.totalMarks > 0 ? Math.round((Number(avgScore) / exam.totalMarks) * 100) : 0;
+      const passRate = graded > 0 ? Math.round((passed / graded) * 100) : 0;
+
+      statsMap.set(exam.id, {
+        total,
+        graded,
+        absent,
+        pending,
+        avgScore,
+        avgPct,
+        highest: highest >= 0 ? highest : null,
+        highestStudent,
+        passed,
+        passRate,
+        cleanExamDate: cleanDate(exam.date)
+      });
+    });
+
+    return statsMap;
+  }, [exams, marks, accessibleStudents]);
+
+  // Unique months available in exams for filtering
+  const availableExamMonths = useMemo(() => {
+    const monthsSet = new Set();
+    exams.forEach(e => {
+      const d = String(e.date || '').replace(/\//g, '-').trim();
+      if (d.length >= 7) {
+        monthsSet.add(d.slice(0, 7));
+      }
+    });
+    monthsSet.add(defaultYearMonth);
+    return Array.from(monthsSet).sort().reverse();
+  }, [exams, defaultYearMonth]);
+
+  // Exams matching the Conducted Tests Directory filters
+  const displayedDirectoryExams = useMemo(() => {
+    return exams.filter(exam => {
+      if (!accessibleClasses.some(c => c.code === exam.classCode)) return false;
+
+      if (directoryClassFilter !== 'ALL' && exam.classCode !== directoryClassFilter) {
+        return false;
+      }
+
+      if (examTabFilter === 'ACTIVE' && exam.status === 'COMPLETED') return false;
+      if (examTabFilter === 'COMPLETED' && exam.status !== 'COMPLETED') return false;
+
+      if (directoryMonthFilter !== 'ALL') {
+        const cleanDate = String(exam.date || '').replace(/\//g, '-').trim();
+        if (!cleanDate.startsWith(directoryMonthFilter)) return false;
+      }
+
+      if (directorySearchQuery.trim()) {
+        const q = directorySearchQuery.toLowerCase().trim();
+        const tTitle = (exam.title || '').toLowerCase();
+        const tSubject = (exam.subject || '').toLowerCase();
+        const clsName = (classes.find(c => c.code === exam.classCode)?.name || exam.classCode || '').toLowerCase();
+        if (!tTitle.includes(q) && !tSubject.includes(q) && !clsName.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).sort((a, b) => {
+      const dateA = String(a.date || '');
+      const dateB = String(b.date || '');
+      return dateB.localeCompare(dateA);
+    });
+  }, [exams, accessibleClasses, directoryClassFilter, examTabFilter, directoryMonthFilter, directorySearchQuery, classes]);
+
+  // Summary performance across displayed directory exams
+  const directoryOverallMetrics = useMemo(() => {
+    let totalPossibleMarks = 0;
+    let totalGradedMarks = 0;
+    let passedStudents = 0;
+    let totalScoreSum = 0;
+    let fullyGradedTestsCount = 0;
+
+    displayedDirectoryExams.forEach(exam => {
+      const st = directoryExamStatsMap.get(exam.id);
+      if (!st) return;
+      totalPossibleMarks += st.total;
+      totalGradedMarks += (st.graded + st.absent);
+      passedStudents += st.passed;
+      if (st.graded > 0) {
+        totalScoreSum += st.avgPct;
+      }
+      if (st.total > 0 && (st.graded + st.absent) >= st.total) {
+        fullyGradedTestsCount++;
+      }
+    });
+
+    const evaluatedTests = displayedDirectoryExams.filter(e => {
+      const st = directoryExamStatsMap.get(e.id);
+      return st && st.graded > 0;
+    }).length;
+
+    const avgPct = evaluatedTests > 0 ? Math.round(totalScoreSum / evaluatedTests) : 0;
+    const passRate = totalGradedMarks > 0 ? Math.round((passedStudents / totalGradedMarks) * 100) : 0;
+
+    return {
+      totalPossibleMarks,
+      totalGradedMarks,
+      passedStudents,
+      avgPct,
+      passRate,
+      fullyGradedTestsCount
+    };
+  }, [displayedDirectoryExams, directoryExamStatsMap]);
 
   // Generate the Saturday week slots (exact count of Saturdays for this month) + Basic Test + Table Test
   const { weekSlots, foundationSlots, otherClassExams, classWeekSlots } = useMemo(() => {
@@ -622,7 +786,11 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     if (primaryExam) {
       setSelectedClass(primaryExam.classCode);
       setSelectedExamId(primaryExam.id);
+      if (primaryExam.date && primaryExam.date.length >= 7) {
+        setSelectedYearMonth(String(primaryExam.date).replace(/\//g, '-').slice(0, 7));
+      }
     }
+    setViewMode('GRADING');
     setExamTabFilter('ACTIVE'); // Ensure newly created test is visible in Active tab
     setNewExamModalOpen(false);
     setExamErrors({});
@@ -692,6 +860,18 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       }));
     }
     setExamErrors({});
+  };
+
+  // Open any test directly in the Student Marks Grading Sheet
+  const handleOpenExamInGradingSheet = (exam) => {
+    if (!exam) return;
+    setSelectedClass(exam.classCode);
+    if (exam.date && exam.date.length >= 7) {
+      const cleanExamDate = String(exam.date).replace(/\//g, '-').trim();
+      setSelectedYearMonth(cleanExamDate.slice(0, 7));
+    }
+    setSelectedExamId(exam.id);
+    setViewMode('GRADING');
   };
 
   // Toggle Exam Completion Lifecycle Status
@@ -1447,44 +1627,389 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         </div>
       )}
 
-      {/* Exam Lifecycle Status Tabs */}
+      {/* View Mode & Lifecycle Status Tabs */}
       <div className="exam-lifecycle-tabs-card glass-card">
-        <div className="exam-tabs-row">
+        <div className="exam-tabs-row flex items-center justify-between flex-wrap gap-3">
+          {/* Dual-Mode View Switcher */}
+          <div className="view-mode-toggle flex items-center gap-1.5 p-1 bg-surface rounded-lg border border-subtle">
+            <button
+              type="button"
+              className={`mode-toggle-btn ${viewMode === 'DIRECTORY' ? 'active' : ''}`}
+              onClick={() => setViewMode('DIRECTORY')}
+            >
+              <FileText size={14} />
+              <span>📋 Conducted Tests Directory ({directoryClassFilter === 'ALL' ? allAccessibleExams.length : allClassExams.length})</span>
+            </button>
+            <button
+              type="button"
+              className={`mode-toggle-btn ${viewMode === 'GRADING' ? 'active' : ''}`}
+              onClick={() => setViewMode('GRADING')}
+            >
+              <Edit size={14} />
+              <span>✍️ Student Marks Grading</span>
+            </button>
+          </div>
+
+          {/* Status Filter Pills */}
           <div className="exam-tabs-pills">
             <button
               type="button"
-              className={`exam-tab-pill ${examTabFilter === 'ACTIVE' ? 'active' : ''}`}
-              onClick={() => setExamTabFilter('ACTIVE')}
+              className={`exam-tab-pill ${examTabFilter === 'ACTIVE' && viewMode === 'DIRECTORY' ? 'active' : ''}`}
+              onClick={() => {
+                setExamTabFilter('ACTIVE');
+                setViewMode('DIRECTORY');
+              }}
+              title="View all tests actively awaiting marks or grading"
             >
               <span className="tab-pill-dot active-dot" />
               <span>Active Tests (Grading)</span>
-              <span className="tab-pill-count">{activeClassExams.length}</span>
+              <span className="tab-pill-count">{directoryClassFilter === 'ALL' ? activeAccessibleExams.length : activeClassExams.length}</span>
             </button>
 
             <button
               type="button"
-              className={`exam-tab-pill ${examTabFilter === 'COMPLETED' ? 'active' : ''}`}
-              onClick={() => setExamTabFilter('COMPLETED')}
+              className={`exam-tab-pill ${examTabFilter === 'COMPLETED' && viewMode === 'DIRECTORY' ? 'active' : ''}`}
+              onClick={() => {
+                setExamTabFilter('COMPLETED');
+                setViewMode('DIRECTORY');
+              }}
+              title="View completed tests"
             >
               <CheckCircle2 size={13} className="text-emerald" />
               <span>Completed & Graded (Archives)</span>
-              <span className="tab-pill-count">{completedClassExams.length}</span>
+              <span className="tab-pill-count">{directoryClassFilter === 'ALL' ? completedAccessibleExams.length : completedClassExams.length}</span>
             </button>
 
             <button
               type="button"
-              className={`exam-tab-pill ${examTabFilter === 'ALL' ? 'active' : ''}`}
-              onClick={() => setExamTabFilter('ALL')}
+              className={`exam-tab-pill ${examTabFilter === 'ALL' && viewMode === 'DIRECTORY' ? 'active' : ''}`}
+              onClick={() => {
+                setExamTabFilter('ALL');
+                setViewMode('DIRECTORY');
+              }}
+              title="Show all conducted tests"
             >
-              <FileText size={13} />
+              <Layers size={13} />
               <span>All Tests</span>
-              <span className="tab-pill-count">{allClassExams.length}</span>
+              <span className="tab-pill-count">{directoryClassFilter === 'ALL' ? allAccessibleExams.length : allClassExams.length}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Selectors Bar */}
+      {viewMode === 'DIRECTORY' ? (
+        <div className="conducted-tests-directory flex flex-col gap-4">
+          {/* 1. Directory Filters & Search Card */}
+          <div className="glass-card p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+              {/* Filter by Standard */}
+              <div className="form-group mb-0">
+                <label className="form-label text-xs font-semibold">Standard (Class)</label>
+                <select
+                  className="form-select font-semibold"
+                  value={directoryClassFilter}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDirectoryClassFilter(val);
+                    if (val !== 'ALL') {
+                      setSelectedClass(val);
+                    }
+                  }}
+                >
+                  <option value="ALL">🏫 All Standards ({accessibleClasses.length} Classes)</option>
+                  {accessibleClasses.map(cls => (
+                    <option key={cls.code} value={cls.code}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter by Month */}
+              <div className="form-group mb-0">
+                <label className="form-label text-xs font-semibold">Exam Month</label>
+                <select
+                  className="form-select font-semibold"
+                  value={directoryMonthFilter}
+                  onChange={(e) => setDirectoryMonthFilter(e.target.value)}
+                >
+                  <option value="ALL">📅 All Months (Full History)</option>
+                  {availableExamMonths.map(ym => {
+                    const [yr, mo] = ym.split('-').map(Number);
+                    const label = new Date(yr, mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    return (
+                      <option key={ym} value={ym}>{label}</option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Search Input */}
+              <div className="form-group mb-0 sm:col-span-2 md:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="form-label text-xs font-semibold mb-0">Search Conducted Tests</label>
+                  {(directoryClassFilter !== 'ALL' || directoryMonthFilter !== 'ALL' || directorySearchQuery || examTabFilter !== 'ALL') && (
+                    <button
+                      type="button"
+                      className="text-3xs text-amber-300 hover:underline"
+                      onClick={() => {
+                        setDirectoryClassFilter('ALL');
+                        setDirectoryMonthFilter('ALL');
+                        setDirectorySearchQuery('');
+                        setExamTabFilter('ALL');
+                      }}
+                    >
+                      Reset Filters
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Search by test name (e.g. Table, Basic, Slip, Additions)..."
+                    value={directorySearchQuery}
+                    onChange={(e) => setDirectorySearchQuery(e.target.value)}
+                  />
+                  {directorySearchQuery && (
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                      onClick={() => setDirectorySearchQuery('')}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Summary Metric Cards */}
+          <div className="directory-stats-grid">
+            <div className="glass-card directory-stat-card">
+              <span className="text-3xs text-muted font-semibold uppercase tracking-wider">Conducted Tests</span>
+              <div className="stat-num text-white">
+                {displayedDirectoryExams.length}
+                <span className="stat-unit">tests</span>
+              </div>
+              <span className="text-3xs text-indigo-300 truncate">
+                {directoryClassFilter === 'ALL' ? 'Across all standards' : classes.find(c => c.code === directoryClassFilter)?.name}
+              </span>
+            </div>
+
+            <div className="glass-card directory-stat-card">
+              <span className="text-3xs text-muted font-semibold uppercase tracking-wider">Grading Progress</span>
+              <div className="stat-num text-amber-300">
+                {directoryOverallMetrics.totalGradedMarks}
+                <span className="stat-unit">/ {directoryOverallMetrics.totalPossibleMarks} scores</span>
+              </div>
+              <span className="text-3xs text-amber-200 truncate">
+                {directoryOverallMetrics.fullyGradedTestsCount} of {displayedDirectoryExams.length} tests fully evaluated
+              </span>
+            </div>
+
+            <div className="glass-card directory-stat-card">
+              <span className="text-3xs text-muted font-semibold uppercase tracking-wider">Overall Average</span>
+              <div className="stat-num text-sky-400">
+                {directoryOverallMetrics.avgPct}%
+                <span className="stat-unit">average</span>
+              </div>
+              <span className="text-3xs text-sky-300 truncate">
+                Score across evaluations
+              </span>
+            </div>
+
+            <div className="glass-card directory-stat-card">
+              <span className="text-3xs text-muted font-semibold uppercase tracking-wider">Pass Rate</span>
+              <div className="stat-num text-emerald">
+                {directoryOverallMetrics.passRate}%
+                <span className="stat-unit">passed</span>
+              </div>
+              <span className="text-3xs text-emerald truncate">
+                {directoryOverallMetrics.passedStudents} student passes recorded
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Conducted Tests Table */}
+          {displayedDirectoryExams.length > 0 ? (
+            <div className="glass-card table-responsive p-0">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Date &amp; Month</th>
+                    <th>Test Title &amp; Subject</th>
+                    <th>Standard</th>
+                    <th>Marks Rule</th>
+                    <th>Grading Progress</th>
+                    <th>Performance</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedDirectoryExams.map(exam => {
+                    const st = directoryExamStatsMap.get(exam.id) || { total: 0, graded: 0, absent: 0, passRate: 0, avgPct: 0, avgScore: 0 };
+                    const evaluated = st.graded + st.absent;
+                    const evalPct = st.total > 0 ? Math.round((evaluated / st.total) * 100) : 0;
+                    const isCompleted = exam.status === 'COMPLETED';
+                    const className = classes.find(c => c.code === exam.classCode)?.name || exam.classCode;
+                    const cleanExamDate = st.cleanExamDate || exam.date || '—';
+
+                    return (
+                      <tr key={exam.id}>
+                        <td>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-white text-xs">{cleanExamDate}</span>
+                            <span className="badge badge-secondary text-3xs" style={{ width: 'fit-content', padding: '1px 5px' }}>
+                              {exam.date && exam.date.length >= 7 ? new Date(exam.date.slice(0, 4), Number(exam.date.slice(5, 7)) - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'General'}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-white text-sm flex items-center gap-1.5">
+                              {exam.title.toLowerCase().includes('table') ? '🔢' : exam.title.toLowerCase().includes('basic') ? '🎯' : '📅'}
+                              {exam.title}
+                            </span>
+                            <span className="text-3xs text-sky-400 font-semibold flex items-center gap-1">
+                              <BookOpen size={11} />
+                              {exam.subject || 'Multi-Subject'}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#A5B4FC', borderColor: 'rgba(99, 102, 241, 0.35)', fontWeight: 700 }}>
+                            {className}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="text-xs">
+                            <span className="font-bold text-white">Max: {exam.totalMarks}</span>
+                            <span className="text-muted ml-1.5">Pass: {exam.passingMarks}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="flex flex-col gap-1" style={{ minWidth: '130px' }}>
+                            <div className="flex items-center justify-between text-3xs">
+                              <span className="font-semibold text-white">{evaluated}/{st.total} Graded</span>
+                              <span className={evalPct === 100 ? 'text-emerald font-bold' : 'text-amber-300 font-semibold'}>{evalPct}%</span>
+                            </div>
+                            <div style={{ height: '5px', width: '100%', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${evalPct}%`, background: evalPct === 100 ? '#10B981' : '#F59E0B', borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                            </div>
+                            {st.absent > 0 && (
+                              <span className="text-3xs text-amber-300">({st.absent} Leave Recorded)</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          {st.graded > 0 ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-bold text-white">Avg: {st.avgPct}% ({st.avgScore})</span>
+                              <span className="text-3xs text-emerald font-semibold">Pass: {st.passRate}% ({st.passed} passed)</span>
+                            </div>
+                          ) : (
+                            <span className="text-3xs text-muted italic">Awaiting evaluation</span>
+                          )}
+                        </td>
+                        <td>
+                          {isCompleted ? (
+                            <span className="badge badge-success flex items-center gap-1" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34D399', borderColor: 'rgba(16, 185, 129, 0.4)' }}>
+                              <CheckCircle2 size={11} />
+                              <span>Completed</span>
+                            </span>
+                          ) : (
+                            <span className="badge badge-warning flex items-center gap-1" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}>
+                              <span className="pulsing-badge-dot" style={{ width: '5px', height: '5px' }} />
+                              <span>Grading / Active</span>
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              style={{ padding: '5px 10px', fontSize: '0.78rem', gap: '4px' }}
+                              onClick={() => handleOpenExamInGradingSheet(exam)}
+                              title="Open Marks Grading Sheet for this test"
+                            >
+                              <Edit size={12} />
+                              <span>Grade / Marks</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
+                              style={{ padding: '5px 8px' }}
+                              onClick={() => handleToggleExamStatus(exam)}
+                              title={isCompleted ? "Reopen this test for grading" : "Mark as Completed / Concluded"}
+                            >
+                              {isCompleted ? <Sparkles size={12} className="text-amber" /> : <CheckCircle2 size={12} className="text-emerald" />}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
+                              style={{ padding: '5px 8px' }}
+                              onClick={() => handleOpenEditExam(exam)}
+                              title="Edit test parameters"
+                            >
+                              <Edit size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              style={{ padding: '5px 8px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                              onClick={() => setDeleteConfirmExam(exam)}
+                              title="Delete test and score records"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="glass-card empty-exam-card" style={{ textAlign: 'center', padding: '50px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={44} className="text-muted mb-3" />
+              <h3 className="text-white font-bold text-lg mb-1">No Conducted Tests Found</h3>
+              <p className="text-muted text-sm mb-4" style={{ maxWidth: '420px' }}>
+                There are no tests matching the current filter ({directoryClassFilter !== 'ALL' ? classes.find(c => c.code === directoryClassFilter)?.name : 'All Standards'}, {directoryMonthFilter !== 'ALL' ? directoryMonthFilter : 'All Months'}). Click below to schedule a new test.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => handleOpenCreateModal()}
+              >
+                <Plus size={16} />
+                <span>Schedule Test</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Single Test Marks Grading Sheet View */
+        <>
+          {/* Quick Return Bar */}
+          <div className="flex items-center justify-between mb-2">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm flex items-center gap-1.5"
+              onClick={() => setViewMode('DIRECTORY')}
+              style={{ padding: '5px 12px', fontSize: '0.8rem' }}
+            >
+              <span>← Back to Conducted Tests Directory ({directoryClassFilter === 'ALL' ? allAccessibleExams.length : allClassExams.length})</span>
+            </button>
+            <span className="text-3xs text-muted">
+              Grading Sheet for: <strong className="text-white">{currentExam?.title || 'Selected Test'}</strong> ({classes.find(c => c.code === selectedClass)?.name || selectedClass})
+            </span>
+          </div>
+
+          {/* Selectors Bar */}
       <div className="glass-card exam-selectors-card">
         <div className="exam-selectors-grid">
           <div className="form-group mb-0">
@@ -2076,6 +2601,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           </button>
         </div>
       )}
+    </>
+  )}
 
       {/* Create Exam Modal - 1-Click Week 1-5 & Multi-Class Scheduling */}
       {newExamModalOpen && (
@@ -2996,6 +3523,64 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           background: rgba(255, 255, 255, 0.08);
           font-size: 0.72rem;
           font-weight: 700;
+        }
+
+        /* Dual View Mode Toggle */
+        .view-mode-toggle {
+          background: rgba(15, 23, 42, 0.7);
+        }
+        .mode-toggle-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 13px;
+          border-radius: 6px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .mode-toggle-btn:hover {
+          color: #ffffff;
+          background: rgba(255, 255, 255, 0.06);
+        }
+        .mode-toggle-btn.active {
+          background: rgba(99, 102, 241, 0.22);
+          border-color: rgba(99, 102, 241, 0.55);
+          color: #C7D2FE;
+          font-weight: 700;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+        }
+
+        /* Conducted Tests Directory Stats */
+        .directory-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 12px;
+        }
+        .directory-stat-card {
+          padding: 12px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          border-radius: var(--radius-md);
+        }
+        .directory-stat-card .stat-num {
+          font-size: 1.35rem;
+          font-weight: 800;
+          font-family: var(--font-heading);
+          display: flex;
+          align-items: baseline;
+          gap: 6px;
+          line-height: 1.2;
+        }
+        .directory-stat-card .stat-unit {
+          font-size: 0.72rem;
+          font-weight: 500;
+          color: var(--text-muted);
         }
 
         /* Class Exam Performance Summary Banner */
