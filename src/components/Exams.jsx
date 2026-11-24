@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import html2canvas from 'html2canvas';
-import { 
-  Award, 
-  Plus, 
-  FileText, 
-  CheckCircle2, 
-  User, 
-  X, 
-  Check, 
-  BookOpen, 
-  Edit, 
-  Trash2, 
-  MessageSquare, 
+import {
+  Award,
+  Plus,
+  FileText,
+  CheckCircle2,
+  User,
+  X,
+  Check,
+  BookOpen,
+  Edit,
+  Trash2,
+  MessageSquare,
   AlertTriangle,
   Printer,
   Sparkles,
@@ -29,28 +29,28 @@ import { logger } from '../lib/logger';
 export default function Exams({ data, currentUser, onSaveData, initialClassFilter }) {
   const { exams = [], marks = [], students = [], classes = [], batches = [] } = data;
   const isTeacher = currentUser?.role === 'TEACHER';
-  const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds) 
-    ? currentUser.assignedBatchIds.map(String) 
+  const assignedBatchIds = Array.isArray(currentUser?.assignedBatchIds)
+    ? currentUser.assignedBatchIds.map(String)
     : [];
-  const assignedStudentIds = Array.isArray(currentUser?.assignedStudentIds) 
-    ? currentUser.assignedStudentIds.map(String) 
+  const assignedStudentIds = Array.isArray(currentUser?.assignedStudentIds)
+    ? currentUser.assignedStudentIds.map(String)
     : [];
 
   const accessibleBatches = isTeacher
     ? batches.filter(b => {
-        const inBatch = assignedBatchIds.includes(String(b.id));
-        const hasAssignedStudent = assignedStudentIds.length > 0 && 
-          students.some(s => assignedStudentIds.includes(String(s.id)) && String(s.batchId) === String(b.id));
-        return inBatch || hasAssignedStudent;
-      })
+      const inBatch = assignedBatchIds.includes(String(b.id));
+      const hasAssignedStudent = assignedStudentIds.length > 0 &&
+        students.some(s => assignedStudentIds.includes(String(s.id)) && String(s.batchId) === String(b.id));
+      return inBatch || hasAssignedStudent;
+    })
     : batches;
 
   const accessibleStudents = isTeacher
     ? students.filter(s => {
-        const inBatch = s.batchId && assignedBatchIds.includes(String(s.batchId));
-        const directStudent = assignedStudentIds.includes(String(s.id));
-        return inBatch || directStudent;
-      })
+      const inBatch = s.batchId && assignedBatchIds.includes(String(s.batchId));
+      const directStudent = assignedStudentIds.includes(String(s.id));
+      return inBatch || directStudent;
+    })
     : students;
 
   // Derive classes from students who are actually in the teacher's assigned batches
@@ -65,9 +65,9 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   // 3. Otherwise first accessible class
   const initialClassCode = (initialClassFilter && accessibleClasses.some(c => c.code === initialClassFilter))
     ? initialClassFilter
-    : (exams.find(e => accessibleClasses.some(c => c.code === e.classCode))?.classCode 
-       || accessibleClasses[0]?.code 
-       || 'CLASS_10');
+    : (exams.find(e => accessibleClasses.some(c => c.code === e.classCode))?.classCode
+      || accessibleClasses[0]?.code
+      || 'CLASS_10');
 
   const now = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -250,7 +250,11 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       };
     });
 
-    // 2. Foundation & Drill Tests (Basic Test & Table Test)
+    // 2. Foundation & Drill Tests (Basic Test & Table Test) - scoped to selected month
+    const defaultFoundationDate = selectedYearMonth === defaultYearMonth 
+      ? todayStr 
+      : `${selectedYearMonth}-15`;
+
     const foundationDefs = [
       { key: 'BASIC_TEST', type: 'BASIC', defaultTitle: 'Basic Test', defaultTotal: 25, defaultPass: 9, matchTerms: ['basic test', 'basics test', 'basic'] },
       { key: 'TABLE_TEST', type: 'TABLE', defaultTitle: 'Table Test', defaultTotal: 20, defaultPass: 7, matchTerms: ['table test', 'tables test', 'table', 'tables'] }
@@ -260,14 +264,16 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       const existingExam = allClassExams.find(e => {
         if (claimedExamIds.has(e.id)) return false;
         const titleLower = (e.title || '').toLowerCase();
-        return def.matchTerms.some(term => titleLower.includes(term));
+        const matchesTerm = def.matchTerms.some(term => titleLower.includes(term));
+        const matchesMonth = e.date ? e.date.startsWith(selectedYearMonth) : true;
+        return matchesTerm && matchesMonth;
       });
 
       if (existingExam) {
         claimedExamIds.add(existingExam.id);
         allClassExams.forEach(e => {
           const tLower = (e.title || '').toLowerCase();
-          if (def.matchTerms.some(term => tLower.includes(term))) {
+          if (def.matchTerms.some(term => tLower.includes(term)) && e.date?.startsWith(selectedYearMonth)) {
             claimedExamIds.add(e.id);
           }
         });
@@ -283,7 +289,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           subject: existingExam.subject || (def.type === 'TABLE' ? 'Mathematics' : 'Multi-Subject'),
           totalMarks: existingExam.totalMarks || def.defaultTotal,
           passingMarks: existingExam.passingMarks || def.defaultPass,
-          date: existingExam.date || todayStr,
+          date: existingExam.date || defaultFoundationDate,
           status: existingExam.status || 'ACTIVE',
           existingExam
         };
@@ -301,7 +307,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         subject: def.type === 'TABLE' ? 'Mathematics' : 'Multi-Subject',
         totalMarks: rule.totalMarks || def.defaultTotal,
         passingMarks: rule.passingMarks || def.defaultPass,
-        date: rule.date || todayStr,
+        date: rule.date || defaultFoundationDate,
         status: 'ACTIVE'
       };
     });
@@ -384,7 +390,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   }, [getSubjectsForClass, currentExam?.classCode, selectedClass]);
 
   // Eligible students for the current exam's class (scoped to teacher batches if teacher)
-  const examStudents = currentExam 
+  const examStudents = currentExam
     ? accessibleStudents.filter(s => s.classCode === currentExam.classCode && s.status === 'ACTIVE')
     : [];
 
@@ -864,8 +870,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
     if (!currentExam) return;
     const classWeek = virtualMarks[virtualKey] || {};
     const unmarkedStudents = examStudents.filter(s => {
-      const m = currentExam.isVirtual 
-        ? classWeek[s.id] 
+      const m = currentExam.isVirtual
+        ? classWeek[s.id]
         : marks.find(mk => mk.examId === currentExam.id && mk.studentId === s.id);
       return !m || m.marksObtained === '' || m.marksObtained === null;
     });
@@ -1361,8 +1367,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           <h1 className="page-title">Tests & Academic Performance</h1>
           <p className="page-subtitle">Weekly slip tests, unit exams, subject customization, and WhatsApp scorecards</p>
         </div>
-        <button 
-          className="btn btn-primary flex items-center gap-2" 
+        <button
+          className="btn btn-primary flex items-center gap-2"
           onClick={() => handleOpenCreateModal()}
           title="Schedule Week 1–5 Test for all classes at once"
         >
@@ -1429,7 +1435,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
         <div className="exam-selectors-grid">
           <div className="form-group mb-0">
             <label className="form-label">Standard (Class 1 to 10)</label>
-            <select 
+            <select
               className="form-select font-semibold"
               value={selectedClass}
               onChange={(e) => {
@@ -1464,8 +1470,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               >
                 ◀
               </button>
-              <input 
-                type="month" 
+              <input
+                type="month"
                 className="form-input font-semibold"
                 style={{ padding: '6px 10px', height: '36px', flex: 1, color: 'white', background: 'rgba(15, 23, 42, 0.6)' }}
                 value={selectedYearMonth}
@@ -1502,7 +1508,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 <span className="text-3xs text-amber-300 ml-1.5">(Active Test)</span>
               )}
             </label>
-            <select 
+            <select
               className="form-select font-semibold"
               value={currentExam?.id || ''}
               onChange={(e) => setSelectedExamId(e.target.value)}
@@ -1850,11 +1856,11 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                       {/* Student-Specific Subject Selector */}
                       <td>
-                        <select 
+                        <select
                           className="form-select form-select-sm"
-                          style={{ 
-                            fontSize: '0.75rem', 
-                            padding: '4px 8px', 
+                          style={{
+                            fontSize: '0.75rem',
+                            padding: '4px 8px',
                             maxWidth: '180px',
                             background: isCustomSubject ? 'rgba(99, 102, 241, 0.18)' : 'rgba(15, 23, 42, 0.6)',
                             borderColor: isCustomSubject ? 'var(--primary-400)' : 'var(--border-subtle)',
@@ -1887,7 +1893,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                       <td className="text-xs text-secondary">{student.school || '—'}</td>
                       <td>
                         <div className="mark-input-group">
-                          <input 
+                          <input
                             ref={el => (markInputsRef.current[student.id] = el)}
                             type="text"
                             inputMode="numeric"
@@ -1932,10 +1938,10 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                             Leave
                           </span>
                         ) : gradeInfo ? (
-                          <span 
-                            className="badge" 
-                            style={{ 
-                              background: `${gradeInfo.color}20`, 
+                          <span
+                            className="badge"
+                            style={{
+                              background: `${gradeInfo.color}20`,
                               color: gradeInfo.color,
                               borderColor: `${gradeInfo.color}40`
                             }}
@@ -1948,7 +1954,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <button 
+                          <button
                             className="btn btn-sm btn-secondary"
                             onClick={() => {
                               if (currentExam.isVirtual) {
@@ -1963,38 +1969,38 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                             <span>Scorecard</span>
                           </button>
                           {!isTeacher && (
-                            <button 
+                            <button
                               className="btn btn-sm"
                               onClick={() => {
                                 if (currentExam.isVirtual) {
-                                handleSaveAllMarks();
-                              }
-                              setReportCardStudent({ student, exam: currentExam, mark: markRecord, autoShare: true });
-                            }}
-                            disabled={!hasMarks && !isAbsent}
-                            title={`Send Scorecard Card to ${student.parentName || 'Parent'} via WhatsApp`}
-                            style={{ 
-                              background: '#10B981', 
-                              color: 'white', 
-                              border: 'none', 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              gap: '4px',
-                              opacity: (hasMarks || isAbsent) ? 1 : 0.4,
-                              cursor: (hasMarks || isAbsent) ? 'pointer' : 'not-allowed'
-                            }}
-                          >
-                            <MessageSquare size={13} />
-                            <span>WhatsApp</span>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
+                                  handleSaveAllMarks();
+                                }
+                                setReportCardStudent({ student, exam: currentExam, mark: markRecord, autoShare: true });
+                              }}
+                              disabled={!hasMarks && !isAbsent}
+                              title={`Send Scorecard Card to ${student.parentName || 'Parent'} via WhatsApp`}
+                              style={{
+                                background: '#10B981',
+                                color: 'white',
+                                border: 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                opacity: (hasMarks || isAbsent) ? 1 : 0.4,
+                                cursor: (hasMarks || isAbsent) ? 'pointer' : 'not-allowed'
+                              }}
+                            >
+                              <MessageSquare size={13} />
+                              <span>WhatsApp</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
           </table>
         </div>
       ) : (
@@ -2006,8 +2012,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
           <p className="text-muted text-sm mb-4" style={{ maxWidth: '420px' }}>
             There are no exams recorded for this standard yet. Click below to schedule a new test, enter slip test marks, and share scorecards with parents.
           </p>
-          <button 
-            type="button" 
+          <button
+            type="button"
             className="btn btn-primary"
             onClick={() => handleOpenCreateModal(selectedClass)}
           >
@@ -2333,7 +2339,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                             className={`class-chip-pill ${isChecked ? 'active' : ''}`}
                             onClick={() => {
                               const current = newExamData.selectedClasses || [];
-                              const updated = isChecked 
+                              const updated = isChecked
                                 ? current.filter(c => c !== cls.code)
                                 : [...current, cls.code];
                               setNewExamData(prev => ({ ...prev, selectedClasses: updated }));
@@ -2369,7 +2375,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   <label className="form-label mb-0 text-xs">Test Title *</label>
                   <span className="text-3xs text-muted">Auto-generated from Week &amp; Subject</span>
                 </div>
-                <input 
+                <input
                   type="text"
                   className={`form-input ${examErrors.title ? 'input-error' : ''}`}
                   placeholder="e.g. Week 1 Test - Mathematics"
@@ -2407,7 +2413,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                       ))}
                     </div>
                   </div>
-                  <input 
+                  <input
                     type="number"
                     className={`form-input ${examErrors.totalMarks ? 'input-error' : ''}`}
                     value={newExamData.totalMarks}
@@ -2425,7 +2431,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 <div className="form-group mb-0">
                   <label className="form-label text-xs">Passing Marks *</label>
-                  <input 
+                  <input
                     type="number"
                     className={`form-input ${examErrors.passingMarks ? 'input-error' : ''}`}
                     value={newExamData.passingMarks}
@@ -2443,7 +2449,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 <div className="form-group mb-0">
                   <label className="form-label text-xs">Test Date (Saturday) *</label>
-                  <input 
+                  <input
                     type="date"
                     className={`form-input ${examErrors.date ? 'input-error' : ''}`}
                     value={newExamData.date}
@@ -2514,7 +2520,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
               <div className="form-group">
                 <label className="form-label">Test Title *</label>
-                <input 
+                <input
                   type="text"
                   className={`form-input ${examErrors.title ? 'input-error' : ''}`}
                   value={editExamData.title}
@@ -2530,14 +2536,14 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Standard *</label>
-                  <select 
+                  <select
                     className="form-select"
                     value={editExamData.classCode}
                     onChange={(e) => {
                       const newCls = e.target.value;
                       const subs = getSubjectsForClass(newCls);
-                      setEditExamData(prev => ({ 
-                        ...prev, 
+                      setEditExamData(prev => ({
+                        ...prev,
                         classCode: newCls,
                         subject: subs.includes(prev.subject) ? prev.subject : (subs[0] || 'Mathematics')
                       }));
@@ -2551,7 +2557,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 <div className="form-group">
                   <label className="form-label">Default Subject *</label>
-                  <select 
+                  <select
                     className={`form-select ${examErrors.subject ? 'input-error' : ''}`}
                     value={getSubjectsForClass(editExamData.classCode).includes(editExamData.subject) ? editExamData.subject : (editExamData.subject ? '__CUSTOM__' : '')}
                     onChange={(e) => {
@@ -2588,7 +2594,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Total Maximum Marks</label>
-                  <input 
+                  <input
                     type="number"
                     className={`form-input ${examErrors.totalMarks ? 'input-error' : ''}`}
                     value={editExamData.totalMarks}
@@ -2603,7 +2609,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
                 <div className="form-group">
                   <label className="form-label">Passing Marks</label>
-                  <input 
+                  <input
                     type="number"
                     className={`form-input ${examErrors.passingMarks ? 'input-error' : ''}`}
                     value={editExamData.passingMarks}
@@ -2619,7 +2625,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
               <div className="form-group">
                 <label className="form-label">Exam Date *</label>
-                <input 
+                <input
                   type="date"
                   className={`form-input ${examErrors.date ? 'input-error' : ''}`}
                   value={editExamData.date}
@@ -2662,7 +2668,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                 <p className="mb-2">
                   Are you sure you want to delete <strong>"{deleteConfirmExam.title}"</strong> ({deleteConfirmExam.subject})?
                 </p>
-                
+
                 {hasScores ? (
                   <>
                     <div style={{ padding: '12px 14px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.45)', borderRadius: '8px', color: '#f87171', fontSize: '0.85rem', marginBottom: '12px' }}>
@@ -2686,8 +2692,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
               <div className="modal-actions-flex" style={{ flexDirection: 'column', gap: '8px' }}>
                 {hasScores && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn btn-success"
                     onClick={() => {
                       handleToggleExamStatus(deleteConfirmExam);
@@ -2704,8 +2710,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   <button type="button" className="btn btn-secondary flex-1" onClick={() => setDeleteConfirmExam(null)}>
                     Cancel
                   </button>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn btn-danger flex-1"
                     onClick={() => handleDeleteExam(deleteConfirmExam)}
                   >
@@ -2781,10 +2787,10 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                         </span>
                       ) : gradeInfo ? (
                         <>
-                          <span 
+                          <span
                             className="badge"
-                            style={{ 
-                              background: `${gradeInfo.color}20`, 
+                            style={{
+                              background: `${gradeInfo.color}20`,
                               color: gradeInfo.color,
                               borderColor: `${gradeInfo.color}40`,
                               fontWeight: 700,
@@ -2812,8 +2818,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
               {/* Action Buttons Row */}
               <div className="modal-actions-flex mt-4" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn btn-primary"
                     onClick={() => window.print()}
                   >
@@ -2822,7 +2828,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   </button>
 
                   {!isTeacher && (
-                    <button 
+                    <button
                       type="button"
                       className="btn"
                       disabled={isSharingCard}
@@ -2844,8 +2850,8 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                     </button>
                   )}
 
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn btn-secondary btn-sm"
                     disabled={isSharingCard}
                     onClick={() => handleDownloadCardImage(student, exam)}
@@ -2856,8 +2862,10 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
                   </button>
                 </div>
 
-                <button 
-                  type="button" 
+                <button
+                  type="button"
+
+
                   className="btn btn-secondary"
                   onClick={() => setReportCardStudent(null)}
                 >

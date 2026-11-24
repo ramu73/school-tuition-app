@@ -68,6 +68,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [activeScorecard, setActiveScorecard] = useState(null);
   const [downloadingScorecard, setDownloadingScorecard] = useState(false);
+  const [selectedExamMonth, setSelectedExamMonth] = useState('ALL');
 
   const navigateToSection = (sectionId) => {
     setActivePortalSection(sectionId);
@@ -311,41 +312,185 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     };
   }, [admissionDateStr, todayStr, studentAttendanceMap]);
 
-  // Student Exam Marks & Trends
-  const studentMarks = marks.filter(m => m.studentId === currentStudent?.id).map(m => {
-    const exam = exams.find(e => e.id === m.examId);
-    return {
-      ...m,
-      examTitle: exam?.title || 'Class Unit Test',
-      subject: m.subject || exam?.subject || 'Mathematics',
-      totalMarks: exam?.totalMarks || 50,
-      passingMarks: exam?.passingMarks || 18,
-      date: exam?.date || 'Recent'
-    };
-  });
+  // Comprehensive & Month-Wise Student Exam Records
+  const studentExamsList = useMemo(() => {
+    if (!currentStudent) return [];
+    const studentClassCode = currentStudent.classCode;
+    const studentIdStr = String(currentStudent.id);
 
-  const evaluatedMarks = studentMarks.filter(m => !m.isAbsent && m.marksObtained !== 'AB' && m.marksObtained !== '' && m.marksObtained !== null && !isNaN(Number(m.marksObtained)));
+    // Fast map of marks recorded for this student by examId
+    const studentMarksMap = new Map();
+    marks.forEach(m => {
+      if (String(m.studentId) === studentIdStr) {
+        studentMarksMap.set(String(m.examId), m);
+      }
+    });
+
+    // Match all exams for the student's standard OR exams with marks recorded for this student
+    const matchedExams = exams.filter(e => {
+      const isClassExam = e.classCode && e.classCode === studentClassCode;
+      const hasMark = studentMarksMap.has(String(e.id));
+      return isClassExam || hasMark;
+    });
+
+    const combined = matchedExams.map(exam => {
+      const mark = studentMarksMap.get(String(exam.id));
+      const isAbsent = Boolean(mark?.isAbsent || mark?.marksObtained === 'AB');
+      const rawMarks = mark ? mark.marksObtained : '';
+      const hasValidScore = Boolean(!isAbsent && rawMarks !== '' && rawMarks !== null && !isNaN(Number(rawMarks)));
+      const marksObtained = hasValidScore ? Number(rawMarks) : (isAbsent ? 'AB' : '');
+      const totalMarks = Number(exam.totalMarks) || 50;
+      const passingMarks = Number(exam.passingMarks) || 18;
+      const percentage = hasValidScore && totalMarks > 0 ? Math.round((marksObtained / totalMarks) * 100) : null;
+      const isPassed = hasValidScore && marksObtained >= passingMarks;
+      const subject = mark?.subject || exam.subject || 'Mathematics';
+      const dateStr = exam.date || (mark?.date || '');
+
+      let status = 'AWAITED';
+      if (isAbsent) status = 'ABSENT';
+      else if (hasValidScore) status = isPassed ? 'PASSED' : 'FAILED';
+      else if (rawMarks !== '' && rawMarks !== null) status = 'GRADED';
+
+      return {
+        id: exam.id,
+        examId: exam.id,
+        examTitle: exam.title || 'Class Slip Test',
+        subject,
+        date: dateStr,
+        totalMarks,
+        passingMarks,
+        marksObtained,
+        isAbsent,
+        hasValidScore,
+        percentage,
+        isPassed,
+        status,
+        remarks: mark?.remarks || (isAbsent ? 'Student was absent for this test.' : (hasValidScore ? (isPassed ? 'Good effort and consistent practice.' : 'Needs improvement & focused revision.') : 'Marks entry in progress')),
+        rawMark: mark,
+        exam
+      };
+    });
+
+    // Also include any mark records for this student where the exam object might not be in exams array
+    marks.forEach(m => {
+      if (String(m.studentId) === studentIdStr && !matchedExams.some(e => String(e.id) === String(m.examId))) {
+        const isAbsent = Boolean(m.isAbsent || m.marksObtained === 'AB');
+        const rawMarks = m.marksObtained;
+        const hasValidScore = Boolean(!isAbsent && rawMarks !== '' && rawMarks !== null && !isNaN(Number(rawMarks)));
+        const marksObtained = hasValidScore ? Number(rawMarks) : (isAbsent ? 'AB' : '');
+        const totalMarks = 50;
+        const passingMarks = 18;
+        const percentage = hasValidScore ? Math.round((marksObtained / totalMarks) * 100) : null;
+        const isPassed = hasValidScore && marksObtained >= passingMarks;
+
+        combined.push({
+          id: m.id || m.examId,
+          examId: m.examId,
+          examTitle: m.examTitle || 'Class Slip Test',
+          subject: m.subject || 'Mathematics',
+          date: m.date || todayStr,
+          totalMarks,
+          passingMarks,
+          marksObtained,
+          isAbsent,
+          hasValidScore,
+          percentage,
+          isPassed,
+          status: isAbsent ? 'ABSENT' : (hasValidScore ? (isPassed ? 'PASSED' : 'FAILED') : 'GRADED'),
+          remarks: m.remarks || '',
+          rawMark: m,
+          exam: null
+        });
+      }
+    });
+
+    // Sort descending by date (newest first)
+    combined.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    return combined;
+  }, [currentStudent, exams, marks, todayStr]);
+
+  const studentMarks = studentExamsList; // Maintain backward compatibility
+
+  // Group student exams month-wise
+  const examsByMonth = useMemo(() => {
+    const groups = {};
+    studentExamsList.forEach(test => {
+      let ym = 'OTHER';
+      let label = 'Other Tests';
+      if (test.date && test.date.length >= 7) {
+        ym = test.date.slice(0, 7); // e.g. '2026-11'
+        const [yr, mo] = ym.split('-').map(Number);
+        if (!isNaN(yr) && !isNaN(mo)) {
+          const d = new Date(yr, mo - 1, 1);
+          label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+      }
+      if (!groups[ym]) {
+        groups[ym] = {
+          yearMonth: ym,
+          monthLabel: label,
+          tests: []
+        };
+      }
+      groups[ym].tests.push(test);
+    });
+
+    // Sort month keys descending (newest month first)
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      if (a === 'OTHER') return 1;
+      if (b === 'OTHER') return -1;
+      return b.localeCompare(a);
+    });
+
+    return sortedKeys.map(k => {
+      const g = groups[k];
+      const graded = g.tests.filter(t => t.hasValidScore);
+      const passed = graded.filter(t => t.isPassed).length;
+      const totalScoreSum = graded.reduce((sum, t) => sum + (t.percentage || 0), 0);
+      const avgScore = graded.length > 0 ? Math.round(totalScoreSum / graded.length) : null;
+      return {
+        ...g,
+        totalCount: g.tests.length,
+        gradedCount: graded.length,
+        passedCount: passed,
+        avgScore
+      };
+    });
+  }, [studentExamsList]);
+
+  const availableExamMonths = useMemo(() => {
+    return examsByMonth.map(g => ({
+      yearMonth: g.yearMonth,
+      label: g.monthLabel,
+      count: g.totalCount
+    }));
+  }, [examsByMonth]);
+
+  const displayedMonthGroups = useMemo(() => {
+    if (selectedExamMonth === 'ALL') {
+      return examsByMonth;
+    }
+    return examsByMonth.filter(g => g.yearMonth === selectedExamMonth);
+  }, [examsByMonth, selectedExamMonth]);
+
+  const evaluatedMarks = studentExamsList.filter(m => m.hasValidScore);
   const testsCount = evaluatedMarks.length;
-  const passedTests = evaluatedMarks.filter(m => Number(m.marksObtained) >= m.passingMarks).length;
+  const passedTests = evaluatedMarks.filter(m => m.isPassed).length;
   const avgPercentage = testsCount > 0 
-    ? Math.round(evaluatedMarks.reduce((sum, m) => sum + (Number(m.marksObtained) / m.totalMarks) * 100, 0) / testsCount)
+    ? Math.round(evaluatedMarks.reduce((sum, m) => sum + (m.percentage || 0), 0) / testsCount)
     : null;
 
-  const latestTest = studentMarks.length > 0 ? studentMarks[studentMarks.length - 1] : null;
-  const latestPct = latestTest && !latestTest.isAbsent && latestTest.marksObtained !== 'AB' && latestTest.marksObtained !== ''
-    ? Math.round((Number(latestTest.marksObtained) / latestTest.totalMarks) * 100) 
-    : null;
-  const prevTest = studentMarks.length >= 2 ? studentMarks[studentMarks.length - 2] : null;
-  const prevPct = prevTest && !prevTest.isAbsent && prevTest.marksObtained !== 'AB' && prevTest.marksObtained !== ''
-    ? Math.round((Number(prevTest.marksObtained) / prevTest.totalMarks) * 100) 
-    : null;
+  const latestTest = studentExamsList.length > 0 ? studentExamsList[0] : null;
+  const latestPct = latestTest?.hasValidScore ? latestTest.percentage : null;
+  const prevTest = studentExamsList.length >= 2 ? studentExamsList[1] : null;
+  const prevPct = prevTest?.hasValidScore ? prevTest.percentage : null;
   const scoreDiff = (latestPct !== null && prevPct !== null) ? (latestPct - prevPct) : null;
 
   // Tutor Feedback & Child Improvement Plan
   const studentFeedback = tutorFeedback.find(f => f.studentId === currentStudent?.id) || null;
 
   // Goal comparison status
-  const evaluatedGoal = studentFeedback?.goal ? calculateStudentGoalProgress(studentFeedback.goal, marks.filter(m => m.studentId === currentStudent?.id), exams) : null;
+  const evaluatedGoal = studentFeedback?.goal ? calculateStudentGoalProgress(studentFeedback.goal, marks.filter(m => String(m.studentId) === String(currentStudent?.id)), exams) : null;
 
   // Homework & Topic Records
   const studentHomework = homework.filter(h => h.batchId === currentStudent?.batchId || h.classCode === currentStudent?.classCode);
@@ -809,7 +954,7 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
       )}
 
       {/* ============================================================== */}
-      {/* 2. EXAM RESULTS & SCORECARDS SECTION */}
+      {/* 2. EXAM RESULTS & SCORECARDS SECTION (MONTH-WISE) */}
       {/* ============================================================== */}
       {(activePortalSection === 'overview' || activePortalSection === 'exams') && (
         <div id="parent-section-exams" className="portal-section-card glass-card">
@@ -818,66 +963,197 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
               <div className="title-icon-badge bg-primary-soft">
                 <Award size={18} className="text-primary" />
               </div>
-              <h3 className="section-title">Exam Results &amp; Slip Test Scores</h3>
+              <div>
+                <h3 className="section-title">Exam Results &amp; Monthly Assessments</h3>
+                <p className="text-3xs text-secondary mt-0.5">
+                  Month-wise test reports, slip test scores, and performance scorecards
+                </p>
+              </div>
             </div>
-            <span className="badge badge-class font-mono text-xs">{studentMarks.length} Tests Recorded</span>
+            <div className="flex items-center gap-2">
+              <span className="badge badge-class font-mono text-xs">
+                {studentExamsList.length} Tests Recorded • {examsByMonth.length} Month{examsByMonth.length === 1 ? '' : 's'}
+              </span>
+            </div>
           </div>
 
-          <div className="tests-list">
-            {studentMarks.length === 0 ? (
+          {/* Month Filter Selector Bar */}
+          {examsByMonth.length > 0 && (
+            <div className="exam-month-filter-bar mb-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+                <div className="flex items-center gap-1.5 text-xs text-secondary font-semibold">
+                  <Calendar size={13} className="text-primary" />
+                  <span>Filter by Month:</span>
+                </div>
+                {/* Mobile / Compact Dropdown */}
+                <select
+                  className="form-select form-select-xs d-md-none"
+                  style={{ width: 'auto', fontSize: '0.75rem', padding: '3px 8px' }}
+                  value={selectedExamMonth}
+                  onChange={(e) => setSelectedExamMonth(e.target.value)}
+                >
+                  <option value="ALL">All Months ({studentExamsList.length} Tests)</option>
+                  {availableExamMonths.map(m => (
+                    <option key={m.yearMonth} value={m.yearMonth}>
+                      {m.label} ({m.count} {m.count === 1 ? 'Test' : 'Tests'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 1-Click Month Pills */}
+              <div className="exam-month-pills-row">
+                <button
+                  type="button"
+                  className={`exam-month-pill ${selectedExamMonth === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setSelectedExamMonth('ALL')}
+                >
+                  <span>All Months</span>
+                  <span className="month-pill-count">{studentExamsList.length}</span>
+                </button>
+                {availableExamMonths.map(m => (
+                  <button
+                    key={m.yearMonth}
+                    type="button"
+                    className={`exam-month-pill ${selectedExamMonth === m.yearMonth ? 'active' : ''}`}
+                    onClick={() => setSelectedExamMonth(m.yearMonth)}
+                  >
+                    <span>{m.label}</span>
+                    <span className="month-pill-count">{m.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Month-wise Test Lists */}
+          <div className="month-groups-container">
+            {studentExamsList.length === 0 ? (
               <div className="empty-state-box">
                 <BookOpen size={32} className="text-muted mb-2" />
-                <p>No tests recorded for this student yet.</p>
+                <p>No tests recorded for {studentClass?.name || 'this class'} yet.</p>
+                <span className="text-3xs text-muted mt-1">Tests scheduled by faculty will appear here month by month.</span>
+              </div>
+            ) : displayedMonthGroups.length === 0 ? (
+              <div className="empty-state-box">
+                <BookOpen size={32} className="text-muted mb-2" />
+                <p>No tests found for the selected month.</p>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs mt-2"
+                  onClick={() => setSelectedExamMonth('ALL')}
+                >
+                  View All Months
+                </button>
               </div>
             ) : (
-              studentMarks.map((test, idx) => {
-                const isAbsent = test.isAbsent || test.marksObtained === 'AB';
-                const hasValidScore = !isAbsent && test.marksObtained !== '' && test.marksObtained !== null && !isNaN(Number(test.marksObtained));
-                const percentage = hasValidScore ? Math.round((Number(test.marksObtained) / test.totalMarks) * 100) : null;
-                const isPassed = hasValidScore && Number(test.marksObtained) >= test.passingMarks;
-
-                return (
-                  <div key={idx} className="parent-test-item">
-                    <div className="test-info-col">
-                      <div className="test-name-bold">{test.examTitle}</div>
-                      <div className="test-meta-text">
-                        Subject: <strong>{test.subject}</strong> • {test.date}
+              displayedMonthGroups.map(group => (
+                <div key={group.yearMonth} className="exam-month-group-card mb-3">
+                  {/* Month Header Banner */}
+                  <div className="exam-month-group-header">
+                    <div className="flex items-center gap-2">
+                      <div className="month-header-icon">
+                        <Calendar size={15} />
                       </div>
-                      {test.remarks && <div className="test-remark-pill">Remark: {test.remarks}</div>}
+                      <div>
+                        <h4 className="month-header-title">{group.monthLabel}</h4>
+                        <span className="text-3xs text-muted">
+                          {group.totalCount} {group.totalCount === 1 ? 'Test Scheduled' : 'Tests Scheduled'}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="test-score-col">
-                      <div className="flex items-center gap-2">
-                        {isAbsent ? (
-                          <div className="score-badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}>
-                            ABSENT
-                          </div>
-                        ) : (
-                          <div className={`score-badge ${isPassed ? 'score-pass' : 'score-fail'}`}>
-                            {test.marksObtained} / {test.totalMarks}
-                          </div>
-                        )}
-                        {percentage !== null ? (
-                          <span className="text-xs text-white font-bold">{percentage}%</span>
-                        ) : isAbsent ? (
-                          <span className="text-xs text-amber-400 font-medium">Leave</span>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-xs"
-                          onClick={() => setActiveScorecard({ test, student: currentStudent })}
-                          style={{ fontSize: '0.7rem', padding: '2px 8px' }}
-                        >
-                          <FileText size={11} />
-                          <span>View Scorecard</span>
-                        </button>
-                      </div>
+                    {/* Month Performance Badges */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {group.avgScore !== null && (
+                        <div className="exam-month-stat-chip">
+                          <span className="text-muted">Avg:</span>
+                          <span className="font-bold text-white">{group.avgScore}%</span>
+                        </div>
+                      )}
+                      {group.gradedCount > 0 && (
+                        <div className="exam-month-stat-chip">
+                          <span className="text-muted">Passed:</span>
+                          <span className="font-bold text-emerald">{group.passedCount}/{group.gradedCount}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                );
-              })
+
+                  {/* Test Items for this Month */}
+                  <div className="tests-list">
+                    {group.tests.map((test, idx) => {
+                      const isAbsent = test.isAbsent;
+                      const hasValidScore = test.hasValidScore;
+                      const isPassed = test.isPassed;
+                      const isAwaited = test.status === 'AWAITED';
+
+                      return (
+                        <div key={test.id || idx} className="parent-test-item">
+                          <div className="test-info-col">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="test-name-bold">{test.examTitle}</span>
+                              <span className="badge badge-secondary text-3xs font-mono" style={{ padding: '1px 6px' }}>
+                                {test.subject}
+                              </span>
+                            </div>
+                            <div className="test-meta-text">
+                              <span>📅 Date: <strong>{test.date}</strong></span>
+                              <span className="mx-1">•</span>
+                              <span>Total: <strong>{test.totalMarks} Marks</strong> (Pass: {test.passingMarks})</span>
+                            </div>
+                            {test.remarks && (
+                              <div className="test-remark-pill">
+                                💬 Remark: {test.remarks}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="test-score-col">
+                            <div className="flex items-center gap-2">
+                              {isAbsent ? (
+                                <div className="score-badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#FBBF24', borderColor: 'rgba(245, 158, 11, 0.4)' }}>
+                                  ABSENT
+                                </div>
+                              ) : isAwaited ? (
+                                <div className="score-badge" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38BDF8', borderColor: 'rgba(56, 189, 248, 0.35)', fontSize: '0.75rem' }}>
+                                  RESULT AWAITED
+                                </div>
+                              ) : (
+                                <div className={`score-badge ${isPassed ? 'score-pass' : 'score-fail'}`}>
+                                  {test.marksObtained} / {test.totalMarks}
+                                </div>
+                              )}
+
+                              {test.percentage !== null ? (
+                                <span className={`text-xs font-bold ${isPassed ? 'text-emerald' : 'text-rose'}`}>
+                                  {test.percentage}%
+                                </span>
+                              ) : isAbsent ? (
+                                <span className="text-xs text-amber-400 font-medium">Leave</span>
+                              ) : null}
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-1">
+                              {!isAwaited && (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-xs"
+                                  onClick={() => setActiveScorecard({ test, student: currentStudent })}
+                                  style={{ fontSize: '0.7rem', padding: '3px 9px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <FileText size={11} className="text-primary" />
+                                  <span>View Scorecard</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -2123,6 +2399,104 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
           box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
         }
         .fill-achieved { background: #10B981 !important; }
+
+        /* Month Filter Pills for Exams */
+        .exam-month-filter-bar {
+          background: rgba(15, 23, 42, 0.45);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 10px 14px;
+        }
+        .exam-month-pills-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .exam-month-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 5px 12px;
+          border-radius: var(--radius-full);
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: var(--text-secondary);
+          font-size: 0.775rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .exam-month-pill:hover {
+          background: rgba(99, 102, 241, 0.15);
+          border-color: rgba(99, 102, 241, 0.35);
+          color: white;
+        }
+        .exam-month-pill.active {
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(79, 70, 229, 0.25) 100%);
+          border-color: #6366F1;
+          color: #EEF2FF;
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.25);
+        }
+        .month-pill-count {
+          font-size: 0.7rem;
+          padding: 1px 6px;
+          border-radius: var(--radius-full);
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          font-weight: 700;
+        }
+
+        /* Month Group Cards */
+        .exam-month-group-card {
+          background: rgba(15, 23, 42, 0.35);
+          border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-md);
+          padding: 14px;
+          transition: all 0.2s ease;
+        }
+        .exam-month-group-card:hover {
+          border-color: rgba(255, 255, 255, 0.12);
+        }
+        .exam-month-group-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-bottom: 10px;
+          margin-bottom: 12px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .month-header-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: var(--radius-sm);
+          background: rgba(99, 102, 241, 0.15);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          color: #818CF8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .month-header-title {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: white;
+          margin: 0;
+          line-height: 1.2;
+        }
+        .exam-month-stat-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 0.725rem;
+          padding: 3px 8px;
+          border-radius: var(--radius-sm);
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
 
         /* Tests List */
         .tests-list { display: flex; flex-direction: column; gap: 10px; }
