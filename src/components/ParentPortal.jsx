@@ -417,8 +417,9 @@ export default function ParentPortal({ currentUser, data = {}, onLogout }) {
     studentExamsList.forEach(test => {
       let ym = 'OTHER';
       let label = 'Other Tests';
-      if (test.date && test.date.length >= 7) {
-        ym = test.date.slice(0, 7); // e.g. '2026-11'
+      const cleanTestDate = String(test.date || '').replace(/\//g, '-').trim();
+      if (cleanTestDate && cleanTestDate.length >= 7) {
+        ym = cleanTestDate.slice(0, 7); // e.g. '2026-11'
         const [yr, mo] = ym.split('-').map(Number);
         if (!isNaN(yr) && !isNaN(mo)) {
           const d = new Date(yr, mo - 1, 1);
