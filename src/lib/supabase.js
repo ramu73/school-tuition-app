@@ -525,20 +525,30 @@ export async function syncTuitionDataToSupabase(data) {
     }
 
     // 6. Exams & Marks
-    if (data.exams && data.exams.length > 0) {
-      const examRows = data.exams.map(e => ({
-        id: e.id,
-        title: e.title,
-        class_code: e.classCode,
-        subject: e.subject,
-        total_marks: e.totalMarks,
-        passing_marks: e.passingMarks,
-        exam_date: e.date || new Date().toISOString().split('T')[0]
-      }));
-      await supabase.from('exams').upsert(examRows, { onConflict: 'id' });
+    if (Array.isArray(data.exams)) {
+      if (data.exams.length > 0) {
+        const examRows = data.exams.map(e => ({
+          id: e.id,
+          title: e.title,
+          class_code: e.classCode,
+          subject: e.subject,
+          total_marks: e.totalMarks,
+          passing_marks: e.passingMarks,
+          exam_date: e.date || new Date().toISOString().split('T')[0]
+        }));
+        await supabase.from('exams').upsert(examRows, { onConflict: 'id' });
 
-      const examIds = data.exams.map(e => e.id);
-      await supabase.from('exams').delete().not('id', 'in', `(${examIds.join(',')})`);
+        const examIds = data.exams.map(e => e.id).filter(Boolean);
+        if (examIds.length > 0) {
+          // CRITICAL: Delete child marks FIRST to satisfy foreign key constraints before deleting exams!
+          await supabase.from('exam_marks').delete().not('exam_id', 'in', `(${examIds.join(',')})`);
+          // Then delete exams that are no longer present
+          await supabase.from('exams').delete().not('id', 'in', `(${examIds.join(',')})`);
+        }
+      } else {
+        await supabase.from('exam_marks').delete().neq('id', 0);
+        await supabase.from('exams').delete().neq('id', 0);
+      }
     }
 
     if (data.marks && data.marks.length > 0) {
@@ -734,6 +744,23 @@ export async function deletePaymentReceiptFromSupabase(receiptNo) {
     return { success: true };
   } catch (err) {
     console.error('Error deleting payment receipt from Supabase:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Delete single exam and all its associated marks from Supabase cleanly
+export async function deleteExamFromSupabase(examId) {
+  const supabase = getSupabaseClient();
+  if (!supabase || !examId) return { success: false };
+  try {
+    // 1. Delete child marks first to respect foreign key constraint
+    await supabase.from('exam_marks').delete().eq('exam_id', examId);
+    // 2. Delete the parent exam row
+    const { error } = await supabase.from('exams').delete().eq('id', examId);
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    console.error('Error deleting exam from Supabase:', err);
     return { success: false, error: err.message };
   }
 }

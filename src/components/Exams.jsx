@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { generateNextId } from '../lib/storage';
 import { logger } from '../lib/logger';
+import { deleteExamFromSupabase } from '../lib/supabase';
 
 export default function Exams({ data, currentUser, onSaveData, initialClassFilter }) {
   const { exams = [], marks = [], students = [], classes = [], batches = [] } = data;
@@ -991,8 +992,9 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
   // Delete Exam with Confirmation
   const handleDeleteExam = (examToDelete) => {
     if (!examToDelete) return;
-    const remainingExams = exams.filter(e => e.id !== examToDelete.id);
-    const remainingMarks = marks.filter(m => m.examId !== examToDelete.id);
+    const targetId = String(examToDelete.id);
+    const remainingExams = exams.filter(e => String(e.id) !== targetId);
+    const remainingMarks = marks.filter(m => String(m.examId) !== targetId);
 
     onSaveData({
       ...data,
@@ -1000,11 +1002,28 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
       marks: remainingMarks
     });
 
+    // Directly cascade deletion from Supabase (deletes marks first, then exam)
+    deleteExamFromSupabase(examToDelete.id).catch(err => {
+      console.warn('Async Supabase delete exam notice:', err);
+    });
+
     logger.action(currentUser, 'DELETE_EXAM', `Deleted test "${examToDelete.title}" and its score records`, { examId: examToDelete.id });
 
-    // Switch selection to remaining test in same class
-    const nextExam = remainingExams.find(e => e.classCode === selectedClass);
-    setSelectedExamId(nextExam ? nextExam.id : '');
+    // Clean up draft virtualMarks
+    setVirtualMarks(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (k.includes(targetId)) delete next[k];
+      });
+      return next;
+    });
+
+    // Switch selection to remaining test in same class if currently selected
+    if (String(selectedExamId) === targetId) {
+      const nextExam = remainingExams.find(e => e.classCode === (examToDelete.classCode || selectedClass));
+      setSelectedExamId(nextExam ? nextExam.id : `VIRTUAL_WEEK_1`);
+    }
+
     setDeleteConfirmExam(null);
   };
 
@@ -3229,7 +3248,7 @@ export default function Exams({ data, currentUser, onSaveData, initialClassFilte
 
       {/* Delete Exam Confirmation Modal with History Protection */}
       {deleteConfirmExam && (() => {
-        const marksInDeleteExam = marks.filter(m => m.examId === deleteConfirmExam.id && m.marksObtained !== '' && m.marksObtained !== null);
+        const marksInDeleteExam = marks.filter(m => String(m.examId) === String(deleteConfirmExam.id) && m.marksObtained !== '' && m.marksObtained !== null);
         const hasScores = marksInDeleteExam.length > 0;
 
         return (
